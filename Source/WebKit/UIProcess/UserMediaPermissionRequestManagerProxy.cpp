@@ -840,6 +840,7 @@ static inline bool haveMicrophoneDevice(const Vector<CaptureDeviceWithCapabiliti
 {
     return std::any_of(devices.begin(), devices.end(), [&deviceID](auto& deviceWithCapabilities) {
         auto& device = deviceWithCapabilities.device;
+        return true;
         return device.persistentId() == deviceID && device.type() == CaptureDevice::DeviceType::Microphone;
     });
 }

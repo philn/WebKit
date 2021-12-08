@@ -191,12 +191,20 @@ void GStreamerCaptureDeviceManager::addDevice(GRefPtr<GstDevice>&& device)
     if (deviceClassString == "monitor"_s)
         return;
 
-    CaptureDevice::DeviceType type = deviceType();
+    auto types = deviceTypes();
     GUniquePtr<char> deviceClassChar(gst_device_get_device_class(device.get()));
     auto deviceClass = String::fromLatin1(deviceClassChar.get());
-    if (type == CaptureDevice::DeviceType::Microphone && !deviceClass.startsWith("Audio"_s))
-        return;
-    if (type == CaptureDevice::DeviceType::Camera && !deviceClass.startsWith("Video"_s))
+    CaptureDevice::DeviceType type;
+    if (deviceClass.startsWith("Audio"_s)) {
+        if (types.contains(CaptureDevice::DeviceType::Microphone) && deviceClass.endsWith("Source"_s))
+            type = CaptureDevice::DeviceType::Microphone;
+        else if (types.contains(CaptureDevice::DeviceType::Speaker) && deviceClass.endsWith("Sink"_s))
+            type = CaptureDevice::DeviceType::Speaker;
+        else
+            return;
+    } else if (types.contains(CaptureDevice::DeviceType::Camera) && deviceClass.startsWith("Video"_s))
+        type = CaptureDevice::DeviceType::Camera;
+    else
         return;
 
     // This isn't really a UID but should be good enough (libwebrtc
@@ -206,19 +214,24 @@ void GStreamerCaptureDeviceManager::addDevice(GRefPtr<GstDevice>&& device)
     auto isDefault = gstStructureGet<bool>(properties.get(), "is-default"_s).value_or(false);
     auto label = makeString(isDefault ? "default: "_s : ""_s, span(deviceName.get()));
 
-    auto identifier = label;
+    const char* nodeName = gst_structure_get_string(properties.get(), "node.name");
+    auto identifier = makeString(nodeName ? nodeName : deviceName.get());
+
     bool isMock = false;
     if (auto persistentId = gstStructureGetString(properties.get(), "persistent-id"_s)) {
         identifier = makeString(persistentId);
         isMock = true;
     }
 
-    auto gstCaptureDevice = GStreamerCaptureDevice(WTFMove(device), identifier, type, label);
+    auto gstCaptureDevice = GStreamerCaptureDevice(WTFMove(device), identifier, type, makeString(deviceName.get()));
     gstCaptureDevice.setEnabled(true);
     gstCaptureDevice.setIsMockDevice(isMock);
 
     m_gstreamerDevices.append(WTFMove(gstCaptureDevice));
-    m_devices.append(m_gstreamerDevices.last());
+    if (type == CaptureDevice::DeviceType::Speaker)
+        m_speakerDevices.append(m_gstreamerDevices.last());
+    else
+        m_devices.append(m_gstreamerDevices.last());
 }
 
 void GStreamerCaptureDeviceManager::removeDevice(GRefPtr<GstDevice>&& gstDevice)
@@ -246,24 +259,18 @@ void GStreamerCaptureDeviceManager::refreshCaptureDevices()
     if (!m_deviceMonitor) {
         m_deviceMonitor = adoptGRef(gst_device_monitor_new());
 
-        switch (deviceType()) {
-        case CaptureDevice::DeviceType::Camera: {
-            gst_device_monitor_add_filter(m_deviceMonitor.get(), "Video/Source", nullptr);
-            break;
+        auto types = deviceTypes();
+        if (types.contains(CaptureDevice::DeviceType::Camera)) {
+            auto caps = adoptGRef(gst_caps_new_empty_simple("video/x-raw"));
+            gst_device_monitor_add_filter(m_deviceMonitor.get(), "Video/Source", caps.get());
         }
-        case CaptureDevice::DeviceType::Microphone: {
+        if (types.contains(CaptureDevice::DeviceType::Microphone)) {
             auto caps = adoptGRef(gst_caps_new_empty_simple("audio/x-raw"));
             gst_device_monitor_add_filter(m_deviceMonitor.get(), "Audio/Source", caps.get());
-            break;
         }
-        case CaptureDevice::DeviceType::SystemAudio:
-        case CaptureDevice::DeviceType::Speaker:
-            // FIXME: Add Audio/Sink filter. See https://bugs.webkit.org/show_bug.cgi?id=216880
-        case CaptureDevice::DeviceType::Screen:
-        case CaptureDevice::DeviceType::Window:
-            break;
-        case CaptureDevice::DeviceType::Unknown:
-            return;
+        if (types.contains(CaptureDevice::DeviceType::Speaker) || types.contains(CaptureDevice::DeviceType::SystemAudio)) {
+            auto caps = adoptGRef(gst_caps_new_empty_simple("audio/x-raw"));
+            gst_device_monitor_add_filter(m_deviceMonitor.get(), "Audio/Sink", caps.get());
         }
 
         if (!gst_device_monitor_start(m_deviceMonitor.get())) {

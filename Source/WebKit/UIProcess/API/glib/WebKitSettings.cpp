@@ -3431,6 +3431,9 @@ void webkit_settings_set_enable_media_stream(WebKitSettings* settings, gboolean 
 
     priv->preferences->setMediaDevicesEnabled(enabled);
     priv->preferences->setMediaStreamEnabled(enabled);
+    priv->preferences->setExposeSpeakersEnabled(enabled);
+    priv->preferences->setPerElementSpeakerSelectionEnabled(enabled);
+    priv->preferences->setSpeakerSelectionRequiresUserGesture(enabled);
     g_object_notify_by_pspec(G_OBJECT(settings), sObjProperties[PROP_ENABLE_MEDIA_STREAM]);
 }
 

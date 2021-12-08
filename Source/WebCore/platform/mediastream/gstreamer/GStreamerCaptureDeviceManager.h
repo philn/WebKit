@@ -30,6 +30,7 @@
 #include "GStreamerVideoCapturer.h"
 #include "RealtimeMediaSourceCenter.h"
 #include "RealtimeMediaSourceFactory.h"
+#include <wtf/Forward.h>
 
 #include <wtf/Noncopyable.h>
 
@@ -46,8 +47,9 @@ public:
     ~GStreamerCaptureDeviceManager();
     std::optional<GStreamerCaptureDevice> gstreamerDeviceWithUID(const String&);
 
+    const Vector<CaptureDevice>& speakerDevices() const { return m_speakerDevices; }
     const Vector<CaptureDevice>& captureDevices() final;
-    virtual CaptureDevice::DeviceType deviceType() = 0;
+    virtual OptionSet<CaptureDevice::DeviceType> deviceTypes() = 0;
 
     // RealtimeMediaSourceCenterObserver interface.
     void devicesChanged() final;
@@ -70,20 +72,28 @@ private:
     Vector<CaptureDevice> m_devices;
     Vector<RefPtr<GStreamerCapturer>> m_capturers;
     bool m_isTearingDown { false };
+    Vector<CaptureDevice> m_speakerDevices;
 };
 
 class GStreamerAudioCaptureDeviceManager final : public GStreamerCaptureDeviceManager {
     friend class NeverDestroyed<GStreamerAudioCaptureDeviceManager>;
 public:
     static GStreamerAudioCaptureDeviceManager& singleton();
-    CaptureDevice::DeviceType deviceType() final { return CaptureDevice::DeviceType::Microphone; }
+    OptionSet<CaptureDevice::DeviceType> deviceTypes() final { return { CaptureDevice::DeviceType::Microphone, CaptureDevice::DeviceType::Speaker }; }
+
+private:
+    GStreamerAudioCaptureDeviceManager() = default;
 };
 
 class GStreamerVideoCaptureDeviceManager final : public GStreamerCaptureDeviceManager {
     friend class NeverDestroyed<GStreamerVideoCaptureDeviceManager>;
 public:
     static GStreamerVideoCaptureDeviceManager& singleton();
-    CaptureDevice::DeviceType deviceType() final { return CaptureDevice::DeviceType::Camera; }
+    static VideoCaptureFactory& videoFactory();
+    OptionSet<CaptureDevice::DeviceType> deviceTypes() final { return { CaptureDevice::DeviceType::Camera }; }
+
+private:
+    GStreamerVideoCaptureDeviceManager() = default;
 };
 
 class GStreamerDisplayCaptureDeviceManager final : public DisplayCaptureManager {

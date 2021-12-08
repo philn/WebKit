@@ -1385,7 +1385,7 @@ GstElement* MediaPlayerPrivateGStreamer::createAudioSink()
     if (!audioSink)
         return nullptr;
 
-#if ENABLE(WEB_AUDIO)
+#if 0//ENABLE(WEB_AUDIO)
     GstElement* audioSinkBin = gst_bin_new("audio-sink");
     ensureAudioSourceProvider();
     m_audioSourceProvider->configureAudioBin(audioSinkBin, audioSink);
@@ -4191,6 +4191,23 @@ void MediaPlayerPrivateGStreamer::checkPlayingConsistency()
             }
         } else
             m_didTryToRecoverPlayingState = false;
+    }
+}
+
+void MediaPlayerPrivateGStreamer::audioOutputDeviceChanged()
+{
+    RefPtr player = m_player.get();
+    if (!player)
+        return;
+
+    auto deviceId = player->audioOutputDeviceId();
+    gst_printerrln("new output device: %s", deviceId.ascii().data());
+    //if (m_audioSink)
+    // phil
+
+    for (auto* element : GstIteratorAdaptor<GstElement>(GUniquePtr<GstIterator>(gst_bin_iterate_sinks(GST_BIN_CAST(m_audioSink.get()))))) {
+        if (gstObjectHasProperty(element, "device"))
+            g_object_set(element, "device", deviceId.utf8().data(), nullptr);
     }
 }
 
