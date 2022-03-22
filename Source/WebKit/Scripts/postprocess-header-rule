@@ -110,6 +110,17 @@ function rewrite_headers () {
             *) exit 1
         esac
     fi
+    
+    if [[ "${HEADER_NAME}" == "WebKitLegacy.h" ]]; then
+        test "${WK_PLATFORM_NAME}" = macosx
+        unifdef -B -DTARGET_OS_IPHONE=$? -o "${WORK_FILE}".unifdef "${WORK_FILE}"
+
+        case $? in
+            0) rm "${WORK_FILE}".unifdef ;;
+            1) mv "${WORK_FILE}"{.unifdef,} ;;
+            *) exit 1
+        esac
+    fi
 
     cmp -s "${WORK_FILE}" "${DEST_FILE}" && rm -f "${WORK_FILE}" || mv "${WORK_FILE}" "${DEST_FILE}"
     [[ "${SOURCE_FILE}" -nt "${DEST_FILE}" ]] && touch "${DEST_FILE}" || true

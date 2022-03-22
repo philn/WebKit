@@ -31,8 +31,8 @@
 #import <WebCore/HistoryController.h>
 #import <WebCore/HistoryItem.h>
 #import <WebCore/Page.h>
-#import <WebFrame.h>
-#import <WebPage.h>
+#import "WebFrame.h"
+#import "WebPage.h"
 
 #if PLATFORM(IOS_FAMILY)
 
