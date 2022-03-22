@@ -1,3 +1,37 @@
+2022-03-22  Elliott Williams  <emw@apple.com>
+
+        [XCBuild] WebKit: Use native headers + build rules for migrated headers
+        https://bugs.webkit.org/show_bug.cgi?id=238213
+        <rdar://problem/90172142>
+
+        Reviewed by NOBODY (OOPS!).
+
+        Replace the Make-based header migration script phase with a native project-based
+        representation in WebKit.xcodeproj.
+
+        The project now contains a 'Migrated Headers' group which lists the headers from
+        WebKitLegacy and WebCore that are copied to WebKit.framework during the build process. This
+        group must be kept in sync with the actual headers in WebKitLegacy, but since new headers
+        shouldn't really be added to WebKitLegacy this will be low-friction.
+
+        A build rule (migrate-headers-rule.sh) performs transformations on the headers to make them
+        import from <WebKit/...>.
+
+        * Configurations/WebKit.xcconfig: Use EXCLUDED_SOURCE_FILE_NAMES to customize migrated
+        headers on mac vs. non-mac platforms.
+        * Scripts/migrate-headers-rule.sh: Added, replaces Make recipes.
+        * Scripts/postprocess-header-rule: Run unifdef on the new WebKitLegacy.h umbrella header.
+        * Shared/API/Cocoa/WebKitLegacy.h: Added. Xcode's header maps forbid a header's name from
+        changing during the copy process, so we have to duplicate WebKitLegacy's umbrella header
+        instead of renaming it WebKit.h -> WebKitLegacy.h during the build.
+        * WebKit.xcodeproj/project.pbxproj: Added 'Migrated Headers' group and build rule.
+        Configured headers to always copy using XCBuild. Removed legacy-only header script phases.
+        * WebProcess/WebCoreSupport/ios/WebFrameLoaderClientIOS.mm: This file used unqualified
+        <HEADER.h> imports, which are not supported by Xcode's headermaps. Replaced with "HEADER.h".
+        * mac/MigrateHeadersFromWebKitLegacy.make: Removed, logic now lives in
+        mingrate-headers-rule.sh.
+        * mac/postprocess-framework-headers.sh: Removed.
+
 2022-03-23  Sihui Liu  <sihui_liu@apple.com>
 
         [ BigSur+ Debug wk2 EWS ] imported/w3c/web-platform-tests/html/webappapis/dynamic-markup-insertion/opening-the-input-stream/quirks.window.html is a flaky crash

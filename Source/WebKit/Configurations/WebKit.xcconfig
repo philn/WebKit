@@ -185,11 +185,11 @@ SECTORDER_FLAGS = $(SECTORDER_FLAGS_$(CONFIGURATION));
 SECTORDER_FLAGS_Production[sdk=iphoneos*] = -Wl,-order_file,$(SDKROOT)/AppleInternal/OrderFiles/WebKit.order;
 SECTORDER_FLAGS_Production[sdk=macosx*] = -Wl,-order_file,mac/WebKit2.order;
 
-EXCLUDED_SOURCE_FILE_NAMES = libWebKitAdditions.a $(EXCLUDED_IOS_RESOURCE_FILE_NAMES) $(EXCLUDED_MACOS_PLUGIN_FILE_NAMES) $(EXCLUDED_MIGRATED_HEADERS_$(WK_WHICH_BUILD_SYSTEM)); $(EXCLUDED_MIGRATED_HEADERS_COCOA_TOUCH_$(WK_IS_COCOA_TOUCH)) $(EXCLUDED_MIGRATED_HEADERS_INTERNAL_SDK_$(USE_INTERNAL_SDK));
+EXCLUDED_SOURCE_FILE_NAMES = libWebKitAdditions.a $(EXCLUDED_IOS_RESOURCE_FILE_NAMES) $(EXCLUDED_MACOS_PLUGIN_FILE_NAMES) $(EXCLUDED_SOURCE_FILE_NAMES_$(WK_WHICH_BUILD_SYSTEM)) $(EXCLUDED_MIGRATED_HEADERS_COCOA_TOUCH_$(WK_IS_COCOA_TOUCH)) $(EXCLUDED_MIGRATED_HEADERS_INTERNAL_SDK_$(USE_INTERNAL_SDK));
 EXCLUDED_IOS_RESOURCE_FILE_NAMES = Resources/ios/*;
 EXCLUDED_IOS_RESOURCE_FILE_NAMES[sdk=iphone*] = ;
-// The legacy build system does not migrate headers using a native build phase.
-EXCLUDED_MIGRATED_HEADERS_legacy = */WebCore/*.h */WebKitLegacy/*.h;
+// The legacy build system does not install headers.
+EXCLUDED_SOURCE_FILE_NAMES_legacy = *.h;
 EXCLUDED_MIGRATED_HEADERS_COCOA_TOUCH_YES = WebDashboardRegion.h WebDynamicScrollBarsView.h WebIconDatabase.h WebJavaScriptTextInputPanel.h WebNSEventExtras.h WebNSPasteboardExtras.h WebNSWindowExtras.h WebPanelAuthenticationHandler.h WebStringTruncator.h;
 EXCLUDED_MIGRATED_HEADERS_COCOA_TOUCH_NO = AbstractPasteboard.h DOMHTMLTextAreaElementPrivate.h DOMUIKitExtensions.h KeyEventCodesIOS.h WAKAppKitStubs.h WAKResponder.h WAKView.h WAKWindow.h WebCaretChangeListener.h WebCoreThread.h WebCoreThreadMessage.h WebCoreThreadRun.h WebEvent.h WebFixedPositionContent.h WebFrameIOS.h WebFrameIPhone.h WebGeolocationCoreLocationProvider.h WebGeolocationPrivate.h WebGeolocationProviderIOS.h WebItemProviderPasteboard.h WebMIMETypeRegistry.h WebNSStringExtrasIOS.h WebNSStringExtrasIPhone.h WebPDFViewIOS.h WebPDFViewIPhone.h WebPDFViewPlaceholder.h WebSelectionRect.h WebUIKitDelegate.h WebUIKitSupport.h WebVisiblePosition.h WKContentObservation.h WKGraphics.h WKTypes.h;
 // WebEventRegion is only exported when ENABLE_IOS_TOUCH_EVENTS is defined.
