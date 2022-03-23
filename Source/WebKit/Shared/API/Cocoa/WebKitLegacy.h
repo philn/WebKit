@@ -26,7 +26,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #if TARGET_OS_IPHONE
-#if defined(__has_include) && __has_include(<WebKit/WebKit.h>)
+#if defined(__has_include) && __has_include(<WebKitLegacy/WebKit.h>)
 #import <WebKitLegacy/WebKit.h>
 #endif
 #else
