@@ -2385,7 +2385,6 @@
 			filePatterns = "*/WebKitLegacy/*.h */WebCore/*.h";
 			fileType = pattern.proxy;
 			inputFiles = (
-				"$(SRCROOT)/Scripts/migrate-headers-rule.sh",
 				"$(SRCROOT)/Scripts/postprocess-header-rule",
 			);
 			isEditable = 1;
@@ -2394,7 +2393,7 @@
 				"$(WK_MIGRATED_HEADER_OUTPUT_DIR)/$(INPUT_FILE_NAME)",
 			);
 			runOncePerArchitecture = 0;
-			script = "\"${SCRIPT_INPUT_FILE_0}\"\n";
+			script = "if [ \"${WK_PLATFORM_NAME}\" != macosx ]; then\n    echo \"#import <WebKitLegacy/${INPUT_FILE_NAME}>\" > \"${SCRIPT_OUTPUT_FILE_0}\"\nelse\n    \"${SCRIPT_INPUT_FILE_0}\"\nfi\n";
 		};
 /* End PBXBuildRule section */
 

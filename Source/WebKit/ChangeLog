@@ -14,13 +14,15 @@
         group must be kept in sync with the actual headers in WebKitLegacy, but since new headers
         shouldn't really be added to WebKitLegacy this will be low-friction.
 
-        A build rule (migrate-headers-rule.sh) performs transformations on the headers to make them
-        import from <WebKit/...>.
+        The preexisting postprocess-header-rule build rule is refactored to handle the
+        transformations needed for Migrated headers, which previous came from WebKitLegacy's
+        `postprocess-header-rule` script or from one of the MigrateHeaders*.make files.
 
         * Configurations/WebKit.xcconfig: Use EXCLUDED_SOURCE_FILE_NAMES to customize migrated
         headers on mac vs. non-mac platforms.
-        * Scripts/migrate-headers-rule.sh: Added, replaces Make recipes.
-        * Scripts/postprocess-header-rule: Run unifdef on the new WebKitLegacy.h umbrella header.
+        * Scripts/postprocess-header-rule: Refactored to incorporate WebKitLegacy's postprocessing
+        steps, and to do less disk I/O, now that it's always invoked as a build rule and can do less
+        in-place editing. Local testing shows a ~15% speedup.
         * Shared/API/Cocoa/WebKitLegacy.h: Added. Xcode's header maps forbid a header's name from
         changing during the copy process, so we have to duplicate WebKitLegacy's umbrella header
         instead of renaming it WebKit.h -> WebKitLegacy.h during the build.
@@ -31,6 +33,8 @@
         * mac/MigrateHeadersFromWebKitLegacy.make: Removed, logic now lives in
         mingrate-headers-rule.sh.
         * mac/postprocess-framework-headers.sh: Removed.
+        * mac/replace-webkit-additions-includes.py: Refactored to use stdin and stdout rather than
+        editing in-place. Corresponds to refactors in postprocess-header-rule.
 
 2022-03-23  Sihui Liu  <sihui_liu@apple.com>
 
