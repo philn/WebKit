@@ -880,7 +880,7 @@ webkit.org/b/234084 media/track/video-track-configuration.html [ Failure ]
 webkit.org/b/237901 media/media-source/media-source-interruption-with-resume-allowing-play.html [ Slow ]
 
 # DataChannel GstWebRTC implementation incomplete
-webkit.org/b/235885 webrtc/datachannel [ Skip ]
+#webkit.org/b/235885 webrtc/datachannel [ Skip ]
 webkit.org/b/235885 http/wpt/webrtc/transfer-datachannel-service-worker.https.html [ Skip ]
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-statsSelector.html [ Skip ]
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-datachannel.html [ Skip ]

@@ -151,15 +151,33 @@ void GStreamerDataChannelHandler::setClient(RTCDataChannelHandlerClient& client,
 bool GStreamerDataChannelHandler::sendStringData(const CString& text)
 {
     GST_DEBUG("Sending string %s", text.data());
+#if 0 //GST_CHECK_VERSION(1, 21, 0)
+    GUniqueOutPtr<GError> error;
+    // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/1958
+    gst_webrtc_data_channel_send_string_full(GST_WEBRTC_DATA_CHANNEL(m_channel.get()), text.data(), &error.outPtr());
+    if (error)
+        GST_WARNING("Unable to send string, error: %s", error->message);
+    return !error;
+#else
     g_signal_emit_by_name(m_channel.get(), "send-string", text.data());
     return true;
+#endif
 }
 
 bool GStreamerDataChannelHandler::sendRawData(const uint8_t* data, size_t length)
 {
     auto bytes = adoptGRef(g_bytes_new(data, length));
+#if 0 //GST_CHECK_VERSION(1, 21, 0)
+    GUniqueOutPtr<GError> error;
+    // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/1958
+    gst_webrtc_data_channel_send_data_full(GST_WEBRTC_DATA_CHANNEL(m_channel.get()), bytes.get(), &error.outPtr());
+    if (error)
+        GST_WARNING("Unable to send raw data, error: %s", error->message);
+    return !error;
+#else
     g_signal_emit_by_name(m_channel.get(), "send-data", bytes.get());
     return true;
+#endif
 }
 
 void GStreamerDataChannelHandler::close()
