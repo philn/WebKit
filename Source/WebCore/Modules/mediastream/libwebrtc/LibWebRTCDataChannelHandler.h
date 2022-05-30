@@ -70,6 +70,7 @@ private:
     bool sendStringData(const CString&) final;
     bool sendRawData(const uint8_t*, size_t) final;
     void close() final;
+    void setBufferedAmountLowThreshold(size_t) final { }
 
     // webrtc::DataChannelObserver API
     void OnStateChange();

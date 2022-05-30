@@ -167,6 +167,11 @@ void GStreamerDataChannelHandler::close()
     g_signal_emit_by_name(m_channel.get(), "close");
 }
 
+void GStreamerDataChannelHandler::setBufferedAmountLowThreshold(size_t threshold)
+{
+    g_object_set(m_channel.get(), "buffered-amount-low-threshold", threshold, nullptr);
+}
+
 void GStreamerDataChannelHandler::checkState()
 {
     ASSERT(m_clientLock.isHeld());

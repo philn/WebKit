@@ -104,6 +104,12 @@ RTCDataChannel::RTCDataChannel(ScriptExecutionContext& context, std::unique_ptr<
 {
 }
 
+void RTCDataChannel::setBufferedAmountLowThreshold(size_t value)
+{
+    m_bufferedAmountLowThreshold = value;
+    m_handler->setBufferedAmountLowThreshold(value);
+}
+
 const AtomString& RTCDataChannel::binaryType() const
 {
     switch (m_binaryType) {
@@ -248,10 +254,15 @@ void RTCDataChannel::didDetectError(Ref<RTCError>&& error)
 void RTCDataChannel::bufferedAmountIsDecreasing(size_t amount)
 {
     queueTaskKeepingObjectAlive(*this, TaskSource::Networking, [this, amount] {
+#if USE(LIBWEBRTC)
         auto previousBufferedAmount = m_bufferedAmount;
         m_bufferedAmount -= amount;
         if (previousBufferedAmount > m_bufferedAmountLowThreshold && m_bufferedAmount <= m_bufferedAmountLowThreshold)
             dispatchEvent(Event::create(eventNames().bufferedamountlowEvent, Event::CanBubble::No, Event::IsCancelable::No));
+#else
+        UNUSED_VARIABLE(amount);
+        dispatchEvent(Event::create(eventNames().bufferedamountlowEvent, Event::CanBubble::No, Event::IsCancelable::No));
+#endif
     });
 }
 
