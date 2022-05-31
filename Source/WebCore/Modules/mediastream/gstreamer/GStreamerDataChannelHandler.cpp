@@ -71,33 +71,16 @@ GUniquePtr<GstStructure> GStreamerDataChannelHandler::fromRTCDataChannelInit(con
     return init;
 }
 
-Ref<RTCDataChannelEvent> GStreamerDataChannelHandler::createDataChannelEvent(Document& document, GRefPtr<GstWebRTCDataChannel>&& dataChannel)
-{
-    GUniqueOutPtr<char> label;
-    GUniqueOutPtr<char> protocol;
-    gboolean ordered, negotiated;
-    gint maxPacketLifeTime, maxRetransmits, id;
-    g_object_get(dataChannel.get(), "ordered", &ordered, "label", &label.outPtr(),
-        "max-packet-lifetime", &maxPacketLifeTime, "max-retransmits", &maxRetransmits,
-        "protocol", &protocol.outPtr(), "negotiated", &negotiated, "id", &id, nullptr);
-
-    RTCDataChannelInit init;
-    init.ordered = ordered;
-    init.maxPacketLifeTime = maxPacketLifeTime;
-    init.maxRetransmits = maxRetransmits;
-    init.protocol = String::fromLatin1(protocol.get());
-    init.negotiated = negotiated;
-    init.id = id;
-
-    auto handler = WTF::makeUnique<GStreamerDataChannelHandler>(WTFMove(dataChannel));
-    auto channel = RTCDataChannel::create(document, WTFMove(handler), String::fromUTF8(label.get()), WTFMove(init));
-    return RTCDataChannelEvent::create(eventNames().datachannelEvent, Event::CanBubble::No, Event::IsCancelable::No, WTFMove(channel));
-}
-
 GStreamerDataChannelHandler::GStreamerDataChannelHandler(GRefPtr<GstWebRTCDataChannel>&& channel)
     : m_channel(WTFMove(channel))
 {
     ASSERT(m_channel);
+    GST_DEBUG("New GStreamerDataChannelHandler for channel %p", m_channel.get());
+
+    {
+        Locker locker { m_clientLock };
+        checkState();
+    }
 
     g_signal_connect_swapped(m_channel.get(), "notify::ready-state", G_CALLBACK(+[](GStreamerDataChannelHandler* handler) {
         handler->readyStateChanged();
@@ -111,6 +94,9 @@ GStreamerDataChannelHandler::GStreamerDataChannelHandler(GRefPtr<GstWebRTCDataCh
     g_signal_connect_swapped(m_channel.get(), "on-error", G_CALLBACK(+[](GStreamerDataChannelHandler* handler, GError* error) {
         handler->onError(error);
     }), this);
+    g_signal_connect_swapped(m_channel.get(), "on-close", G_CALLBACK(+[](GStreamerDataChannelHandler* handler) {
+        handler->onClose();
+    }), this);
     g_signal_connect_swapped(m_channel.get(), "on-buffered-amount-low", G_CALLBACK(+[](GStreamerDataChannelHandler* handler) {
         // FIXME: We should pass the amount delta from webrtcbin to the WebCore handler.
         handler->onBufferedAmountLow();
@@ -119,15 +105,45 @@ GStreamerDataChannelHandler::GStreamerDataChannelHandler(GRefPtr<GstWebRTCDataCh
 
 GStreamerDataChannelHandler::~GStreamerDataChannelHandler()
 {
-    g_signal_handlers_disconnect_by_data(m_channel.get(), this);
+    GST_DEBUG("Deleting GStreamerDataChannelHandler for channel %p", m_channel.get());
+    if (m_channel)
+        g_signal_handlers_disconnect_by_data(m_channel.get(), this);
+}
+
+RTCDataChannelInit GStreamerDataChannelHandler::dataChannelInit() const
+{
+    GUniqueOutPtr<char> protocol;
+    gboolean ordered, negotiated;
+    gint maxPacketLifeTime, maxRetransmits, id;
+    g_object_get(m_channel.get(), "ordered", &ordered, "max-packet-lifetime", &maxPacketLifeTime, "max-retransmits", &maxRetransmits,
+        "protocol", &protocol.outPtr(), "negotiated", &negotiated, "id", &id, nullptr);
+
+    RTCDataChannelInit init;
+    init.ordered = ordered;
+    init.maxPacketLifeTime = maxPacketLifeTime;
+    init.maxRetransmits = maxRetransmits;
+    init.protocol = String::fromLatin1(protocol.get());
+    init.negotiated = negotiated;
+    init.id = id;
+    return init;
+}
+
+String GStreamerDataChannelHandler::label() const
+{
+    GUniqueOutPtr<char> label;
+    g_object_get(m_channel.get(), "label", &label.outPtr(), nullptr);
+    return String::fromUTF8(label.get());
 }
 
 void GStreamerDataChannelHandler::setClient(RTCDataChannelHandlerClient& client, ScriptExecutionContextIdentifier contextIdentifier)
 {
     Locker locker { m_clientLock };
     ASSERT(!m_client);
+    GST_DEBUG("Setting client on channel %p", m_channel.get());
     m_client = client;
     m_contextIdentifier = contextIdentifier;
+
+    checkState();
 
     for (auto& message : m_pendingMessages) {
         switchOn(message, [&](Ref<FragmentedSharedBuffer>& data) {
@@ -141,7 +157,7 @@ void GStreamerDataChannelHandler::setClient(RTCDataChannelHandlerClient& client,
                 if (auto rtcError = toRTCError(*stateChange.error))
                     client.didDetectError(rtcError.releaseNonNull());
             }
-            GST_DEBUG("Dispatching state change to %d", static_cast<int>(stateChange.state));
+            GST_DEBUG("Dispatching state change to %d on channel %p", static_cast<int>(stateChange.state), m_channel.get());
             client.didChangeReadyState(stateChange.state);
         });
     }
@@ -150,13 +166,15 @@ void GStreamerDataChannelHandler::setClient(RTCDataChannelHandlerClient& client,
 
 bool GStreamerDataChannelHandler::sendStringData(const CString& text)
 {
-    GST_DEBUG("Sending string %s", text.data());
+    GST_DEBUG("Sending string of length: %zu", text.length());
+    GST_TRACE("Sending string %s", text.data());
     g_signal_emit_by_name(m_channel.get(), "send-string", text.data());
     return true;
 }
 
 bool GStreamerDataChannelHandler::sendRawData(const uint8_t* data, size_t length)
 {
+    GST_DEBUG("Sending raw data of length: %zu", length);
     auto bytes = adoptGRef(g_bytes_new(data, length));
     g_signal_emit_by_name(m_channel.get(), "send-data", bytes.get());
     return true;
@@ -164,7 +182,14 @@ bool GStreamerDataChannelHandler::sendRawData(const uint8_t* data, size_t length
 
 void GStreamerDataChannelHandler::close()
 {
-    g_signal_emit_by_name(m_channel.get(), "close");
+    GST_DEBUG("Closing channel %p", m_channel.get());
+    m_closing = true;
+
+    GstWebRTCDataChannelState channelState;
+    g_object_get(m_channel.get(), "ready-state", &channelState, nullptr);
+
+    if (channelState == GST_WEBRTC_DATA_CHANNEL_STATE_OPEN)
+        g_signal_emit_by_name(m_channel.get(), "close");
 }
 
 void GStreamerDataChannelHandler::setBufferedAmountLowThreshold(size_t threshold)
@@ -175,6 +200,9 @@ void GStreamerDataChannelHandler::setBufferedAmountLowThreshold(size_t threshold
 void GStreamerDataChannelHandler::checkState()
 {
     ASSERT(m_clientLock.isHeld());
+
+    if (!m_channel)
+        return;
 
     GstWebRTCDataChannelState channelState;
     g_object_get(m_channel.get(), "ready-state", &channelState, nullptr);
@@ -200,18 +228,25 @@ void GStreamerDataChannelHandler::checkState()
     }
 
     if (!m_client) {
-        GST_DEBUG("No client yet, queueing state");
+        GST_DEBUG("No client yet on channel %p, queueing state", m_channel.get());
         m_pendingMessages.append(StateChange { state, { } });
+        return;
+    }
+
+    if (channelState == GST_WEBRTC_DATA_CHANNEL_STATE_OPEN && m_closing) {
+        GST_DEBUG("Ignoring open state notification on channel %p because it was pending to be closed", m_channel.get());
         return;
     }
 
     if (!*m_client)
         return;
 
-    GST_DEBUG("Dispatching state change to %d", static_cast<int>(state));
+    GST_DEBUG("Dispatching state change to %d on channel %p", static_cast<int>(state), m_channel.get());
     postTask([client = m_client, state] {
-        if (!*client)
+        if (!*client) {
+            GST_DEBUG("No client");
             return;
+        }
         client.value()->didChangeReadyState(state);
     });
 }
@@ -224,10 +259,12 @@ void GStreamerDataChannelHandler::readyStateChanged()
 
 void GStreamerDataChannelHandler::onMessageData(GBytes* bytes)
 {
+    auto size = g_bytes_get_size(bytes);
+    GST_DEBUG("Incoming data of size: %zu", size);
     Locker locker { m_clientLock };
 
     if (!m_client) {
-        m_pendingMessages.append(FragmentedSharedBuffer::create(bytes));
+        m_pendingMessages.append(SharedBuffer::create(bytes));
         return;
     }
 
@@ -247,7 +284,7 @@ void GStreamerDataChannelHandler::onMessageString(const char* message)
 {
     Locker locker { m_clientLock };
 
-    GST_DEBUG("Incoming string: %s", message);
+    GST_TRACE("Incoming string: %s", message);
     if (!m_client) {
         GST_DEBUG("No client yet, keeping as buffered message");
         m_pendingMessages.append(String::fromUTF8(message));
@@ -286,16 +323,27 @@ void GStreamerDataChannelHandler::onError(GError* error)
     });
 }
 
+void GStreamerDataChannelHandler::onClose()
+{
+    Locker locker { m_clientLock };
+    GST_DEBUG("Channel %p closed!", m_channel.get());
+    checkState();
+}
+
 void GStreamerDataChannelHandler::onBufferedAmountLow()
 {
     Locker locker { m_clientLock };
-    if (!m_client)
+    GST_DEBUG("Buffered amount getting low on channel %p", m_channel.get());
+    if (!m_client) {
+        GST_DEBUG("No client, no notification to dispatch");
         return;
+    }
 
     postTask([client = m_client] {
         if (!client)
             return;
 
+        GST_DEBUG("Dispatching low buffered amount notification");
         // FIXME: Pass amount to handler instead of 0.
         client.value()->bufferedAmountIsDecreasing(0);
     });

@@ -44,8 +44,12 @@ public:
     explicit GStreamerDataChannelHandler(GRefPtr<GstWebRTCDataChannel>&&);
     ~GStreamerDataChannelHandler();
 
+    RTCDataChannelInit dataChannelInit() const;
+    String label() const;
+
     static GUniquePtr<GstStructure> fromRTCDataChannelInit(const RTCDataChannelInit&);
-    static Ref<RTCDataChannelEvent> createDataChannelEvent(Document&, GRefPtr<GstWebRTCDataChannel>&&);
+
+    const GstWebRTCDataChannel* channel() const { return m_channel.get(); }
 
 private:
     // RTCDataChannelHandler API
@@ -58,6 +62,7 @@ private:
     void onMessageData(GBytes*);
     void onMessageString(const char*);
     void onError(GError*);
+    void onClose();
     void onBufferedAmountLow();
     void readyStateChanged();
 
@@ -78,8 +83,7 @@ private:
     std::optional<uint64_t> m_previousBufferedAmount;
     PendingMessages m_pendingMessages WTF_GUARDED_BY_LOCK(m_clientLock);
 
-    Lock m_openLock;
-    Condition m_openCondition WTF_GUARDED_BY_LOCK(m_openLock);
+    bool m_closing { false };
 };
 
 } // namespace WebCore

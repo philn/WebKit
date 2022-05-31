@@ -827,8 +827,8 @@ class WebkitFlatpak:
                            "--talk-name=org.gtk.vfs",
                            "--talk-name=org.gtk.vfs.*"]
 
-        flatpak_a11y_args = self.setup_a11y_proxy()
-        flatpak_command.extend(flatpak_a11y_args)
+        # flatpak_a11y_args = self.setup_a11y_proxy()
+        # flatpak_command.extend(flatpak_a11y_args)
 
         if not gather_output and args and self.is_build_webkit(args[0]) and not self.is_branch_build():
             # Ensure self.build_path exists.
@@ -1036,6 +1036,11 @@ class WebkitFlatpak:
             "WEBKIT_BUILD_DIR_BIND_MOUNT": "%s:%s" % (sandbox_build_path, self.build_path),
             "WEBKIT_FLATPAK_USER_DIR": os.environ["FLATPAK_USER_DIR"],
         })
+
+
+        output_dir = os.environ.get('WEBKIT_OUTPUTDIR')
+        if output_dir:
+            flatpak_env["WEBKIT_OUTPUTDIR"] = output_dir
 
         display = os.environ.get("DISPLAY")
         if display:

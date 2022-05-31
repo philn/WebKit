@@ -25,6 +25,9 @@
 #include "GStreamerDtlsTransportBackend.h"
 #include "GStreamerWebRTCUtils.h"
 
+GST_DEBUG_CATEGORY_EXTERN(webkit_webrtc_endpoint_debug);
+#define GST_CAT_DEFAULT webkit_webrtc_endpoint_debug
+
 namespace WebCore {
 
 static inline RTCSctpTransportState toRTCSctpTransportState(GstWebRTCSCTPTransportState state)
@@ -84,6 +87,7 @@ void GStreamerSctpTransportBackend::stateChanged()
     guint16 maxChannels;
     uint64_t maxMessageSize;
     g_object_get(m_backend.get(), "state", &transportState, "max-message-size", &maxMessageSize, "max-channels", &maxChannels, nullptr);
+    GST_DEBUG("Notifying SCTP transport state, max-message-size: %" G_GUINT64_FORMAT " max-channels: %" G_GUINT16_FORMAT, maxMessageSize, maxChannels);
     callOnMainThread([client = m_client, transportState, maxChannels, maxMessageSize] {
         if (!client)
             return;
