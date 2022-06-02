@@ -226,7 +226,6 @@ UIProcess/libwpe/WebPasteboardProxyLibWPE.cpp
 
 UIProcess/linux/MemoryPressureMonitor.cpp
 
-UIProcess/soup/WebCookieManagerProxySoup.cpp
 UIProcess/soup/WebProcessPoolSoup.cpp
 
 UIProcess/wpe/WebPageProxyWPE.cpp

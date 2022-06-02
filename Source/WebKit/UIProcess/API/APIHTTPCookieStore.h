@@ -27,6 +27,7 @@
 
 #include "APIObject.h"
 #include <WebCore/Cookie.h>
+#include <pal/SessionID.h>
 #include <wtf/CompletionHandler.h>
 #include <wtf/Forward.h>
 #include <wtf/WeakHashSet.h>
@@ -38,13 +39,11 @@ enum class HTTPCookieAcceptPolicy : uint8_t;
 }
 
 namespace WebKit {
-class WebCookieManagerProxy;
+class NetworkProcessProxy;
 class WebsiteDataStore;
 }
 
 namespace API {
-
-class APIWebCookieManagerProxyObserver;
 
 class HTTPCookieStore final : public ObjectImpl<Object::Type::HTTPCookieStore> {
 public:
@@ -59,6 +58,7 @@ public:
     void cookiesForURL(WTF::URL&&, CompletionHandler<void(Vector<WebCore::Cookie>&&)>&&);
     void setCookies(Vector<WebCore::Cookie>&&, CompletionHandler<void()>&&);
     void deleteCookie(const WebCore::Cookie&, CompletionHandler<void()>&&);
+    void deleteCookiesForHostnames(const Vector<WTF::String>&, CompletionHandler<void()>&&);
     
     void deleteAllCookies(CompletionHandler<void()>&&);
     void setHTTPCookieAcceptPolicy(WebCore::HTTPCookieAcceptPolicy, CompletionHandler<void()>&&);
@@ -79,11 +79,12 @@ public:
 
 private:
     HTTPCookieStore(WebKit::WebsiteDataStore&);
-    
+    WebKit::NetworkProcessProxy* networkProcessIfExists();
+    WebKit::NetworkProcessProxy* networkProcessLaunchingIfNecessary();
+
+    PAL::SessionID m_sessionID;
     WeakPtr<WebKit::WebsiteDataStore> m_owningDataStore;
     WeakHashSet<Observer> m_observers;
-    WeakPtr<WebKit::WebCookieManagerProxy> m_observedCookieManagerProxy;
-    std::unique_ptr<APIWebCookieManagerProxyObserver> m_cookieManagerProxyObserver;
 };
 
 }

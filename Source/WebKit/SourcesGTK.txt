@@ -281,7 +281,6 @@ UIProcess/gtk/WebPreferencesGtk.cpp
 UIProcess/gtk/WebTextChecker.cpp
 UIProcess/gtk/WebTextCheckerClient.cpp
 
-UIProcess/soup/WebCookieManagerProxySoup.cpp
 UIProcess/soup/WebProcessPoolSoup.cpp
 
 WebProcess/GPU/graphics/gbm/RemoteGraphicsContextGLProxyGBM.cpp

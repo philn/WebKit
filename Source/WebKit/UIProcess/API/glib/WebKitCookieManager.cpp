@@ -23,7 +23,6 @@
 
 #include "NetworkProcessProxy.h"
 #include "SoupCookiePersistentStorageType.h"
-#include "WebCookieManagerProxy.h"
 #include "WebKitCookieManagerPrivate.h"
 #include "WebKitEnumTypes.h"
 #include "WebKitWebsiteDataManagerPrivate.h"
