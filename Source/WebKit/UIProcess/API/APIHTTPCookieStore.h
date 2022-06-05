@@ -33,6 +33,10 @@
 #include <wtf/WeakHashSet.h>
 #include <wtf/WeakPtr.h>
 
+#if USE(SOUP)
+#include "SoupCookiePersistentStorageType.h"
+#endif
+
 namespace WebCore {
 struct Cookie;
 enum class HTTPCookieAcceptPolicy : uint8_t;
@@ -62,6 +66,7 @@ public:
     
     void deleteAllCookies(CompletionHandler<void()>&&);
     void setHTTPCookieAcceptPolicy(WebCore::HTTPCookieAcceptPolicy, CompletionHandler<void()>&&);
+    void getHTTPCookieAcceptPolicy(CompletionHandler<void(const WebCore::HTTPCookieAcceptPolicy&)>&&);
     void flushCookies(CompletionHandler<void()>&&);
 
     class Observer : public CanMakeWeakPtr<Observer> {
@@ -76,6 +81,10 @@ public:
     void cookiesDidChange();
 
     void filterAppBoundCookies(Vector<WebCore::Cookie>&&, CompletionHandler<void(Vector<WebCore::Cookie>&&)>&&);
+
+#if USE(SOUP)
+    void setCookiePersistentStorage(const WTF::String& storagePath, WebKit::SoupCookiePersistentStorageType);
+#endif
 
 private:
     HTTPCookieStore(WebKit::WebsiteDataStore&);

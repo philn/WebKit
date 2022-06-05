@@ -138,6 +138,14 @@ void HTTPCookieStore::setHTTPCookieAcceptPolicy(WebCore::HTTPCookieAcceptPolicy 
         completionHandler();
 }
 
+void HTTPCookieStore::getHTTPCookieAcceptPolicy(CompletionHandler<void(const WebCore::HTTPCookieAcceptPolicy&)>&& completionHandler)
+{
+    if (auto* networkProcess = networkProcessLaunchingIfNecessary())
+        networkProcess->sendWithAsyncReply(Messages::WebCookieManager::GetHTTPCookieAcceptPolicy(m_sessionID), WTFMove(completionHandler));
+    else
+        completionHandler({ });
+}
+
 void HTTPCookieStore::flushCookies(CompletionHandler<void()>&& completionHandler)
 {
     if (auto* networkProcess = networkProcessIfExists())
