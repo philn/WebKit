@@ -3994,6 +3994,46 @@ void webkit_web_view_run_javascript_in_world(WebKitWebView* webView, const gchar
     });
 }
 
+/*
+ * webkit_web_view_run_async_javascript_function_in_world:
+ * @web_view: a #WebKitWebView
+ * @body: the JavaScript function body
+ * @arguments: a #GHashTable storing the function arguments
+ * @world_name: the name of a #WebKitScriptWorld
+ * @cancellable: (allow-none): a #GCancellable or %NULL to ignore
+ * @callback: (scope async): a #GAsyncReadyCallback to call when the script finished
+ * @user_data: (closure): the data to pass to callback function
+ *
+ * Asynchronously run @body in the script world with name @world_name of the current page context in
+ * @web_view. If WebKitSettings:enable-javascript is FALSE, this method will do nothing. This API
+ * differs from webkit_web_view_run_javascript_in_world(), the JavaScript function can return a
+ * Promise and its result will be properly passed to the callback.
+ *
+ * When the operation is finished, @callback will be called. You can then call
+ * webkit_web_view_run_javascript_in_world_finish() to get the result of the operation.
+ *
+ * Since: 2.38
+ */
+void webkit_web_view_run_async_javascript_function_in_world(WebKitWebView* webView, const gchar* body, GVariant* arguments, const char* worldName, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer userData)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
+    g_return_if_fail(body);
+    g_return_if_fail(worldName);
+
+    auto task = adoptGRef(g_task_new(webView, cancellable, callback, userData));
+    auto world = API::ContentWorld::sharedWorldWithName(String::fromUTF8(worldName));
+    auto serializedArguments = WebCore::ArgumentWireBytesMap { };
+    getPage(webView).runJavaScriptInFrameInScriptWorld({ String::fromUTF8(body), URL { }, RunAsAsyncFunction::Yes, WTFMove(serializedArguments), ForceUserGesture::Yes }, std::nullopt, world.get(), [task = WTFMove(task)](auto&& result) {
+        RefPtr<API::SerializedScriptValue> serializedScriptValue;
+        ExceptionDetails exceptionDetails;
+        if (result.has_value())
+            serializedScriptValue = WTFMove(result.value());
+        else
+            exceptionDetails = WTFMove(result.error());
+        webkitWebViewRunJavaScriptCallback(serializedScriptValue.get(), exceptionDetails, task.get());
+    });
+}
+
 /**
  * webkit_web_view_run_javascript_in_world_finish:
  * @web_view: a #WebKitWebView

@@ -319,6 +319,27 @@ static void testWebViewZoomLevel(WebViewTest* test, gconstpointer)
     g_assert_cmpfloat(webkit_web_view_get_zoom_level(test->m_webView), ==, 2.5);
 }
 
+static void testWebViewRunAsyncFunctions(WebViewTest* test, gconstpointer)
+{
+    GUniqueOutPtr<GError> error;
+
+    WebKitJavascriptResult* javascriptResult = test->runAsyncJavaScriptFunctionInWorldAndWaitUntilFinished("return new Promise((resolve) => { resolve(42); });", nullptr, "", &error.outPtr());
+    g_assert_nonnull(javascriptResult);
+    test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(webkit_javascript_result_get_js_value(javascriptResult)));
+    g_assert_no_error(error.get());
+    g_assert_cmpfloat(WebViewTest::javascriptResultToNumber(javascriptResult), ==, 42);
+
+    GVariantDict dict;
+    g_variant_dict_init(&dict, nullptr);
+    g_variant_dict_insert(&dict, "count", "u", 42);
+    auto* args = g_variant_dict_end(&dict);
+    javascriptResult = test->runAsyncJavaScriptFunctionInWorldAndWaitUntilFinished("return new Promise((resolve) => { resolve(count); });", args, "", &error.outPtr());
+    g_assert_nonnull(javascriptResult);
+    test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(webkit_javascript_result_get_js_value(javascriptResult)));
+    g_assert_no_error(error.get());
+    g_assert_cmpfloat(WebViewTest::javascriptResultToNumber(javascriptResult), ==, 42);
+}
+
 static void testWebViewRunJavaScript(WebViewTest* test, gconstpointer)
 {
     static const char* html = "<html><body><a id='WebKitLink' href='http://www.webkitgtk.org/' title='WebKitGTK Title'>WebKitGTK Website</a></body></html>";
@@ -1731,6 +1752,7 @@ void beforeAll()
     WebViewTest::add("WebKitWebView", "settings", testWebViewSettings);
     WebViewTest::add("WebKitWebView", "zoom-level", testWebViewZoomLevel);
     WebViewTest::add("WebKitWebView", "run-javascript", testWebViewRunJavaScript);
+    WebViewTest::add("WebKitWebView", "run-async-js-functions", testWebViewRunAsyncFunctions);
 #if ENABLE(FULLSCREEN_API)
     FullScreenClientTest::add("WebKitWebView", "fullscreen", testWebViewFullScreen);
 #endif
