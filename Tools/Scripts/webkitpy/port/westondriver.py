@@ -33,7 +33,6 @@ import time
 
 from webkitpy.port.server_process import ServerProcess
 from webkitpy.port.driver import Driver
-from webkitpy.port.xvfbdriver import XvfbDriver
 
 _log = logging.getLogger(__name__)
 
@@ -52,24 +51,14 @@ class WestonDriver(Driver):
     def __init__(self, *args, **kwargs):
         Driver.__init__(self, *args, **kwargs)
         self._startup_delay_secs = 1.0
-        self._xvfbdriver = XvfbDriver(*args, **kwargs)
 
     def _setup_environ_for_test(self):
         driver_environment = super(WestonDriver, self)._setup_environ_for_test()
-        xvfb_display_id = self._xvfbdriver._xvfb_run(driver_environment)
-        driver_environment['DISPLAY'] = ':%d' % xvfb_display_id
-
-        # Ensure that Xvfb is ready and replying and expected before continuing, give it 3 tries.
-        if not self._xvfbdriver._xvfb_check_if_ready(xvfb_display_id):
-            self._xvfbdriver._current_retry_start_xvfb += 1
-            if self._xvfbdriver._current_retry_start_xvfb > 3:
-                _log.error('Failed to start Xvfb display server ... giving up after 3 retries.')
-                raise RuntimeError('Unable to start Xvfb display server')
-            _log.error('Failed to start Xvfb display server ... retrying [ %s of 3 ].' % self._xvfbdriver._current_retry_start_xvfb)
-            return self._setup_environ_for_test()
 
         weston_socket = 'WKTesting-weston-%032x' % random.getrandbits(128)
-        weston_command = ['weston', '--socket=%s' % weston_socket, '--width=1024', '--height=768', '--use-pixman']
+        weston_command = ['weston', '-Bheadless-backend.so', '--socket=%s' % weston_socket, '--width=1280', '--height=720',
+                          #'--use-pixman'
+                          ]
         if self._port._should_use_jhbuild():
             weston_command = self._port._jhbuild_wrapper + weston_command
         with open(os.devnull, 'w') as devnull:
