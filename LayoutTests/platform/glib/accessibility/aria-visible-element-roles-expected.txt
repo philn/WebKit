@@ -60,7 +60,7 @@ This test ensures ARIA visible elements (e.g. those with both `hidden` and `aria
     AXRole: AXTextField
 
 <input hidden="" aria-hidden="false" id="color-input" type="color">
-    AXRole: AXButton
+    AXRole: AXTextField
 
 <input hidden="" aria-hidden="false" id="range-input" type="range">
     AXRole: AXSlider
