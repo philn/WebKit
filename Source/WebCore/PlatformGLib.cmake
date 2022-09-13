@@ -1,4 +1,11 @@
 
+if (USE_OPENSSL)
+  include(platform/OpenSSL.cmake)
+else ()
+  include(platform/GCrypt.cmake)
+endif ()
+
+
 set(ModernMediaControlsImageFiles
     ${WEBCORE_DIR}/Modules/modern-media-controls/images/adwaita/EnterFullscreen.svg
     ${WEBCORE_DIR}/Modules/modern-media-controls/images/adwaita/ExitFullscreen.svg

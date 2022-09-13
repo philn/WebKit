@@ -1,6 +1,5 @@
 include(platform/Cairo.cmake)
 include(platform/FreeType.cmake)
-include(platform/GCrypt.cmake)
 include(platform/GStreamer.cmake)
 include(platform/ImageDecoders.cmake)
 include(platform/Soup.cmake)
