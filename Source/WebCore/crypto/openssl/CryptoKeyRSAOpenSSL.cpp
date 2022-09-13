@@ -33,7 +33,7 @@
 #include "CryptoKeyRSAComponents.h"
 #include "OpenSSLUtilities.h"
 #include <JavaScriptCore/TypedArrayInlines.h>
-#include <openssl/X509.h>
+#include <openssl/x509.h>
 #include <openssl/evp.h>
 
 namespace WebCore {
@@ -165,7 +165,7 @@ bool CryptoKeyRSA::isRestrictedToHash(CryptoAlgorithmIdentifier& identifier) con
 
 size_t CryptoKeyRSA::keySizeInBits() const
 {
-    RSA* rsa = EVP_PKEY_get0_RSA(m_platformKey.get());
+    auto rsa = EVP_PKEY_get0_RSA(m_platformKey.get());
     if (!rsa)
         return 0;
 

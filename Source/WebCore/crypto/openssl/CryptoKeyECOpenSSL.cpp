@@ -377,7 +377,7 @@ RefPtr<CryptoKeyEC> CryptoKeyEC::platformImportPkcs8(CryptoAlgorithmIdentifier i
 
 Vector<uint8_t> CryptoKeyEC::platformExportRaw() const
 {
-    EC_KEY* key = EVP_PKEY_get0_EC_KEY(platformKey());
+    auto key = EVP_PKEY_get0_EC_KEY(platformKey());
     if (!key)
         return { };
     
@@ -398,7 +398,7 @@ bool CryptoKeyEC::platformAddFieldElements(JsonWebKey& jwk) const
 {
     size_t keySizeInBytes = (keySizeInBits() + 7) / 8;
 
-    EC_KEY* key = EVP_PKEY_get0_EC_KEY(platformKey());
+    auto key = EVP_PKEY_get0_EC_KEY(platformKey());
     if (!key)
         return false;
 

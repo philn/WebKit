@@ -50,6 +50,25 @@ const EVP_MD* digestAlgorithm(CryptoAlgorithmIdentifier hashFunction)
     }
 }
 
+const char* digestAlgorithmName(CryptoAlgorithmIdentifier hashFunction)
+{
+    switch (hashFunction) {
+    case CryptoAlgorithmIdentifier::SHA_1:
+        return "sha1";
+    case CryptoAlgorithmIdentifier::SHA_224:
+        return "sha224";
+    case CryptoAlgorithmIdentifier::SHA_256:
+        return "sha256";
+    case CryptoAlgorithmIdentifier::SHA_384:
+        return "sha384";
+    case CryptoAlgorithmIdentifier::SHA_512:
+        return "sha512";
+    default:
+        return nullptr;
+    }
+}
+
+
 std::optional<Vector<uint8_t>> calculateDigest(const EVP_MD* algorithm, const Vector<uint8_t>& message)
 {
     EvpDigestCtxPtr ctx;

@@ -46,7 +46,7 @@ ExceptionOr<Vector<uint8_t>> CryptoAlgorithmECDSA::platformSign(const CryptoAlgo
     if (!digest)
         return Exception { OperationError };
 
-    EC_KEY* ecKey = EVP_PKEY_get0_EC_KEY(key.platformKey());
+    auto ecKey = EVP_PKEY_get0_EC_KEY(key.platformKey());
     if (!ecKey)
         return Exception { OperationError };
 
@@ -90,7 +90,7 @@ ExceptionOr<bool> CryptoAlgorithmECDSA::platformVerify(const CryptoAlgorithmEcds
     if (!digest)
         return Exception { OperationError };
 
-    EC_KEY* ecKey = EVP_PKEY_get0_EC_KEY(key.platformKey());
+    auto ecKey = EVP_PKEY_get0_EC_KEY(key.platformKey());
     if (!ecKey)
         return Exception { OperationError };
 

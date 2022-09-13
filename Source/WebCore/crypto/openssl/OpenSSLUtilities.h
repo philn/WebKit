@@ -30,7 +30,7 @@
 #include <openssl/aes.h>
 #include <openssl/evp.h>
 #include <stdint.h>
-#include <wtf/NonCopyable.h>
+#include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
 
 #if ENABLE(WEB_CRYPTO)
@@ -38,6 +38,8 @@
 namespace WebCore {
 
 const EVP_MD* digestAlgorithm(CryptoAlgorithmIdentifier hashFunction);
+
+const char* digestAlgorithmName(CryptoAlgorithmIdentifier hashFunction);
 
 std::optional<Vector<uint8_t>> calculateDigest(const EVP_MD* algorithm, const Vector<uint8_t>& message);
 
