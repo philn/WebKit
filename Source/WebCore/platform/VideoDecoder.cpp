@@ -28,7 +28,13 @@
 
 #if ENABLE(WEB_CODECS)
 
+#if USE(LIBWEBRTC)
 #include "LibWebRTCVPXVideoDecoder.h"
+#endif
+
+#if USE(GSTREAMER)
+#include "VideoDecoderGStreamer.h"
+#endif
 
 namespace WebCore {
 
@@ -60,6 +66,11 @@ void VideoDecoder::createLocalDecoder(const String& codecName, const Config&, Cr
         LibWebRTCVPXVideoDecoder::create(LibWebRTCVPXVideoDecoder::Type::VP9, WTFMove(callback), WTFMove(outputCallback), WTFMove(postCallback));
         return;
     }
+#elif USE(GSTREAMER)
+    // FIXME: Probe for support first.
+    UniqueRef<VideoDecoder> decoder = makeUniqueRef<GStreamerVideoDecoder>(codecName, WTFMove(outputCallback), WTFMove(postCallback));
+    callback(WTFMove(decoder));
+    return;
 #else
     UNUSED_PARAM(codecName);
     UNUSED_PARAM(outputCallback);

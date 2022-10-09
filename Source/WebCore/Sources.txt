@@ -2018,6 +2018,7 @@ platform/ThreadTimers.cpp
 platform/Timer.cpp
 platform/UserActivity.cpp
 platform/VideoDecoder.cpp
+platform/VideoEncoder.cpp
 platform/VideoFrame.cpp
 platform/VideoPixelFormat.cpp
 platform/WebCoreCrossThreadCopier.cpp
