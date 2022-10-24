@@ -94,10 +94,14 @@ GStreamerVideoDecoder::GStreamerVideoDecoder(const String& codecName, OutputCall
     //     gst_app_src_set_caps(GST_APP_SRC(m_src.get()), caps.get());
     // }
 
-    m_decodebin = makeGStreamerElement("decodebin3", nullptr);
-    g_signal_connect_swapped(m_decodebin.get(), "pad-added", G_CALLBACK(+[](GStreamerVideoDecoder* decoder, GstPad* pad) {
-        decoder->connectPad(pad);
-    }), this);
+    // m_decodebin = makeGStreamerElement("decodebin3", nullptr);
+    // g_signal_connect_swapped(m_decodebin.get(), "pad-added", G_CALLBACK(+[](GStreamerVideoDecoder* decoder, GstPad* pad) {
+    //     decoder->connectPad(pad);
+    // }), this);
+
+    auto* parser = makeGStreamerElement("h264parse", nullptr);
+
+    m_decodebin = makeGStreamerElement("avdec_h264", nullptr);
 
     m_videoconvert = makeGStreamerElement("videoconvert", nullptr);
 
@@ -127,9 +131,10 @@ GStreamerVideoDecoder::GStreamerVideoDecoder(const String& codecName, OutputCall
     auto caps = adoptGRef(gst_caps_from_string("video/x-raw, format=(string)RGBA"));
     g_object_set(m_sink.get(), "enable-last-sample", FALSE, "max-buffers", 1, "sync", false, "caps", caps.get(), nullptr);
 
-    gst_bin_add_many(GST_BIN_CAST(m_pipeline.get()), m_src.get(), m_decodebin.get(), m_videoconvert.get(), m_sink.get(), nullptr);
-    gst_element_link(m_src.get(), m_decodebin.get());
-    gst_element_link(m_videoconvert.get(), m_sink.get());
+    gst_bin_add_many(GST_BIN_CAST(m_pipeline.get()), m_src.get(), parser, m_decodebin.get(), m_videoconvert.get(), m_sink.get(), nullptr);
+    gst_element_link_many(m_src.get(), parser, m_decodebin.get(), m_videoconvert.get(), m_sink.get(),  nullptr);
+    // gst_element_link(m_src.get(), m_decodebin.get());
+    // gst_element_link(m_videoconvert.get(), m_sink.get());
     gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
 }
 
@@ -141,6 +146,11 @@ GStreamerVideoDecoder::~GStreamerVideoDecoder()
 void GStreamerVideoDecoder::decode(EncodedFrame&& frame, DecodeCallback&& callback)
 {
     GST_DEBUG_OBJECT(m_pipeline.get(), "Decoding frame");
+
+    // if (frame.isKeyFrame) {
+    //     gst_element_send_event(m_src.get(), gst_video_event_new_downstream_force_key_unit(toGstClockTime()));
+    // }
+
     m_timestamp = frame.timestamp;
     m_duration = frame.duration;
     Vector<uint8_t> data { frame.data };
