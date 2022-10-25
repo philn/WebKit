@@ -55,9 +55,10 @@ void VideoDecoder::create(const String& codecName, const Config& config, CreateC
 }
 
 
-void VideoDecoder::createLocalDecoder(const String& codecName, const Config&, CreateCallback&& callback, OutputCallback&& outputCallback, PostTaskCallback&& postCallback)
+void VideoDecoder::createLocalDecoder(const String& codecName, const Config& config, CreateCallback&& callback, OutputCallback&& outputCallback, PostTaskCallback&& postCallback)
 {
 #if USE(LIBWEBRTC)
+    UNUSED_PARAM(config);
     if (codecName == "vp8"_s) {
         LibWebRTCVPXVideoDecoder::create(LibWebRTCVPXVideoDecoder::Type::VP8, WTFMove(callback), WTFMove(outputCallback), WTFMove(postCallback));
         return;
@@ -68,7 +69,7 @@ void VideoDecoder::createLocalDecoder(const String& codecName, const Config&, Cr
     }
 #elif USE(GSTREAMER)
     // FIXME: Probe for support first.
-    UniqueRef<VideoDecoder> decoder = makeUniqueRef<GStreamerVideoDecoder>(codecName, WTFMove(outputCallback), WTFMove(postCallback));
+    UniqueRef<VideoDecoder> decoder = makeUniqueRef<GStreamerVideoDecoder>(codecName, config, WTFMove(outputCallback), WTFMove(postCallback));
     callback(WTFMove(decoder));
     return;
 #else

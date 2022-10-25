@@ -25,6 +25,7 @@
 
 #include <gst/app/gstappsink.h>
 #include <gst/app/gstappsrc.h>
+#include <gst/gstcaps.h>
 
 #if ENABLE(WEB_CODECS) && USE(GSTREAMER)
 
@@ -33,7 +34,7 @@ using namespace WebCore;
 GST_DEBUG_CATEGORY(webkit_video_decoder_debug);
 #define GST_CAT_DEFAULT webkit_video_decoder_debug
 
-GStreamerVideoDecoder::GStreamerVideoDecoder(const String& codecName, OutputCallback&& outputCallback, PostTaskCallback&& postTaskCallback)
+GStreamerVideoDecoder::GStreamerVideoDecoder(const String& codecName, const Config& config, OutputCallback&& outputCallback, PostTaskCallback&& postTaskCallback)
     : m_outputCallback(WTFMove(outputCallback))
     , m_postTaskCallback(WTFMove(postTaskCallback))
 {
@@ -87,21 +88,28 @@ GStreamerVideoDecoder::GStreamerVideoDecoder(const String& codecName, OutputCall
     }), this);
 
     m_src = makeGStreamerElement("appsrc", nullptr);
+    // g_object_set(m_src.get(), "max-buffers", 2, nullptr);
 
-    g_object_set(m_src.get(), "max-buffers", 2, nullptr);
-    // if (codecName.startsWith("avc1"_s)) {
-    //     auto caps = adoptGRef(gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "byte-stream", nullptr));
-    //     gst_app_src_set_caps(GST_APP_SRC(m_src.get()), caps.get());
-    // }
+    // GstElement* parser = nullptr;
 
-    // m_decodebin = makeGStreamerElement("decodebin3", nullptr);
-    // g_signal_connect_swapped(m_decodebin.get(), "pad-added", G_CALLBACK(+[](GStreamerVideoDecoder* decoder, GstPad* pad) {
-    //     decoder->connectPad(pad);
-    // }), this);
+    if (codecName.startsWith("avc1"_s)) {
+        Vector<uint8_t> data { config.description };
+        auto inputCaps = adoptGRef(gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "avc", "codec_data", GST_TYPE_BUFFER, gstBufferNewWrappedFast(fastMemDup(data.data(), data.sizeInBytes()), data.sizeInBytes()), "width", G_TYPE_INT, config.width, "height", G_TYPE_INT, config.height, nullptr));
+        gst_app_src_set_caps(GST_APP_SRC_CAST(m_src.get()), inputCaps.get());
 
-    auto* parser = makeGStreamerElement("h264parse", nullptr);
+        // parser = makeGStreamerElement("h264parse", nullptr);
+        // m_decodebin = makeGStreamerElement("avdec_h264", nullptr);
 
-    m_decodebin = makeGStreamerElement("avdec_h264", nullptr);
+    } else {
+        WTFLogAlways("Codec %s not wired in yet", codecName.ascii().data());
+        return;
+    }
+
+    m_decodebin = makeGStreamerElement("decodebin3", nullptr);
+    g_signal_connect_swapped(m_decodebin.get(), "pad-added", G_CALLBACK(+[](GStreamerVideoDecoder* decoder, GstPad* pad) {
+        decoder->connectPad(pad);
+    }), this);
+
 
     m_videoconvert = makeGStreamerElement("videoconvert", nullptr);
 
@@ -129,12 +137,16 @@ GStreamerVideoDecoder::GStreamerVideoDecoder(const String& codecName, OutputCall
     gst_app_sink_set_callbacks(GST_APP_SINK(m_sink.get()), &callbacks, this, nullptr);
 
     auto caps = adoptGRef(gst_caps_from_string("video/x-raw, format=(string)RGBA"));
-    g_object_set(m_sink.get(), "enable-last-sample", FALSE, "max-buffers", 1, "sync", false, "caps", caps.get(), nullptr);
+    g_object_set(m_sink.get(), "enable-last-sample", FALSE, // "max-buffers", 1,
+                 "sync", false, "caps", caps.get(), nullptr);
 
-    gst_bin_add_many(GST_BIN_CAST(m_pipeline.get()), m_src.get(), parser, m_decodebin.get(), m_videoconvert.get(), m_sink.get(), nullptr);
-    gst_element_link_many(m_src.get(), parser, m_decodebin.get(), m_videoconvert.get(), m_sink.get(),  nullptr);
-    // gst_element_link(m_src.get(), m_decodebin.get());
-    // gst_element_link(m_videoconvert.get(), m_sink.get());
+    gst_bin_add_many(GST_BIN_CAST(m_pipeline.get()), m_src.get(), //parser,
+                     m_decodebin.get(),
+                     m_videoconvert.get(), m_sink.get(),
+                     nullptr);
+    //gst_element_link_many(m_src.get(), parser, m_decodebin.get(), m_videoconvert.get(), m_sink.get(),  nullptr);
+    gst_element_link(m_src.get(), m_decodebin.get());
+    gst_element_link(m_videoconvert.get(), m_sink.get());
     gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
 }
 
@@ -234,7 +246,7 @@ void GStreamerVideoDecoder::processSample(GRefPtr<GstSample>&& sample)
 
         auto* buffer = gst_sample_get_buffer(sample.get());
         auto videoFrame = VideoFrameGStreamer::createWrappedSample(sample, fromGstClockTime(GST_BUFFER_PTS(buffer)));
-        m_outputCallback({ WTFMove(videoFrame), timestamp, duration });
+        m_outputCallback(VideoDecoder::DecodedFrame { WTFMove(videoFrame), timestamp, duration });
 
         {
             LockHolder lock(m_sampleLock);

@@ -34,7 +34,7 @@ class GStreamerVideoDecoder : public ThreadSafeRefCounted<GStreamerVideoDecoder>
     WTF_MAKE_FAST_ALLOCATED;
 
 public:
-    GStreamerVideoDecoder(const String& codecName, OutputCallback&&, PostTaskCallback&&);
+    GStreamerVideoDecoder(const String& codecName, const Config&, OutputCallback&&, PostTaskCallback&&);
     ~GStreamerVideoDecoder();
 
 private:
