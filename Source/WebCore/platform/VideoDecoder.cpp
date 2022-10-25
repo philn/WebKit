@@ -68,10 +68,8 @@ void VideoDecoder::createLocalDecoder(const String& codecName, const Config& con
         return;
     }
 #elif USE(GSTREAMER)
-    // FIXME: Probe for support first.
-    UniqueRef<VideoDecoder> decoder = makeUniqueRef<GStreamerVideoDecoder>(codecName, config, WTFMove(outputCallback), WTFMove(postCallback));
-    callback(WTFMove(decoder));
-    return;
+    if (GStreamerVideoDecoder::create(codecName, config, WTFMove(callback), WTFMove(outputCallback), WTFMove(postCallback)))
+        return;
 #else
     UNUSED_PARAM(codecName);
     UNUSED_PARAM(outputCallback);
