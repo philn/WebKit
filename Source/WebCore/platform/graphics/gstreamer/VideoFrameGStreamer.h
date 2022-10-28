@@ -45,10 +45,7 @@ public:
         return adoptRef(*new VideoFrameGStreamer(WTFMove(sample), presentationSize, presentationTime, videoRotation, videoMirrored, WTFMove(metadata)));
     }
 
-    static Ref<VideoFrameGStreamer> createWrappedSample(const GRefPtr<GstSample>& sample, const MediaTime& presentationTime, Rotation videoRotation = Rotation::None)
-    {
-        return adoptRef(*new VideoFrameGStreamer(sample, presentationTime, videoRotation));
-    }
+    static Ref<VideoFrameGStreamer> createWrappedSample(const GRefPtr<GstSample>& sample, const MediaTime& presentationTime, Rotation videoRotation = Rotation::None);
 
     static Ref<VideoFrameGStreamer> createFromPixelBuffer(Ref<PixelBuffer>&&, CanvasContentType canvasContentType, Rotation videoRotation, const MediaTime& presentationTime = MediaTime::invalidTime(), const IntSize& destinationSize = { }, double frameRate = 1, bool videoMirrored = false, std::optional<VideoFrameTimeMetadata>&& metadata = std::nullopt);
 
@@ -58,12 +55,13 @@ public:
     GstSample* sample() const { return m_sample.get(); }
     RefPtr<JSC::Uint8ClampedArray> computeRGBAImageData() const;
 
-private:
-    VideoFrameGStreamer(GRefPtr<GstSample>&&, const FloatSize& presentationSize, const MediaTime& presentationTime = MediaTime::invalidTime(), Rotation = Rotation::None, bool videoMirrored = false, std::optional<VideoFrameTimeMetadata>&& = std::nullopt);
-    VideoFrameGStreamer(const GRefPtr<GstSample>&, const MediaTime& presentationTime, Rotation = Rotation::None);
-
     FloatSize presentationSize() const final { return m_presentationSize; }
     uint32_t pixelFormat() const final { return 0; }
+
+private:
+    VideoFrameGStreamer(GRefPtr<GstSample>&&, const FloatSize& presentationSize, const MediaTime& presentationTime = MediaTime::invalidTime(), Rotation = Rotation::None, bool videoMirrored = false, std::optional<VideoFrameTimeMetadata>&& = std::nullopt);
+    VideoFrameGStreamer(const GRefPtr<GstSample>&, const FloatSize& presentationSize, const MediaTime& presentationTime, Rotation = Rotation::None);
+
     bool isGStreamer() const final { return true; }
 
     GRefPtr<GstSample> m_sample;

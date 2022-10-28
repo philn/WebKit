@@ -30,11 +30,67 @@
 
 namespace WebCore {
 
+RefPtr<VideoFrame> VideoFrame::fromNativeImage(NativeImage&)
+{
+    // FIXME: Add support.
+    WTFLogAlways("%s", __PRETTY_FUNCTION__);
+    return nullptr;
+}
+
+RefPtr<VideoFrame> VideoFrame::createNV12(Span<const uint8_t>, size_t, size_t, const ComputedPlaneLayout&, const ComputedPlaneLayout&, PlatformVideoColorSpace&&)
+{
+    // FIXME: Add support.
+    WTFLogAlways("%s", __PRETTY_FUNCTION__);
+    return nullptr;
+}
+
+RefPtr<VideoFrame> VideoFrame::createRGBA(Span<const uint8_t>, size_t, size_t, const ComputedPlaneLayout&, PlatformVideoColorSpace&&)
+{
+    // FIXME: Add support.
+    WTFLogAlways("%s", __PRETTY_FUNCTION__);
+    return nullptr;
+}
+
+RefPtr<VideoFrame> VideoFrame::createBGRA(Span<const uint8_t>, size_t, size_t, const ComputedPlaneLayout&, PlatformVideoColorSpace&&)
+{
+    // FIXME: Add support.
+    WTFLogAlways("%s", __PRETTY_FUNCTION__);
+    return nullptr;
+}
+
+RefPtr<VideoFrame> VideoFrame::createI420(Span<const uint8_t>, size_t, size_t, const ComputedPlaneLayout&, const ComputedPlaneLayout&, const ComputedPlaneLayout&, PlatformVideoColorSpace&&)
+{
+    // FIXME: Add support.
+    WTFLogAlways("%s", __PRETTY_FUNCTION__);
+    return nullptr;
+}
+
+void VideoFrame::copyTo(Span<uint8_t>, VideoPixelFormat, Vector<ComputedPlaneLayout>&&, CopyCallback&& callback)
+{
+    // FIXME: Add support.
+    WTFLogAlways("%s", __PRETTY_FUNCTION__);
+    callback({});
+}
+
+void VideoFrame::paintInContext(GraphicsContext&, const FloatRect&, bool)
+{
+    // FIXME: Add support.
+    WTFLogAlways("%s", __PRETTY_FUNCTION__);
+}
+
 static inline void setBufferFields(GstBuffer* buffer, const MediaTime& presentationTime, double frameRate)
 {
     GST_BUFFER_FLAG_SET(buffer, GST_BUFFER_FLAG_LIVE);
     GST_BUFFER_DTS(buffer) = GST_BUFFER_PTS(buffer) = toGstClockTime(presentationTime);
     GST_BUFFER_DURATION(buffer) = toGstClockTime(1_s / frameRate);
+}
+
+Ref<VideoFrameGStreamer> VideoFrameGStreamer::createWrappedSample(const GRefPtr<GstSample>& sample, const MediaTime& presentationTime, Rotation videoRotation)
+{
+    auto* caps = gst_sample_get_caps(sample.get());
+    auto presentationSize = getVideoResolutionFromCaps(caps);
+    RELEASE_ASSERT(presentationSize);
+    return adoptRef(*new VideoFrameGStreamer(sample, *presentationSize, presentationTime, videoRotation));
 }
 
 Ref<VideoFrameGStreamer> VideoFrameGStreamer::createFromPixelBuffer(Ref<PixelBuffer>&& pixelBuffer, CanvasContentType canvasContentType, Rotation videoRotation, const MediaTime& presentationTime, const IntSize& destinationSize, double frameRate, bool videoMirrored, std::optional<VideoFrameTimeMetadata>&& metadata)
@@ -123,9 +179,10 @@ VideoFrameGStreamer::VideoFrameGStreamer(GRefPtr<GstSample>&& sample, const Floa
         buffer = webkitGstBufferSetVideoFrameTimeMetadata(buffer, WTFMove(metadata));
 }
 
-VideoFrameGStreamer::VideoFrameGStreamer(const GRefPtr<GstSample>& sample, const MediaTime& presentationTime, Rotation videoRotation)
+VideoFrameGStreamer::VideoFrameGStreamer(const GRefPtr<GstSample>& sample, const FloatSize& presentationSize, const MediaTime& presentationTime, Rotation videoRotation)
     : VideoFrame(presentationTime, false, videoRotation)
     , m_sample(sample)
+    , m_presentationSize(presentationSize)
 {
 }
 

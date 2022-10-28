@@ -49,7 +49,7 @@ void VideoFrame::initializeCharacteristics(MediaTime presentationTime, bool isMi
     const_cast<Rotation&>(m_rotation) = rotation;
 }
 
-#if !PLATFORM(COCOA)
+#if !PLATFORM(COCOA) && !USE(GSTREAMER)
 RefPtr<VideoFrame> VideoFrame::fromNativeImage(NativeImage&)
 {
     // FIXME: Add support.
@@ -86,6 +86,13 @@ void VideoFrame::copyTo(Span<uint8_t>, VideoPixelFormat, Vector<ComputedPlaneLay
     callback({ });
 }
 
+void VideoFrame::paintInContext(GraphicsContext&, const FloatRect&, bool)
+{
+    // FIXME: Add support.
+}
+#endif
+
+#if !PLATFORM(COCOA)
 RefPtr<JSC::Uint8ClampedArray> VideoFrame::getRGBAImageData() const
 {
 #if USE(GSTREAMER)
@@ -94,11 +101,6 @@ RefPtr<JSC::Uint8ClampedArray> VideoFrame::getRGBAImageData() const
 #endif
     // FIXME: Add support.
     return nullptr;
-}
-
-void VideoFrame::paintInContext(GraphicsContext&, const FloatRect&, bool)
-{
-    // FIXME: Add support.
 }
 #endif
 

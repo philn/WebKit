@@ -3330,7 +3330,6 @@ void webkit_settings_set_enable_webrtc(WebKitSettings* settings, gboolean enable
     if (enabled)
         webkit_settings_set_enable_media_stream(settings, enabled);
     priv->preferences->setPeerConnectionEnabled(enabled);
-    priv->preferences->setWebCodecsEnabled(enabled);
     g_object_notify_by_pspec(G_OBJECT(settings), sObjProperties[PROP_ENABLE_WEBRTC]);
 }
 

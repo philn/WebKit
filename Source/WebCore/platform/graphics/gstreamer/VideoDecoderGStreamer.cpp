@@ -167,9 +167,8 @@ void GStreamerVideoDecoder::decode(EncodedFrame&& frame, DecodeCallback&& callba
         if (protectedThis->m_isClosed)
             return;
 
-        String result;
-        // FIXME: fill result in case of error.
-        callback(WTFMove(result));
+        // FIXME: Bubble error if any, through outputCallback, and return early.
+        callback({ });
     });
 }
 
