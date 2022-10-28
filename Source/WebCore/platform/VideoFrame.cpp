@@ -85,11 +85,6 @@ void VideoFrame::copyTo(Span<uint8_t>, VideoPixelFormat, Vector<ComputedPlaneLay
     // FIXME: Add support.
     callback({ });
 }
-
-void VideoFrame::paintInContext(GraphicsContext&, const FloatRect&, bool)
-{
-    // FIXME: Add support.
-}
 #endif
 
 #if !PLATFORM(COCOA)

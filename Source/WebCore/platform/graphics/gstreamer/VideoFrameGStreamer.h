@@ -58,6 +58,8 @@ public:
     FloatSize presentationSize() const final { return m_presentationSize; }
     uint32_t pixelFormat() const final { return 0; }
 
+    void paintInContext(GraphicsContext&, const FloatRect&, bool shouldDiscardAlpha) final;
+
 private:
     VideoFrameGStreamer(GRefPtr<GstSample>&&, const FloatSize& presentationSize, const MediaTime& presentationTime = MediaTime::invalidTime(), Rotation = Rotation::None, bool videoMirrored = false, std::optional<VideoFrameTimeMetadata>&& = std::nullopt);
     VideoFrameGStreamer(const GRefPtr<GstSample>&, const FloatSize& presentationSize, const MediaTime& presentationTime, Rotation = Rotation::None);

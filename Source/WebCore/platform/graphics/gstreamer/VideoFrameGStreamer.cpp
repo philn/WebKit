@@ -22,6 +22,9 @@
 #include "VideoFrameGStreamer.h"
 
 #include "GStreamerCommon.h"
+#include "GraphicsContext.h"
+#include "ImageGStreamer.h"
+#include "ImageOrientation.h"
 #include "PixelBuffer.h"
 #include <JavaScriptCore/JSCInlines.h>
 #include <JavaScriptCore/TypedArrayInlines.h>
@@ -72,10 +75,17 @@ void VideoFrame::copyTo(Span<uint8_t>, VideoPixelFormat, Vector<ComputedPlaneLay
     callback({});
 }
 
-void VideoFrame::paintInContext(GraphicsContext&, const FloatRect&, bool)
+void VideoFrameGStreamer::paintInContext(GraphicsContext& context, const FloatRect& destination, bool shouldDiscardAlpha)
 {
-    // FIXME: Add support.
-    WTFLogAlways("%s", __PRETTY_FUNCTION__);
+    UNUSED_PARAM(shouldDiscardAlpha);
+    auto gstImage = ImageGStreamer::createImage(m_sample.get());
+    if (!gstImage)
+        return;
+
+    //FloatRect imageRect = rotation().usesWidthAsHeight() ? FloatRect(gstImage->rect().location(), gstImage->rect().size().transposedSize()) : gstImage->rect();
+    auto imageRect = gstImage->rect();
+
+    context.drawImage(gstImage->image(), destination, imageRect, { gstImage->hasAlpha() ? CompositeOperator::SourceOver : CompositeOperator::Copy, ImageOrientation::None });
 }
 
 static inline void setBufferFields(GstBuffer* buffer, const MediaTime& presentationTime, double frameRate)

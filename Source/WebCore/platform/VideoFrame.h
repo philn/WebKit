@@ -103,7 +103,7 @@ public:
 
     void initializeCharacteristics(MediaTime presentationTime, bool isMirrored, Rotation);
 
-    void paintInContext(GraphicsContext&, const FloatRect&, bool shouldDiscardAlpha);
+    WEBCORE_EXPORT virtual void paintInContext(GraphicsContext&, const FloatRect&, bool) { }
 
     const PlatformVideoColorSpace& colorSpace() const { return m_colorSpace; }
 
