@@ -3636,6 +3636,7 @@ void MediaPlayerPrivateGStreamer::paint(GraphicsContext& context, const FloatRec
         return;
 
     GstCaps* caps = gst_sample_get_caps(m_sample.get());
+    GST_DEBUG_OBJECT(m_pipeline.get(), "Input caps: %" GST_PTR_FORMAT, caps);
 
     GstVideoInfo videoInfo;
     gst_video_info_init(&videoInfo);
@@ -3664,14 +3665,19 @@ void MediaPlayerPrivateGStreamer::paint(GraphicsContext& context, const FloatRec
 #endif
             gst_caps_set_simple(m_colorConvertOutputCaps.get(), "format", G_TYPE_STRING, formatString,
                 "texture-target", G_TYPE_STRING, GST_GL_TEXTURE_TARGET_2D_STR, nullptr);
-            if (!gst_gl_color_convert_set_caps(m_colorConvert.get(), caps, m_colorConvertOutputCaps.get()))
+            if (!gst_gl_color_convert_set_caps(m_colorConvert.get(), caps, m_colorConvertOutputCaps.get())) {
+                GST_WARNING_OBJECT(m_pipeline.get(), "Unable to perform color conversion to %" GST_PTR_FORMAT, m_colorConvertOutputCaps.get());
                 return;
+            }
         }
 
         GRefPtr<GstBuffer> rgbBuffer = adoptGRef(gst_gl_color_convert_perform(m_colorConvert.get(), buffer));
-        if (UNLIKELY(!GST_IS_BUFFER(rgbBuffer.get())))
+        if (UNLIKELY(!GST_IS_BUFFER(rgbBuffer.get()))) {
+            GST_WARNING_OBJECT(m_pipeline.get(), "Video frame conversion failed");
             return;
+        }
 
+        GST_DEBUG_OBJECT(m_pipeline.get(), "Video frame converted to %" GST_PTR_FORMAT, m_colorConvertOutputCaps.get());
         const GstStructure* info = gst_sample_get_info(m_sample.get());
         m_sample = adoptGRef(gst_sample_new(rgbBuffer.get(), m_colorConvertOutputCaps.get(),
             gst_sample_get_segment(m_sample.get()), info ? gst_structure_copy(info) : nullptr));
@@ -3682,6 +3688,7 @@ void MediaPlayerPrivateGStreamer::paint(GraphicsContext& context, const FloatRec
     if (!gstImage)
         return;
 
+    GST_DEBUG_OBJECT(m_pipeline.get(), "Rendering video frame to graphics context");
     FloatRect imageRect = m_videoSourceOrientation.usesWidthAsHeight() ? FloatRect(gstImage->rect().location(), gstImage->rect().size().transposedSize()) : gstImage->rect();
 
     context.drawImage(gstImage->image(), rect, imageRect, { gstImage->hasAlpha() ? CompositeOperator::SourceOver : CompositeOperator::Copy, m_videoSourceOrientation });

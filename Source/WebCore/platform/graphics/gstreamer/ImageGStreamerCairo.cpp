@@ -28,11 +28,34 @@
 #include <gst/gst.h>
 #include <gst/video/gstvideometa.h>
 
+#if USE(GSTREAMER_GL)
+#include <gst/gl/gstglmemory.h>
+#endif
+
+GST_DEBUG_CATEGORY(webkit_image_image_cairo);
+#define GST_CAT_DEFAULT webkit_image_image_cairo
 
 namespace WebCore {
 
+#define CAT_PERFORMANCE gstGetPerformanceDebugCategory()
+
+static inline GstDebugCategory* gstGetPerformanceDebugCategory()
+{
+    static GstDebugCategory* cat = NULL;
+    static std::once_flag onceFlag;
+    std::call_once(onceFlag, [&] {
+        GST_DEBUG_CATEGORY_GET(cat, "GST_PERFORMANCE");
+    });
+    return cat;
+}
+
 ImageGStreamer::ImageGStreamer(GstSample* sample)
 {
+    static std::once_flag debugRegisteredFlag;
+    std::call_once(debugRegisteredFlag, [] {
+        GST_DEBUG_CATEGORY_INIT(webkit_image_image_cairo, "webkitimagecairo", 0, "WebKit Image Cairo");
+    });
+
     GstCaps* caps = gst_sample_get_caps(sample);
     GstVideoInfo videoInfo;
     gst_video_info_init(&videoInfo);
@@ -45,6 +68,16 @@ ImageGStreamer::ImageGStreamer(GstSample* sample)
     GstBuffer* buffer = gst_sample_get_buffer(sample);
     if (UNLIKELY(!GST_IS_BUFFER(buffer)))
         return;
+
+#if USE(GSTREAMER_GL)
+    auto* memory = gst_buffer_peek_memory(buffer, 0);
+    // Force a download of GL memory.
+    if (gst_is_gl_memory(memory)) {
+        GstMapInfo info;
+        if (gst_memory_map(memory, &info, static_cast<GstMapFlags>(GST_MAP_WRITE | GST_MAP_GL)))
+            gst_memory_unmap(memory, &info);
+    }
+#endif
 
     m_frameMapped = gst_video_frame_map(&m_videoFrame, &videoInfo, buffer, GST_MAP_READ);
     if (!m_frameMapped)
@@ -77,6 +110,7 @@ ImageGStreamer::ImageGStreamer(GstSample* sample)
         uint8_t* surfaceData = static_cast<uint8_t*>(fastMalloc(height * stride));
         uint8_t* surfacePixel = surfaceData;
 
+        GST_CAT_TRACE(CAT_PERFORMANCE, "Copying video frame data to cairo texture");
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 // These store the source pixel components.
@@ -151,8 +185,10 @@ ImageGStreamer::ImageGStreamer(GstSample* sample)
         surface = adoptRef(cairo_image_surface_create_for_data(surfaceData, CAIRO_FORMAT_ARGB32, width, height, stride));
         static cairo_user_data_key_t s_surfaceDataKey;
         cairo_surface_set_user_data(surface.get(), &s_surfaceDataKey, surfaceData, [](void* data) { fastFree(data); });
-    } else
+    } else {
+        GST_TRACE("Creating cairo surface from video frame data");
         surface = adoptRef(cairo_image_surface_create_for_data(bufferData, CAIRO_FORMAT_ARGB32, width, height, stride));
+    }
 
     ASSERT(cairo_surface_status(surface.get()) == CAIRO_STATUS_SUCCESS);
     m_image = BitmapImage::create(WTFMove(surface));
