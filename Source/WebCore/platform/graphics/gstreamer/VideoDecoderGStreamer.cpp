@@ -112,7 +112,6 @@ GStreamerVideoDecoder::GStreamerVideoDecoder(const String& codecName, const Conf
         decoder->connectPad(pad);
     }), this);
 
-    m_videoconvert = makeGStreamerElement("videoconvert", nullptr);
     m_sink = makeGStreamerElement("appsink", nullptr);
 
     static GstAppSinkCallbacks callbacks = {
@@ -136,12 +135,10 @@ GStreamerVideoDecoder::GStreamerVideoDecoder(const String& codecName, const Conf
     };
     gst_app_sink_set_callbacks(GST_APP_SINK(m_sink.get()), &callbacks, this, nullptr);
 
-    auto caps = adoptGRef(gst_caps_from_string("video/x-raw, format=(string)RGBA"));
-    g_object_set(m_sink.get(), "enable-last-sample", FALSE, "sync", false, "caps", caps.get(), nullptr);
+    g_object_set(m_sink.get(), "enable-last-sample", FALSE, "sync", FALSE, nullptr);
 
-    gst_bin_add_many(GST_BIN_CAST(m_pipeline.get()), m_src.get(), m_decodebin.get(), m_videoconvert.get(), m_sink.get(), nullptr);
+    gst_bin_add_many(GST_BIN_CAST(m_pipeline.get()), m_src.get(), m_decodebin.get(), m_sink.get(), nullptr);
     gst_element_link(m_src.get(), m_decodebin.get());
-    gst_element_link(m_videoconvert.get(), m_sink.get());
     gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
 }
 
@@ -215,15 +212,12 @@ bool GStreamerVideoDecoder::handleMessage(GstMessage* message)
 
 void GStreamerVideoDecoder::connectPad(GstPad* pad)
 {
-    auto padCaps = adoptGRef(gst_pad_query_caps(pad, nullptr));
-    GST_DEBUG_OBJECT(m_pipeline.get(), "New decodebin pad %" GST_PTR_FORMAT " caps: %" GST_PTR_FORMAT, pad, padCaps.get());
+    auto caps = adoptGRef(gst_pad_query_caps(pad, nullptr));
+    GST_DEBUG_OBJECT(m_pipeline.get(), "New decodebin pad %" GST_PTR_FORMAT " caps: %" GST_PTR_FORMAT, pad, caps.get());
+    RELEASE_ASSERT(doCapsHaveType(caps.get(), "video"));
 
-    bool isVideo = doCapsHaveType(padCaps.get(), "video");
-    RELEASE_ASSERT(isVideo);
-
-    auto sinkPad = adoptGRef(gst_element_get_static_pad(m_videoconvert.get(), "sink"));
+    auto sinkPad = adoptGRef(gst_element_get_static_pad(m_sink.get(), "sink"));
     gst_pad_link(pad, sinkPad.get());
-    gst_element_sync_state_with_parent(m_videoconvert.get());
     gst_element_sync_state_with_parent(m_sink.get());
 }
 

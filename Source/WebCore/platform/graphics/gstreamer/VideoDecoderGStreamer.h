@@ -56,7 +56,6 @@ private:
     GRefPtr<GstElement> m_pipeline;
     GRefPtr<GstElement> m_src;
     GRefPtr<GstElement> m_decodebin;
-    GRefPtr<GstElement> m_videoconvert;
     GRefPtr<GstElement> m_sink;
 
     Condition m_sampleCondition;

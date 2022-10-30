@@ -19,10 +19,12 @@
 
 #pragma once
 
+#include "ImageOrientation.h"
 #if ENABLE(VIDEO) && USE(GSTREAMER)
 
 #include "VideoFrame.h"
 #include "VideoFrameMetadataGStreamer.h"
+#include <gst/video/video-format.h>
 #include <wtf/glib/GRefPtr.h>
 
 typedef struct _GstSample GstSample;
@@ -40,15 +42,11 @@ public:
         Canvas2D
     };
 
-    static Ref<VideoFrameGStreamer> create(GRefPtr<GstSample>&& sample, const FloatSize& presentationSize, const MediaTime& presentationTime = MediaTime::invalidTime(), Rotation videoRotation = Rotation::None, bool videoMirrored = false, std::optional<VideoFrameTimeMetadata>&& metadata = std::nullopt)
-    {
-        return adoptRef(*new VideoFrameGStreamer(WTFMove(sample), presentationSize, presentationTime, videoRotation, videoMirrored, WTFMove(metadata)));
-    }
+    static Ref<VideoFrameGStreamer> create(GRefPtr<GstSample>&& sample, const FloatSize& presentationSize, const MediaTime& presentationTime = MediaTime::invalidTime(), Rotation videoRotation = Rotation::None, bool videoMirrored = false, std::optional<VideoFrameTimeMetadata>&& metadata = std::nullopt);
 
     static Ref<VideoFrameGStreamer> createWrappedSample(const GRefPtr<GstSample>& sample, const MediaTime& presentationTime, Rotation videoRotation = Rotation::None);
 
     static Ref<VideoFrameGStreamer> createFromPixelBuffer(Ref<PixelBuffer>&&, CanvasContentType canvasContentType, Rotation videoRotation, const MediaTime& presentationTime = MediaTime::invalidTime(), const IntSize& destinationSize = { }, double frameRate = 1, bool videoMirrored = false, std::optional<VideoFrameTimeMetadata>&& metadata = std::nullopt);
-
 
     RefPtr<VideoFrameGStreamer> resizeTo(const IntSize&);
 
@@ -56,18 +54,22 @@ public:
     RefPtr<JSC::Uint8ClampedArray> computeRGBAImageData() const;
 
     FloatSize presentationSize() const final { return m_presentationSize; }
-    uint32_t pixelFormat() const final { return 0; }
+    uint32_t pixelFormat() const final;
+
+    void setImageOrientation(const ImageOrientation& orientation) { m_imageOrientation = orientation; }
 
     void paintInContext(GraphicsContext&, const FloatRect&, bool shouldDiscardAlpha) final;
 
 private:
-    VideoFrameGStreamer(GRefPtr<GstSample>&&, const FloatSize& presentationSize, const MediaTime& presentationTime = MediaTime::invalidTime(), Rotation = Rotation::None, bool videoMirrored = false, std::optional<VideoFrameTimeMetadata>&& = std::nullopt);
-    VideoFrameGStreamer(const GRefPtr<GstSample>&, const FloatSize& presentationSize, const MediaTime& presentationTime, Rotation = Rotation::None);
+    VideoFrameGStreamer(GRefPtr<GstSample>&&, const FloatSize& presentationSize, const MediaTime& presentationTime = MediaTime::invalidTime(), Rotation = Rotation::None, bool videoMirrored = false, std::optional<VideoFrameTimeMetadata>&& = std::nullopt, PlatformVideoColorSpace&& = { });
+    VideoFrameGStreamer(const GRefPtr<GstSample>&, const FloatSize& presentationSize, const MediaTime& presentationTime, Rotation = Rotation::None, PlatformVideoColorSpace&& = {});
 
     bool isGStreamer() const final { return true; }
 
     GRefPtr<GstSample> m_sample;
     FloatSize m_presentationSize;
+    mutable GstVideoFormat m_cachedVideoFormat { GST_VIDEO_FORMAT_UNKNOWN };
+    ImageOrientation m_imageOrientation;
 };
 
 } // namespace WebCore
