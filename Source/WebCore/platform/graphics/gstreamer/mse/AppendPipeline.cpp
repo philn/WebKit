@@ -141,18 +141,16 @@ AppendPipeline::AppendPipeline(SourceBufferPrivateGStreamer& sourceBufferPrivate
     }, this, nullptr);
 
     const String& type = m_sourceBufferPrivate.type().containerType();
-    GST_DEBUG("SourceBuffer containerType: %s", type.utf8().data());
-    bool hasDemuxer = true;
-    if (type.endsWith("mp4"_s) || type.endsWith("aac"_s)) {
+    GST_DEBUG_OBJECT(pipeline(), "SourceBuffer containerType: %s", type.utf8().data());
+
+    GstElement* typefind = nullptr;
+    if (type.endsWith("mp4"_s) || type.endsWith("aac"_s))
         m_demux = makeGStreamerElement("qtdemux", nullptr);
-        m_typefind = makeGStreamerElement("identity", nullptr);
-    } else if (type.endsWith("webm"_s)) {
+    else if (type.endsWith("webm"_s))
         m_demux = makeGStreamerElement("matroskademux", nullptr);
-        m_typefind = makeGStreamerElement("identity", nullptr);
-    } else if (type == "audio/mpeg"_s) {
+    else if (type == "audio/mpeg"_s) {
         m_demux = makeGStreamerElement("identity", nullptr);
-        m_typefind = makeGStreamerElement("typefind", nullptr);
-        hasDemuxer = false;
+        typefind = makeGStreamerElement("typefind", nullptr);
     } else
         ASSERT_NOT_REACHED();
 
@@ -163,11 +161,13 @@ AppendPipeline::AppendPipeline(SourceBufferPrivateGStreamer& sourceBufferPrivate
     m_demuxerDataEnteringPadProbeInformation.probeId = gst_pad_add_probe(demuxerPad.get(), GST_PAD_PROBE_TYPE_BUFFER, reinterpret_cast<GstPadProbeCallback>(appendPipelinePadProbeDebugInformation), &m_demuxerDataEnteringPadProbeInformation, nullptr);
 #endif
 
-    if (hasDemuxer) {
+    auto elementClass = makeString(gst_element_get_metadata(m_demux.get(), GST_ELEMENT_METADATA_KLASS));
+    auto classifiers = elementClass.split('/');
+    if (classifiers.contains("Demuxer"_s)) {
         // These signals won't outlive the lifetime of `this`.
-        g_signal_connect(m_demux.get(), "no-more-pads", G_CALLBACK(+[](GstElement*, AppendPipeline* appendPipeline) {
+        g_signal_connect_swapped(m_demux.get(), "no-more-pads", G_CALLBACK(+[](AppendPipeline* appendPipeline) {
             ASSERT(!isMainThread());
-            GST_DEBUG("Posting no-more-pads task to main thread");
+            GST_DEBUG_OBJECT(appendPipeline->pipeline(), "Posting no-more-pads task to main thread");
             appendPipeline->m_taskQueue.enqueueTaskAndWait<AbortableTaskQueue::Void>([appendPipeline]() {
                 appendPipeline->didReceiveInitializationSegment();
                 return AbortableTaskQueue::Void();
@@ -177,7 +177,7 @@ AppendPipeline::AppendPipeline(SourceBufferPrivateGStreamer& sourceBufferPrivate
         GRefPtr<GstPad> identitySrcPad = adoptGRef(gst_element_get_static_pad(m_demux.get(), "src"));
         gst_pad_add_probe(identitySrcPad.get(), GST_PAD_PROBE_TYPE_BUFFER, reinterpret_cast<GstPadProbeCallback>(
             +[](GstPad *pad, GstPadProbeInfo*, AppendPipeline* appendPipeline) {
-                GRefPtr<GstCaps> caps = gst_pad_get_current_caps(pad);
+                auto caps = adoptGRef(gst_pad_get_current_caps(pad));
                 if (!caps)
                     return GST_PAD_PROBE_DROP;
                 appendPipeline->m_taskQueue.enqueueTaskAndWait<AbortableTaskQueue::Void>([appendPipeline]() {
@@ -190,8 +190,12 @@ AppendPipeline::AppendPipeline(SourceBufferPrivateGStreamer& sourceBufferPrivate
     }
 
     // Add_many will take ownership of a reference. That's why we used an assignment before.
-    gst_bin_add_many(GST_BIN(m_pipeline.get()), m_appsrc.get(), m_typefind.get(), m_demux.get(), nullptr);
-    gst_element_link_many(m_appsrc.get(), m_typefind.get(), m_demux.get(), nullptr);
+    gst_bin_add_many(GST_BIN_CAST(m_pipeline.get()), m_appsrc.get(), m_demux.get(), nullptr);
+    if (typefind) {
+        gst_bin_add(GST_BIN_CAST(m_pipeline.get()), typefind);
+        gst_element_link_many(m_appsrc.get(), typefind, m_demux.get(), nullptr);
+    } else
+        gst_element_link(m_appsrc.get(), m_demux.get());
 
     assertedElementSetState(m_pipeline.get(), GST_STATE_PLAYING);
 }

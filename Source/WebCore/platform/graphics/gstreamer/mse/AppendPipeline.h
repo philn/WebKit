@@ -155,8 +155,7 @@ private:
     GRefPtr<GstElement> m_pipeline;
     GRefPtr<GstBus> m_bus;
     GRefPtr<GstElement> m_appsrc;
-    // To simplify the code, mtypefind and m_demux can be a GstIdentity when not needed.
-    GRefPtr<GstElement> m_typefind;
+    // To simplify the code, m_demux can be a GstIdentity when not needed.
     GRefPtr<GstElement> m_demux;
 
     Vector<std::unique_ptr<Track>> m_tracks;
