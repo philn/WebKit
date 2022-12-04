@@ -151,6 +151,12 @@ AppendPipeline::AppendPipeline(SourceBufferPrivateGStreamer& sourceBufferPrivate
     else if (type == "audio/mpeg"_s) {
         m_demux = makeGStreamerElement("identity", nullptr);
         typefind = makeGStreamerElement("typefind", nullptr);
+    } else if (type == "audio/flac"_s) {
+        m_demux = makeGStreamerElement("identity", nullptr);
+        // The typefind element can't reliably detect headerless flac bitstreams, so hardcode caps
+        // on the source element, the downstream parser will refine those.
+        auto caps = adoptGRef(gst_caps_new_empty_simple("audio/x-flac"));
+        gst_app_src_set_caps(GST_APP_SRC_CAST(m_appsrc.get()), caps.get());
     } else
         ASSERT_NOT_REACHED();
 
@@ -398,6 +404,13 @@ void AppendPipeline::appsinkNewSample(const Track& track, GRefPtr<GstSample>&& s
         return;
     }
 
+    if (m_sourceBufferPrivate.timestampOffset().isValid()) {
+        auto offset = toGstClockTime(m_sourceBufferPrivate.timestampOffset());
+        if (GST_BUFFER_PTS(buffer) >= offset)
+            GST_BUFFER_PTS(buffer) -= offset;
+        if (GST_BUFFER_DTS_IS_VALID(buffer) && GST_BUFFER_DTS(buffer) >= offset)
+            GST_BUFFER_DTS(buffer) -= offset;
+    }
     auto mediaSample = MediaSampleGStreamer::create(WTFMove(sample), track.presentationSize, track.trackId);
 
     GST_TRACE_OBJECT(pipeline(), "append: trackId=%s PTS=%s DTS=%s DUR=%s presentationSize=%.0fx%.0f",
@@ -741,7 +754,8 @@ GRefPtr<GstElement> createOptionalParserForFormat(GstBin* bin, const AtomString&
         default:
             GST_WARNING_OBJECT(bin, "Unsupported audio mpeg caps: %" GST_PTR_FORMAT, caps);
         }
-    }
+    } else if (!g_strcmp0(mediaType, "audio/x-flac"))
+        elementClass = "flacparse";
 
     GST_DEBUG_OBJECT(bin, "Creating %s parser for stream with caps %" GST_PTR_FORMAT, elementClass, caps);
     GRefPtr<GstElement> result(makeGStreamerElement(elementClass, parserName.ascii().data()));
