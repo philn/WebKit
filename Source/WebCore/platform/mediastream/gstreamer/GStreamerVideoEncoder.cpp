@@ -38,7 +38,7 @@ GST_DEBUG_CATEGORY(webrtc_venc_debug);
 #define KBIT_TO_BIT 1024
 
 static GstStaticPadTemplate sinkTemplate = GST_STATIC_PAD_TEMPLATE("sink", GST_PAD_SINK, GST_PAD_ALWAYS, GST_STATIC_CAPS("video/x-raw(ANY)"));
-static GstStaticPadTemplate srcTemplate = GST_STATIC_PAD_TEMPLATE("src", GST_PAD_SRC, GST_PAD_ALWAYS, GST_STATIC_CAPS("video/x-h264;video/x-vp8;video/x-vp9"));
+static GstStaticPadTemplate srcTemplate = GST_STATIC_PAD_TEMPLATE("src", GST_PAD_SRC, GST_PAD_ALWAYS, GST_STATIC_CAPS("video/x-h264;video/x-vp8;video/x-vp9;video/x-h265"));
 
 using SetBitrateFunc = Function<void(GObject* encoder, const char* propertyName, int bitrate)>;
 using SetupFunc = Function<void(WebKitWebrtcVideoEncoder*)>;
@@ -61,6 +61,7 @@ enum EncoderId {
     OpenH264,
     OmxH264,
     VaapiH264,
+    VaapiH265,
     Vp8,
     Vp9
 };
@@ -487,6 +488,12 @@ static void webkit_webrtc_video_encoder_class_init(WebKitWebrtcVideoEncoderClass
         }, "bitrate", setBitrateKbitPerSec, "key-int-max");
 
     Encoders::registerEncoder(VaapiH264, "vah264enc", "h264parse", "video/x-h264", nullptr,
+        [](WebKitWebrtcVideoEncoder* self) {
+            gst_util_set_object_arg(G_OBJECT(self->priv->encoder.get()), "rate-control", "cbr");
+            g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
+        }, "bitrate", setBitrateKbitPerSec, "key-int-max");
+
+    Encoders::registerEncoder(VaapiH265, "vah265enc", "h265parse", "video/x-h265", nullptr,
         [](WebKitWebrtcVideoEncoder* self) {
             gst_util_set_object_arg(G_OBJECT(self->priv->encoder.get()), "rate-control", "cbr");
             g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
