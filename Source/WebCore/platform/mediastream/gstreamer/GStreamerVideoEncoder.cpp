@@ -60,6 +60,7 @@ enum EncoderId {
     X264,
     OpenH264,
     OmxH264,
+    VaapiH264,
     Vp8,
     Vp9
 };
@@ -479,6 +480,17 @@ static void webkit_webrtc_video_encoder_class_init(WebKitWebrtcVideoEncoderClass
             }
             g_object_set(self->priv->inputCapsFilter.get(), "caps", inputCaps.get(), nullptr);
         }, "target-bitrate", setBitrateBitPerSec, "keyframe-max-dist");
+
+    Encoders::registerEncoder(VaapiH264, "vah264lpenc", "h264parse", "video/x-h264", nullptr,
+        [](WebKitWebrtcVideoEncoder* self) {
+            g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
+        }, "bitrate", setBitrateKbitPerSec, "key-int-max");
+
+    Encoders::registerEncoder(VaapiH264, "vah264enc", "h264parse", "video/x-h264", nullptr,
+        [](WebKitWebrtcVideoEncoder* self) {
+            gst_util_set_object_arg(G_OBJECT(self->priv->encoder.get()), "rate-control", "cbr");
+            g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
+        }, "bitrate", setBitrateKbitPerSec, "key-int-max");
 
     auto srcPadTemplateCaps = createSrcPadTemplateCaps();
     gst_element_class_add_pad_template(elementClass, gst_pad_template_new("src", GST_PAD_SRC, GST_PAD_ALWAYS, srcPadTemplateCaps.get()));
