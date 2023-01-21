@@ -22,6 +22,7 @@
 #if USE(GSTREAMER) && ENABLE(VIDEO)
 
 #include "GStreamerCommon.h"
+#include "GStreamerElementHarness.h"
 #include "ImageDecoder.h"
 #include "MIMETypeRegistry.h"
 #include "SampleMap.h"
@@ -78,47 +79,32 @@ public:
 
     void setHasEOS();
     void notifySample(GRefPtr<GstSample>&&);
+    void storeDecodedSample(GRefPtr<GstSample>&&);
 
 private:
     class InnerDecoder : public ThreadSafeRefCounted<InnerDecoder>, public CanMakeWeakPtr<InnerDecoder> {
         WTF_MAKE_FAST_ALLOCATED;
         WTF_MAKE_NONCOPYABLE(InnerDecoder);
     public:
-        static RefPtr<InnerDecoder> create(ImageDecoderGStreamer& decoder, const uint8_t* data, gssize size)
+        static RefPtr<InnerDecoder> create(ImageDecoderGStreamer& decoder, Span<const uint8_t> buffer)
         {
-            return adoptRef(*new InnerDecoder(decoder, data, size));
+            return adoptRef(*new InnerDecoder(decoder, buffer));
         }
 
-        InnerDecoder(ImageDecoderGStreamer& decoder, const uint8_t* data, gssize size)
-            : m_decoder(decoder)
-            , m_runLoop(RunLoop::current())
-        {
-            m_memoryStream = adoptGRef(g_memory_input_stream_new_from_data(data, size, nullptr));
-        }
-
-        ~InnerDecoder();
+        ~InnerDecoder() = default;
 
         void run();
         EncodedDataStatus encodedDataStatus() const;
 
     private :
-        static void decodebinPadAddedCallback(ImageDecoderGStreamer::InnerDecoder*, GstPad*);
-        void handleMessage(GstMessage*);
-        void preparePipeline();
-        void connectDecoderPad(GstPad*);
+        InnerDecoder(ImageDecoderGStreamer&, Span<const uint8_t>);
 
         ImageDecoderGStreamer& m_decoder;
-        GRefPtr<GstElement> m_pipeline;
-        GRefPtr<GInputStream> m_memoryStream;
-        GRefPtr<GstElement> m_decodebin;
-        RunLoop& m_runLoop;
-
-        Condition m_messageCondition;
-        Lock m_messageLock;
-        bool m_messageDispatched WTF_GUARDED_BY_LOCK(m_messageLock) { false };
+        Span<const uint8_t> m_buffer;
+        RefPtr<GStreamerElementHarness> m_parserHarness;
+        RefPtr<GStreamerElementHarness> m_decoderHarness;
     };
 
-    void handleSample(GRefPtr<GstSample>&&);
     void pushEncodedData(const FragmentedSharedBuffer&);
 
     const ImageDecoderGStreamerSample* sampleAtIndex(size_t) const;
