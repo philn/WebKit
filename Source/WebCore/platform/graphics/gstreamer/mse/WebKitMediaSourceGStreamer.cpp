@@ -210,13 +210,18 @@ static GRefPtr<GstElement> findPipeline(GRefPtr<GstElement> element)
 }
 #endif // GST_DISABLE_GST_DEBUG
 
+static String trimPathSeparator(const AtomString& s)
+{
+    return makeStringByReplacingAll(s, '/', '-');
+}
+
 static void dumpPipeline(ASCIILiteral description, const RefPtr<Stream>& stream)
 {
 #ifdef GST_DISABLE_GST_DEBUG
     [[maybe_unused]] fileNamePattern;
     [[maybe_unused]] stream;
 #else
-    auto fileName = makeString("playback-pipeline-"_s, stream->track->stringId(), '-', description);
+    auto fileName = makeString("playback-pipeline-"_s, trimPathSeparator(stream->track->stringId()), '-', description);
     GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(findPipeline(GRefPtr<GstElement>(GST_ELEMENT(stream->source))).get()),
         GST_DEBUG_GRAPH_SHOW_ALL, fileName.utf8().data());
 #endif
