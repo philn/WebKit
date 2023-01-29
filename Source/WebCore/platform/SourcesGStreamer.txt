@@ -88,6 +88,7 @@ platform/graphics/gstreamer/eme/WebKitThunderDecryptorGStreamer.cpp @no-unify
 platform/graphics/gstreamer/mse/AppendPipeline.cpp
 platform/graphics/gstreamer/mse/GStreamerMediaDescription.cpp
 platform/graphics/gstreamer/mse/GStreamerRegistryScannerMSE.cpp
+platform/graphics/gstreamer/mse/GStreamerSourceBufferParser.cpp
 platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.cpp
 platform/graphics/gstreamer/mse/MediaSourcePrivateGStreamer.cpp
 platform/graphics/gstreamer/mse/MediaSourceTrackGStreamer.cpp

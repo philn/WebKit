@@ -338,15 +338,24 @@ void TrackPrivateBaseGStreamer::installUpdateConfigurationHandlers()
         }), this);
     } else if (m_stream) {
         g_signal_connect_swapped(m_stream.get(), "notify::caps", G_CALLBACK(+[](TrackPrivateBaseGStreamer* track) {
-            track->m_taskQueue.enqueueTask([track]() {
-                auto caps = adoptGRef(gst_stream_get_caps(track->m_stream.get()));
+            auto caps = adoptGRef(gst_stream_get_caps(track->m_stream.get()));
+            if (isMainThread()) {
+                track->capsChanged(String::fromLatin1(gst_stream_get_stream_id(track->m_stream.get())), WTFMove(caps));
+                return;
+            }
+            track->m_taskQueue.enqueueTask([track, caps = WTFMove(caps)]() mutable {
                 track->capsChanged(String::fromLatin1(gst_stream_get_stream_id(track->m_stream.get())), WTFMove(caps));
             });
         }), this);
 
         g_signal_connect_swapped(m_stream.get(), "notify::tags", G_CALLBACK(+[](TrackPrivateBaseGStreamer* track) {
-            track->m_taskQueue.enqueueTask([track]() {
-                auto tags = adoptGRef(gst_stream_get_tags(track->m_stream.get()));
+            auto tags = adoptGRef(gst_stream_get_tags(track->m_stream.get()));
+            if (isMainThread()) {
+                track->updateConfigurationFromTags(WTFMove(tags));
+                return;
+            }
+
+            track->m_taskQueue.enqueueTask([track, tags = WTFMove(tags)]() mutable {
                 track->updateConfigurationFromTags(WTFMove(tags));
             });
         }), this);

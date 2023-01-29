@@ -406,6 +406,10 @@ void registerWebKitGStreamerElements()
                 gst_plugin_feature_set_rank(GST_PLUGIN_FEATURE_CAST(avAACDecoderFactory.get()), GST_RANK_MARGINAL);
         }
 
+        // Uprank opusparse, so that parsebin (used by the MSE SourceBuffer parser) can make use of it.
+        if (auto factory = adoptGRef(gst_element_factory_find("opusparse")))
+            gst_plugin_feature_set_rank(GST_PLUGIN_FEATURE_CAST(factory.get()), GST_RANK_SECONDARY);
+
         // Prevent decodebin(3) from auto-plugging hlsdemux if it was disabled. UAs should be able
         // to fallback to MSE when this happens.
         const char* hlsSupport = g_getenv("WEBKIT_GST_ENABLE_HLS_SUPPORT");
