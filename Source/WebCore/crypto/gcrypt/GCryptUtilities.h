@@ -86,4 +86,8 @@ std::optional<Vector<uint8_t>> mpiZeroPrefixedData(gcry_sexp_t, size_t targetLen
 std::optional<Vector<uint8_t>> mpiSignedData(gcry_mpi_t);
 std::optional<Vector<uint8_t>> mpiSignedData(gcry_sexp_t);
 
+std::optional<Vector<uint8_t>> gcryptDeriveHKDFBits(const Vector<uint8_t>& key, const Vector<uint8_t>& salt, const Vector<uint8_t>& info, size_t lengthInBytes, CryptoAlgorithmIdentifier);
+
+std::optional<Vector<uint8_t>> gcryptAES_CTR(PAL::GCrypt::CipherOperation, const Vector<uint8_t>& key, const Vector<uint8_t>& counter, size_t counterLength, const Vector<uint8_t>& inputText);
+
 } // namespace WebCore
