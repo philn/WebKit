@@ -286,6 +286,8 @@ set(WebCore_PRIVATE_FRAMEWORK_HEADERS
     Modules/indexeddb/shared/IDBResultData.h
     Modules/indexeddb/shared/IDBTransactionInfo.h
 
+    Modules/keyboard-lock/Keyboard.h
+
     Modules/mediarecorder/MediaRecorderProvider.h
 
     Modules/mediasession/NavigatorMediaSession.h
