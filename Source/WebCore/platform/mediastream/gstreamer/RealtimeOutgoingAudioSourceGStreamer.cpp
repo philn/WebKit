@@ -63,6 +63,18 @@ void RealtimeOutgoingAudioSourceGStreamer::initialize()
     });
     static Atomic<uint64_t> sourceCounter = 0;
     gst_element_set_name(m_bin.get(), makeString("outgoing-audio-source-"_s, sourceCounter.exchangeAdd(1)).ascii().data());
+
+    m_dtmfSource = makeGStreamerElement("rtpdtmfsrc"_s, "dtmfSource"_s);
+    if (!m_dtmfSource) {
+        gst_printerrln("RTP DTMF element(s) missing, DTMF tones sending support disabled.");
+        return;
+    }
+
+    g_object_set(m_dtmfSource.get(), "pt", 110, nullptr);
+    gst_bin_add(GST_BIN_CAST(m_bin.get()), m_dtmfSource.get());
+    auto srcPad = adoptGRef(gst_element_get_static_pad(m_dtmfSource.get(), "src"));
+    auto sinkPad = adoptGRef(gst_element_request_pad_simple(m_rtpFunnel.get(), "sink_%u"));
+    gst_pad_link(srcPad.get(), sinkPad.get());
 }
 
 RTCRtpCapabilities RealtimeOutgoingAudioSourceGStreamer::rtpCapabilities() const

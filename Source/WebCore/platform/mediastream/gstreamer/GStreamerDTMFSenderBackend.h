@@ -21,7 +21,9 @@
 
 #if ENABLE(WEB_RTC) && USE(GSTREAMER_WEBRTC)
 
+#include "GRefPtrGStreamer.h"
 #include "RTCDTMFSenderBackend.h"
+#include "RealtimeOutgoingAudioSourceGStreamer.h"
 #include <wtf/TZoneMalloc.h>
 #include <wtf/WeakPtr.h>
 
@@ -31,7 +33,7 @@ namespace WebCore {
 class GStreamerDTMFSenderBackend final : public RTCDTMFSenderBackend, public CanMakeWeakPtr<GStreamerDTMFSenderBackend, WeakPtrFactoryInitialization::Eager> {
     WTF_MAKE_TZONE_ALLOCATED(GStreamerDTMFSenderBackend);
 public:
-    explicit GStreamerDTMFSenderBackend();
+    explicit GStreamerDTMFSenderBackend(ThreadSafeWeakPtr<RealtimeOutgoingAudioSourceGStreamer>&&);
     ~GStreamerDTMFSenderBackend();
 
 private:
@@ -43,7 +45,14 @@ private:
     size_t duration() const final;
     size_t interToneGap() const final;
 
+    void sendEvent(const GRefPtr<GstPad>&, int number, int volume, bool start);
+
+    ThreadSafeWeakPtr<RealtimeOutgoingAudioSourceGStreamer> m_source;
     Function<void()> m_onTonePlayed;
+    bool m_canInsertDTMF { false };
+    GRefPtr<GstElement> m_pipeline;
+    GRefPtr<GstElement> m_dtmfSrc;
+    StringBuilder m_tones;
 };
 
 } // namespace WebCore

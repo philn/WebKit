@@ -50,6 +50,8 @@ private:
     void initialize();
 
     RTCRtpCapabilities rtpCapabilities() const final;
+
+    GRefPtr<GstElement> m_dtmfSource;
 };
 
 } // namespace WebCore
