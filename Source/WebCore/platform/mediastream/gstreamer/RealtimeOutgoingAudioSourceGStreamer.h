@@ -45,6 +45,8 @@ private:
     GRefPtr<GstElement> m_fallbackSource;
     GRefPtr<GstElement> m_audioconvert;
     GRefPtr<GstElement> m_audioresample;
+    GRefPtr<GstElement> m_dtmfSource;
+    GRefPtr<GstElement> m_rtpMuxer;
 };
 
 } // namespace WebCore

@@ -27,9 +27,9 @@
 
 namespace WebCore {
 
-GStreamerDTMFSenderBackend::GStreamerDTMFSenderBackend()
+GStreamerDTMFSenderBackend::GStreamerDTMFSenderBackend(const GRefPtr<GstElement>& senderBin)
 {
-    notImplemented();
+    m_element = senderBin;
 }
 
 GStreamerDTMFSenderBackend::~GStreamerDTMFSenderBackend()
@@ -39,13 +39,36 @@ GStreamerDTMFSenderBackend::~GStreamerDTMFSenderBackend()
 
 bool GStreamerDTMFSenderBackend::canInsertDTMF()
 {
-    notImplemented();
-    return false;
+    return true;
 }
 
-void GStreamerDTMFSenderBackend::playTone(const char, size_t, size_t)
+void GStreamerDTMFSenderBackend::playTone(const char tone, size_t duration, size_t interToneGap)
 {
-    notImplemented();
+    static HashMap<String, int> tones = {
+        { "0"_s, 0 },
+        { "1"_s, 1 },
+        { "2"_s, 2 },
+        { "3"_s, 3 },
+        { "4"_s, 4 },
+        { "5"_s, 5 },
+        { "6"_s, 6 },
+        { "7"_s, 7 },
+        { "8"_s, 8 },
+        { "9"_s, 9 },
+        { "S"_s, 10 },
+        { "P"_s, 11 },
+        { "A"_s, 12 },
+        { "B"_s, 13 },
+        { "C"_s, 14 },
+        { "D"_s, 15 }
+    };
+    // FIXME: comma event : 2 seconds silence
+
+    auto toneNumber = tones.get(makeString(tone));
+    gst_element_send_event(m_element.get(), gst_event_new_custom(GST_EVENT_CUSTOM_UPSTREAM, gst_structure_new("dtmf-event", "type", G_TYPE_INT, 1, "number", G_TYPE_INT, toneNumber, "volume", G_TYPE_INT, 25, "start", G_TYPE_BOOLEAN, TRUE, nullptr)));
+    sleep(Seconds::fromMilliseconds(duration));
+    gst_element_send_event(m_element.get(), gst_event_new_custom(GST_EVENT_CUSTOM_UPSTREAM, gst_structure_new("dtmf-event", "type", G_TYPE_INT, 1, "start", G_TYPE_BOOLEAN, FALSE, nullptr)));
+    m_onTonePlayed();
 }
 
 String GStreamerDTMFSenderBackend::tones() const

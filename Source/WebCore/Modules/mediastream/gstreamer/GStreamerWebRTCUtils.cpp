@@ -490,13 +490,23 @@ GRefPtr<GstCaps> capsFromRtpCapabilities(RefPtr<UniqueSSRCGenerator> ssrcGenerat
 {
     auto caps = adoptGRef(gst_caps_new_empty());
     for (unsigned index = 0; auto& codec : capabilities.codecs) {
-        auto components = codec.mimeType.split('/');
-        auto* codecStructure = gst_structure_new("application/x-rtp", "media", G_TYPE_STRING, components[0].ascii().data(),
-            "encoding-name", G_TYPE_STRING, components[1].ascii().data(), "clock-rate", G_TYPE_INT, codec.clockRate, nullptr);
+        auto* codecStructure = gst_structure_new("application/x-rtp", "clock-rate", G_TYPE_INT, codec.clockRate, nullptr);
 
         auto ssrc = ssrcGenerator->generateSSRC();
         if (ssrc != std::numeric_limits<uint32_t>::max())
             gst_structure_set(codecStructure, "ssrc", G_TYPE_UINT, ssrc, nullptr);
+
+        if (codec.mimeType.find('/') != notFound) {
+            auto components = codec.mimeType.split('/');
+            gst_structure_set(codecStructure, "media", G_TYPE_STRING, components[0].ascii().data(),
+                              "encoding-name", G_TYPE_STRING, components[1].ascii().data(), nullptr);
+        } else if (codec.mimeType == "telephone-event"_s) {
+            gst_structure_set(codecStructure, "media", G_TYPE_STRING, "audio",
+                "encoding-name", G_TYPE_STRING, codec.mimeType.ascii().data(), nullptr);
+        } else {
+            GST_WARNING("Skipping invalid RTP mime-type: %s", codec.mimeType.ascii().data());
+            continue;
+        }
 
         if (!codec.sdpFmtpLine.isEmpty()) {
             for (auto& fmtp : codec.sdpFmtpLine.split(';')) {

@@ -45,6 +45,19 @@ RealtimeOutgoingAudioSourceGStreamer::RealtimeOutgoingAudioSourceGStreamer(const
     m_audioconvert = makeGStreamerElement("audioconvert", nullptr);
     m_audioresample = makeGStreamerElement("audioresample", nullptr);
     gst_bin_add_many(GST_BIN_CAST(m_bin.get()), m_audioconvert.get(), m_audioresample.get(), nullptr);
+
+    m_rtpMuxer = makeGStreamerElement("rtpdtmfmux", nullptr);
+    if (m_rtpMuxer) {
+        m_dtmfSource = makeGStreamerElement("rtpdtmfsrc", nullptr);
+        if (m_dtmfSource) {
+            gst_bin_add_many(GST_BIN_CAST(m_bin.get()), m_dtmfSource.get(), m_rtpMuxer.get(), nullptr);
+            gst_element_link_pads_full(m_dtmfSource.get(), "src", m_rtpMuxer.get(), "priority_sink_%u", GST_PAD_LINK_CHECK_DEFAULT);
+        }
+    } else {
+        WTFLogAlways("RTP DTMF muxer not found, DTMF tones sending might not work as expected");
+        m_rtpMuxer = makeGStreamerElement("rtpfunnel", nullptr);
+        gst_bin_add(GST_BIN_CAST(m_bin.get()), m_rtpMuxer.get());
+    }
 }
 
 RTCRtpCapabilities RealtimeOutgoingAudioSourceGStreamer::rtpCapabilities() const
@@ -90,6 +103,8 @@ bool RealtimeOutgoingAudioSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
         m_encoder = makeGStreamerElement("mulawenc", nullptr);
     else if (encoding == "isac"_s)
         m_encoder = makeGStreamerElement("isacenc", nullptr);
+    // else if (encoding == "telephone-event"_s)
+    //     m_encoder = makeGStreamerElement("identity", nullptr);
     else {
         GST_ERROR_OBJECT(m_bin.get(), "Unsupported outgoing audio encoding: %s", encodingName);
         return false;
@@ -111,8 +126,13 @@ bool RealtimeOutgoingAudioSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
     }
 
     int payloadType;
-    if (gst_structure_get_int(structure, "payload", &payloadType))
+    if (gst_structure_get_int(structure, "payload", &payloadType)) {
         g_object_set(m_payloader.get(), "pt", payloadType, nullptr);
+
+        // FIXME phil this is fishy... needs a valid pt, clock-rate, and likely ssrc too. Check allowedCaps?
+        if (m_dtmfSource)
+            g_object_set(m_dtmfSource.get(), "pt", payloadType+1, nullptr);
+    }
 
     g_object_set(m_capsFilter.get(), "caps", caps.get(), nullptr);
 
@@ -126,7 +146,21 @@ bool RealtimeOutgoingAudioSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
         }
     }
 
-    return gst_element_link_many(m_preEncoderQueue.get(), m_encoder.get(), m_payloader.get(), m_postEncoderQueue.get(), nullptr);
+    if (!gst_element_link_many(m_preEncoderQueue.get(), m_encoder.get(), m_payloader.get(), nullptr))
+        return false;
+
+    if (!gst_element_link_pads_full(m_payloader.get(), "src", m_rtpMuxer.get(), "sink_%u", GST_PAD_LINK_CHECK_DEFAULT))
+        return false;
+
+    // auto dtmfSourcePad = adoptGRef(gst_element_get_static_pad(m_dtmfSource.get(), "src"));
+    // if (!gst_pad_is_linked(dtmfSourcePad.get())) {
+    //     auto sinkPad = adoptGRef(gst_element_request_pad_simple(m_rtpMuxer.get(), "priority_sink_%u"));
+    //     // gst_pad_set_event_function(sinkPad.get(),
+    //     //                            reinterpret_cast<GstPadEventFunction>(+[]()));
+    //     gst_pad_link(dtmfSourcePad.get(), sinkPad.get());
+    // }
+
+    return gst_element_link(m_rtpMuxer.get(), m_postEncoderQueue.get());
 }
 
 void RealtimeOutgoingAudioSourceGStreamer::codecPreferencesChanged(const GRefPtr<GstCaps>& codecPreferences)
@@ -135,7 +169,7 @@ void RealtimeOutgoingAudioSourceGStreamer::codecPreferencesChanged(const GRefPtr
     if (m_payloader) {
         gst_element_set_state(m_payloader.get(), GST_STATE_NULL);
         gst_element_set_state(m_encoder.get(), GST_STATE_NULL);
-        gst_element_unlink_many(m_preEncoderQueue.get(), m_encoder.get(), m_payloader.get(), m_postEncoderQueue.get(), nullptr);
+        gst_element_unlink_many(m_preEncoderQueue.get(), m_encoder.get(), m_payloader.get(), m_rtpMuxer.get(), m_postEncoderQueue.get(), nullptr);
         gst_bin_remove_many(GST_BIN_CAST(m_bin.get()), m_payloader.get(), m_encoder.get(), nullptr);
         m_payloader.clear();
         m_encoder.clear();
