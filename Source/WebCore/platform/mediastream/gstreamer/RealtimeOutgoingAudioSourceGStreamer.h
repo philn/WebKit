@@ -47,6 +47,7 @@ private:
     GRefPtr<GstElement> m_audioresample;
     GRefPtr<GstElement> m_inputCapsFilter;
     GRefPtr<GstCaps> m_inputCaps;
+    GRefPtr<GstElement> m_dtmfSource;
 };
 
 } // namespace WebCore

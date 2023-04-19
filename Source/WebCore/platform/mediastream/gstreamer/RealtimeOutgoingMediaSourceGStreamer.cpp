@@ -319,7 +319,7 @@ void RealtimeOutgoingMediaSourceGStreamer::unlinkPayloader()
         gst_element_set_state(m_encoder.get(), GST_STATE_NULL);
     gst_element_set_state(m_payloader.get(), GST_STATE_NULL);
     if (m_type == RealtimeOutgoingMediaSourceGStreamer::Type::Audio) {
-        gst_element_unlink_many(m_preEncoderQueue.get(), m_encoder.get(), m_payloader.get(), m_postEncoderQueue.get(), nullptr);
+        gst_element_unlink_many(m_preEncoderQueue.get(), m_encoder.get(), m_payloader.get(), m_rtpMuxer.get(), m_postEncoderQueue.get(), nullptr);
         gst_bin_remove_many(GST_BIN_CAST(m_bin.get()), m_payloader.get(), m_encoder.get(), nullptr);
         m_encoder.clear();
     } else {

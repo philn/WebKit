@@ -264,7 +264,8 @@ void GStreamerRtpSenderBackend::setParameters(const RTCRtpSendParameters& parame
 
 std::unique_ptr<RTCDTMFSenderBackend> GStreamerRtpSenderBackend::createDTMFBackend()
 {
-    return makeUnique<GStreamerDTMFSenderBackend>();
+    auto* source = audioSource();
+    return makeUnique<GStreamerDTMFSenderBackend>(source->bin());
 }
 
 Ref<RTCRtpTransformBackend> GStreamerRtpSenderBackend::rtcRtpTransformBackend()

@@ -44,8 +44,22 @@ RealtimeOutgoingAudioSourceGStreamer::RealtimeOutgoingAudioSourceGStreamer(const
     gst_element_set_name(m_bin.get(), makeString("outgoing-audio-source-"_s, sourceCounter.exchangeAdd(1)).ascii().data());
     m_audioconvert = makeGStreamerElement("audioconvert", nullptr);
     m_audioresample = makeGStreamerElement("audioresample", nullptr);
+
     m_inputCapsFilter = gst_element_factory_make("capsfilter", nullptr);
     gst_bin_add_many(GST_BIN_CAST(m_bin.get()), m_audioconvert.get(), m_audioresample.get(), m_inputCapsFilter.get(), nullptr);
+
+    m_rtpMuxer = makeGStreamerElement("rtpdtmfmux", nullptr);
+    if (m_rtpMuxer) {
+        m_dtmfSource = makeGStreamerElement("rtpdtmfsrc", nullptr);
+        if (m_dtmfSource) {
+            gst_bin_add_many(GST_BIN_CAST(m_bin.get()), m_dtmfSource.get(), m_rtpMuxer.get(), nullptr);
+            gst_element_link_pads_full(m_dtmfSource.get(), "src", m_rtpMuxer.get(), "priority_sink_%u", GST_PAD_LINK_CHECK_DEFAULT);
+        }
+    } else {
+        WTFLogAlways("RTP DTMF muxer not found, DTMF tones sending might not work as expected");
+        m_rtpMuxer = makeGStreamerElement("rtpfunnel", nullptr);
+        gst_bin_add(GST_BIN_CAST(m_bin.get()), m_rtpMuxer.get());
+    }
 }
 
 RTCRtpCapabilities RealtimeOutgoingAudioSourceGStreamer::rtpCapabilities() const
@@ -113,6 +127,8 @@ bool RealtimeOutgoingAudioSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
         m_encoder = makeGStreamerElement("alawenc", nullptr);
     else if (encoding == "pcmu"_s)
         m_encoder = makeGStreamerElement("mulawenc", nullptr);
+    // else if (encoding == "telephone-event"_s)
+    //     m_encoder = makeGStreamerElement("identity", nullptr);
     else {
         GST_ERROR_OBJECT(m_bin.get(), "Unsupported outgoing audio encoding: %s", encoding.ascii().data());
         return false;
@@ -137,13 +153,20 @@ bool RealtimeOutgoingAudioSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
         gst_structure_remove_field(structure.get(), "minptime");
     }
 
+
     if (auto payloadType = gstStructureGet<int>(structure.get(), "payload"_s)) {
         g_object_set(m_payloader.get(), "pt", *payloadType, nullptr);
+
+        // FIXME phil this is fishy... needs a valid pt, clock-rate, and likely ssrc too. Check allowedCaps?
+        if (m_dtmfSource)
+            g_object_set(m_dtmfSource.get(), "pt", *payloadType + 1, nullptr);
+
         gst_structure_remove_field(structure.get(), "payload");
     }
 
     if (m_payloaderState) {
         g_object_set(m_payloader.get(), "seqnum-offset", m_payloaderState->seqnum, nullptr);
+        g_object_set(m_dtmfSource.get(), "seqnum-offset", m_payloaderState->seqnum, nullptr);
         m_payloaderState.reset();
     }
 
@@ -169,7 +192,21 @@ bool RealtimeOutgoingAudioSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
         }
     }
 
-    return gst_element_link_many(m_preEncoderQueue.get(), m_encoder.get(), m_payloader.get(), m_postEncoderQueue.get(), nullptr);
+    if (!gst_element_link_many(m_preEncoderQueue.get(), m_encoder.get(), m_payloader.get(), nullptr))
+        return false;
+
+    if (!gst_element_link_pads_full(m_payloader.get(), "src", m_rtpMuxer.get(), "sink_%u", GST_PAD_LINK_CHECK_DEFAULT))
+        return false;
+
+    // auto dtmfSourcePad = adoptGRef(gst_element_get_static_pad(m_dtmfSource.get(), "src"));
+    // if (!gst_pad_is_linked(dtmfSourcePad.get())) {
+    //     auto sinkPad = adoptGRef(gst_element_request_pad_simple(m_rtpMuxer.get(), "priority_sink_%u"));
+    //     // gst_pad_set_event_function(sinkPad.get(),
+    //     //                            reinterpret_cast<GstPadEventFunction>(+[]()));
+    //     gst_pad_link(dtmfSourcePad.get(), sinkPad.get());
+    // }
+
+    return gst_element_link(m_rtpMuxer.get(), m_postEncoderQueue.get());
 }
 
 void RealtimeOutgoingAudioSourceGStreamer::connectFallbackSource()

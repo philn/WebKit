@@ -21,6 +21,7 @@
 
 #if ENABLE(WEB_RTC) && USE(GSTREAMER_WEBRTC)
 
+#include "GRefPtrGStreamer.h"
 #include "RTCDTMFSenderBackend.h"
 #include <wtf/WeakPtr.h>
 
@@ -30,7 +31,7 @@ namespace WebCore {
 class GStreamerDTMFSenderBackend final : public RTCDTMFSenderBackend, public CanMakeWeakPtr<GStreamerDTMFSenderBackend, WeakPtrFactoryInitialization::Eager> {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    explicit GStreamerDTMFSenderBackend();
+    explicit GStreamerDTMFSenderBackend(const GRefPtr<GstElement>& senderBin);
     ~GStreamerDTMFSenderBackend();
 
 private:
@@ -43,6 +44,7 @@ private:
     size_t interToneGap() const final;
 
     Function<void()> m_onTonePlayed;
+    GRefPtr<GstElement> m_element;
 };
 
 } // namespace WebCore

@@ -99,6 +99,8 @@ protected:
     GUniquePtr<GstStructure> m_parameters;
     GRefPtr<GstElement> m_fallbackSource;
 
+    GRefPtr<GstElement> m_rtpMuxer;
+
     struct PayloaderState {
         unsigned seqnum;
     };
