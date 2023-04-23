@@ -2231,7 +2231,7 @@ webkit.org/b/224068 imported/w3c/web-platform-tests/webrtc-encoded-transform/scr
 webrtc/audio-sframe.html [ Skip ]
 webrtc/sframe-test-vectors.html [ Skip ]
 webrtc/sframe-transform-buffer-source.html [ Skip ]
-webrtc/video-sframe.html [ Skip ]
+#webrtc/video-sframe.html [ Skip ]
 webkit.org/b/219825 webrtc/sframe-keys.html [ Skip ]
 webkit.org/b/229055 http/wpt/webrtc/sframe-transform-error.html [ Skip ]
 http/wpt/webrtc/video-script-transform-simulcast.html [ Skip ]
