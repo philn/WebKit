@@ -18,6 +18,7 @@
  */
 
 #include "config.h"
+#include "GStreamerWebRTCUtils.h"
 #include "RealtimeOutgoingMediaSourceGStreamer.h"
 
 #if USE(GSTREAMER_WEBRTC)
@@ -61,18 +62,41 @@ RealtimeOutgoingMediaSourceGStreamer::RealtimeOutgoingMediaSourceGStreamer(const
 
     setSource(track.privateTrack());
 
-    auto postEncoderQueueSinkPad = adoptGRef(gst_element_get_static_pad(m_postEncoderQueue.get(), "sink"));
-    gst_pad_add_probe(postEncoderQueueSinkPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+    auto payloaderSinkPad = adoptGRef(gst_element_get_static_pad(m_postPayloaderQueue.get(), "sink"));
+    gst_pad_add_probe(payloaderSinkPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
         auto& source = *reinterpret_cast<RealtimeOutgoingMediaSourceGStreamer*>(userData);
         if (!source.m_transformCallback)
             return GST_PAD_PROBE_OK;
 
         auto* buffer = GST_BUFFER_CAST(GST_PAD_PROBE_INFO_DATA(info));
-        auto writableBuffer = adoptGRef(gst_buffer_make_writable(buffer));
-        if (auto transformedBuffer = source.m_transformCallback(WTFMove(writableBuffer))) {
-            GST_PAD_PROBE_INFO_DATA(info) = transformedBuffer.leakRef();
-            GstMappedBuffer mappedBuffer(GST_BUFFER_CAST(GST_PAD_PROBE_INFO_DATA(info)), GST_MAP_READ);
-            GST_MEMDUMP_OBJECT(source.m_bin.get(), "Transformed buffer", mappedBuffer.data(), mappedBuffer.size());
+
+        GstMappedRtpBuffer mappedBuffer(buffer, GST_MAP_READ);
+        auto* inputRtpBuffer = mappedBuffer.mappedData();
+        auto* payload = gst_rtp_buffer_get_payload_buffer(inputRtpBuffer);
+        auto payloadLength = gst_rtp_buffer_get_payload_len(inputRtpBuffer);
+        auto csrcCount = gst_rtp_buffer_get_csrc_count(inputRtpBuffer);
+        auto timestamp = gst_rtp_buffer_get_timestamp(inputRtpBuffer);
+
+        auto writablePayload = adoptGRef(gst_buffer_make_writable(payload));
+        if (auto transformedPayload = source.m_transformCallback(WTFMove(writablePayload))) {
+            auto* transformedPacket = gst_rtp_buffer_new_allocate(payloadLength, 0, csrcCount);
+            {
+                GstMappedRtpBuffer writableBuffer(transformedPacket, GST_MAP_WRITE);
+                auto* outputRtpBuffer = writableBuffer.mappedData();
+                gst_rtp_buffer_set_marker(outputRtpBuffer, gst_rtp_buffer_get_marker(inputRtpBuffer));
+                gst_rtp_buffer_set_payload_type(outputRtpBuffer, gst_rtp_buffer_get_payload_type(inputRtpBuffer));
+                gst_rtp_buffer_set_seq(outputRtpBuffer, gst_rtp_buffer_get_seq(inputRtpBuffer));
+                gst_rtp_buffer_set_timestamp(outputRtpBuffer, timestamp);
+                gst_rtp_buffer_set_ssrc(outputRtpBuffer, gst_rtp_buffer_get_ssrc(inputRtpBuffer));
+                for (auto i = 0; i < csrcCount; ++i)
+                    gst_rtp_buffer_set_csrc(outputRtpBuffer, i, gst_rtp_buffer_get_csrc((inputRtpBuffer), i));
+
+                // TODO: copy header extensions data.
+            }
+            transformedPacket = gst_buffer_append(transformedPacket, transformedPayload.leakRef());
+            mappedBuffer.unmapEarly();
+            //GST_PAD_PROBE_INFO_DATA(info) = gst_buffer_ref(transformedPacket.get());
+            gst_buffer_replace(&buffer, transformedPacket);
         }
 
         return GST_PAD_PROBE_OK;

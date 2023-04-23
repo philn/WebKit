@@ -74,6 +74,7 @@
 
 #if USE(GSTREAMER_WEBRTC)
 #include <gst/webrtc/webrtc-enumtypes.h>
+#include "GStreamerRtpTransformer.h"
 #endif
 
 #if USE(GSTREAMER_FULL) && GST_CHECK_VERSION(1, 18, 0) && !GST_CHECK_VERSION(1, 20, 0)
@@ -340,6 +341,9 @@ void registerWebKitGStreamerElements()
 
 #if ENABLE(MEDIA_STREAM)
         gst_element_register(nullptr, "mediastreamsrc", GST_RANK_PRIMARY, WEBKIT_TYPE_MEDIA_STREAM_SRC);
+#endif
+#if USE(GSTREAMER_WEBRTC)
+        gst_element_register(nullptr, "rtptransformer", GST_RANK_NONE, GSTREAMER_TYPE_RTP_TRANSFORMER);
 #endif
         registerInternalVideoEncoder();
 

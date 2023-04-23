@@ -37,6 +37,7 @@
 #if USE(GSTREAMER_WEBRTC)
 #include "RealtimeIncomingAudioSourceGStreamer.h"
 #include "RealtimeIncomingVideoSourceGStreamer.h"
+#include "GStreamerRtpTransformer.h"
 #endif
 
 #include <gst/app/gstappsrc.h>
@@ -145,6 +146,14 @@ public:
             videoCounter++;
         }
 
+#if USE(GSTREAMER_WEBRTC)
+        auto& source = track.source();
+        if (source.isIncomingAudioSource() || source.isIncomingVideoSource()) {
+            m_transformer = gstreamerRtpTransformerNew(static_cast<RealtimeIncomingSourceGStreamer&>(source));
+            gst_bin_add(GST_BIN_CAST(m_parent), m_transformer.get());
+        }
+#endif
+
         bool isCaptureTrack = track.isCaptureTrack();
         m_src = makeGStreamerElement("appsrc", elementName.ascii().data());
 
@@ -204,6 +213,10 @@ public:
             }), this, nullptr);
         }
 #endif
+
+        gst_bin_add(GST_BIN_CAST(m_parent), m_src.get());
+        if (m_transformer)
+            gst_element_link(m_src.get(), m_transformer.get());
     }
 
     virtual ~InternalSource()
@@ -234,6 +247,13 @@ public:
     const MediaStreamTrackPrivate& track() const { return m_track; }
     const String& padName() const { return m_padName; }
     GstElement* get() const { return m_src.get(); }
+
+    GRefPtr<GstPad> sourcePad() {
+        if (m_transformer)
+            return gst_element_get_static_pad(m_transformer.get(), "src");
+
+        return gst_element_get_static_pad(m_src.get(), "src");
+    }
 
     void startObserving()
     {
@@ -544,6 +564,8 @@ private:
 #if USE(GSTREAMER_WEBRTC)
     bool m_consumerIsVideoPlayer { false };
 #endif
+
+    GRefPtr<GstElement> m_transformer;
 };
 
 struct _WebKitMediaStreamSrcPrivate {
@@ -965,11 +987,15 @@ void webkitMediaStreamSrcAddTrack(WebKitMediaStreamSrc* self, MediaStreamTrackPr
     GST_DEBUG_OBJECT(self, "Setup %s source for track %s, only track: %s", sourceType, track->id().utf8().data(), boolForPrinting(onlyTrack));
 
     auto padName = makeString(sourceType, "_src", counter);
+<<<<<<< HEAD
     auto source = makeUnique<InternalSource>(GST_ELEMENT_CAST(self), *track, padName, consumerIsVideoPlayer);
     auto* element = source->get();
     gst_bin_add(GST_BIN_CAST(self), element);
+=======
+    auto source = makeUnique<InternalSource>(GST_ELEMENT_CAST(self), *track, padName);
+>>>>>>> 10a47f9db57e (rtp transform wip)
 
-    auto pad = adoptGRef(gst_element_get_static_pad(element, "src"));
+    auto pad = source->sourcePad();
     auto tags = mediaStreamTrackPrivateGetTags(*track);
     if (!onlyTrack) {
         auto* data = new ProbeData(GST_ELEMENT_CAST(self), padTemplate, WTFMove(tags), track->id().utf8().data(), track->source().type(), source->padName());
@@ -980,7 +1006,7 @@ void webkitMediaStreamSrcAddTrack(WebKitMediaStreamSrc* self, MediaStreamTrackPr
         gst_pad_set_active(pad.get(), TRUE);
         webkitMediaStreamSrcAddPad(self, pad.get(), padTemplate, WTFMove(tags), source->padName());
     }
-    gst_element_sync_state_with_parent(element);
+    gst_bin_sync_children_states(GST_BIN_CAST(self));
 
     source->startObserving();
     self->priv->sources.append(WTFMove(source));
