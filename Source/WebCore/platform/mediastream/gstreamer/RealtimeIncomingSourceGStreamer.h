@@ -45,6 +45,12 @@ public:
 
     void tearDown();
 
+
+    using TransformCallback = Function<GRefPtr<GstBuffer>(GRefPtr<GstBuffer>&&)>;
+    void setTransformCallback(TransformCallback&& callback) { m_transformCallback = WTFMove(callback); }
+
+    GRefPtr<GstBuffer> transform(GRefPtr<GstBuffer>&& buffer) { return m_transformCallback(WTFMove(buffer)); }
+
 protected:
     RealtimeIncomingSourceGStreamer(const CaptureDevice&);
 
@@ -60,6 +66,8 @@ private:
     GRefPtr<GstElement> m_sink;
     Lock m_clientLock;
     HashMap<int, GRefPtr<GstElement>> m_clients WTF_GUARDED_BY_LOCK(m_clientLock);
+
+    TransformCallback m_transformCallback;
 };
 
 } // namespace WebCore

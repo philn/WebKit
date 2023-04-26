@@ -23,6 +23,7 @@
 
 #include "GRefPtrGStreamer.h"
 #include "RTCRtpReceiverBackend.h"
+#include "RealtimeIncomingSourceGStreamer.h"
 #include "RealtimeMediaSource.h"
 
 namespace WebCore {
@@ -46,6 +47,8 @@ private:
     std::unique_ptr<RTCDtlsTransportBackend> dtlsTransportBackend() final;
 
     GRefPtr<GstWebRTCRTPReceiver> m_rtcReceiver;
+
+    RefPtr<RealtimeIncomingSourceGStreamer> m_incomingSource;
 };
 
 } // namespace WebCore

@@ -59,6 +59,9 @@ public:
     virtual void fillEncodingParameters(const GUniquePtr<GstStructure>&) { }
     virtual void setParameters(GUniquePtr<GstStructure>&&) { }
 
+    using TransformCallback = Function<GRefPtr<GstBuffer>(GRefPtr<GstBuffer>&&)>;
+    void setTransformCallback(TransformCallback&& callback) { m_transformCallback = WTFMove(callback); }
+
 protected:
     enum Type {
         Audio,
@@ -90,6 +93,7 @@ protected:
     GRefPtr<GstElement> m_encoder;
     GRefPtr<GstElement> m_payloader;
     GRefPtr<GstElement> m_postEncoderQueue;
+    GRefPtr<GstElement> m_postPayloaderQueue;
     GRefPtr<GstElement> m_capsFilter;
     mutable GRefPtr<GstCaps> m_allowedCaps;
     GRefPtr<GstWebRTCRTPTransceiver> m_transceiver;
@@ -125,6 +129,8 @@ private:
     void unlinkPayloader();
 
     unsigned long m_padBlockedProbe { 0 };
+
+    TransformCallback m_transformCallback;
 };
 
 } // namespace WebCore

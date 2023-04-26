@@ -21,6 +21,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 // THE POSSIBILITY OF SUCH DAMAGE.
 
+Modules/mediastream/RTCRtpSFrameTransformerGCrypt.cpp
 Modules/mediastream/gstreamer/GStreamerDataChannelHandler.cpp
 Modules/mediastream/gstreamer/GStreamerDtlsTransportBackend.cpp
 Modules/mediastream/gstreamer/GStreamerIceTransportBackend.cpp
@@ -32,6 +33,7 @@ Modules/mediastream/gstreamer/GStreamerRtpSenderBackend.cpp
 Modules/mediastream/gstreamer/GStreamerRtpSenderTransformBackend.cpp
 Modules/mediastream/gstreamer/GStreamerRtpTransceiverBackend.cpp
 Modules/mediastream/gstreamer/GStreamerRtpTransformBackend.cpp
+Modules/mediastream/gstreamer/GStreamerRtpTransformableFrame.cpp
 Modules/mediastream/gstreamer/GStreamerSctpTransportBackend.cpp
 Modules/mediastream/gstreamer/GStreamerStatsCollector.cpp
 Modules/mediastream/gstreamer/GStreamerWebRTCUtils.cpp
@@ -135,6 +137,7 @@ platform/mediastream/gstreamer/GStreamerIncomingTrackProcessor.cpp
 platform/mediastream/gstreamer/GStreamerMediaStreamSource.cpp @no-unify
 platform/mediastream/gstreamer/GStreamerMockDevice.cpp @no-unify
 platform/mediastream/gstreamer/GStreamerMockDeviceProvider.cpp @no-unify
+platform/mediastream/gstreamer/GStreamerRtpTransformer.cpp @no-unify
 platform/mediastream/gstreamer/GStreamerVideoCaptureSource.cpp
 platform/mediastream/gstreamer/GStreamerVideoCapturer.cpp
 platform/mediastream/gstreamer/GStreamerWebRTCProvider.cpp

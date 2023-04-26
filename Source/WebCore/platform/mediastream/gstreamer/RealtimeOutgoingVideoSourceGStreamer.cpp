@@ -220,7 +220,7 @@ bool RealtimeOutgoingVideoSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
         }
     }
 
-    return gst_element_link_many(m_encoder.get(), m_payloader.get(), m_postEncoderQueue.get(), nullptr);
+    return gst_element_link_many(m_encoder.get(), m_postEncoderQueue.get(), m_payloader.get(), m_postPayloaderQueue.get(), nullptr);
 }
 
 void RealtimeOutgoingVideoSourceGStreamer::connectFallbackSource()

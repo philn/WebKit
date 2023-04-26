@@ -22,11 +22,19 @@
 #if ENABLE(WEB_RTC) && USE(GSTREAMER_WEBRTC)
 
 #include "RTCRtpTransformBackend.h"
+
+#include "GRefPtrGStreamer.h"
+#include <wtf/Condition.h>
+#include <wtf/Forward.h>
 #include <wtf/Lock.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class GStreamerRtpTransformBackend : public RTCRtpTransformBackend {
+public:
+    GRefPtr<GstBuffer> transform(GRefPtr<GstBuffer>&&);
+
 protected:
     GStreamerRtpTransformBackend(MediaType, Side);
     void setInputCallback(Callback&&);
@@ -47,13 +55,13 @@ private:
     Callback m_inputCallback;
 
     Lock m_outputCallbackLock;
-};
 
-inline GStreamerRtpTransformBackend::GStreamerRtpTransformBackend(MediaType mediaType, Side side)
-    : m_mediaType(mediaType)
-    , m_side(side)
-{
-}
+    Lock m_transformLock;
+    Condition m_transformCondition;
+    GRefPtr<GstBuffer> m_transformedBuffer;
+
+    String m_backendId;
+};
 
 } // namespace WebCore
 

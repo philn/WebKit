@@ -38,6 +38,7 @@
 #if USE(GSTREAMER_WEBRTC)
 #include "RealtimeIncomingAudioSourceGStreamer.h"
 #include "RealtimeIncomingVideoSourceGStreamer.h"
+#include "GStreamerRtpTransformer.h"
 #endif
 
 #include <gst/app/gstappsrc.h>
@@ -157,6 +158,14 @@ public:
             videoCounter++;
         }
 
+#if 0 // USE(GSTREAMER_WEBRTC)
+        auto& source = track.source();
+        if (source.isIncomingAudioSource() || source.isIncomingVideoSource()) {
+            m_transformer = gstreamerRtpTransformerNew(static_cast<RealtimeIncomingSourceGStreamer&>(source));
+            gst_bin_add(GST_BIN_CAST(m_parent), m_transformer.get());
+        }
+#endif
+
         bool isCaptureTrack = track.isCaptureTrack();
         m_src = makeGStreamerElement("appsrc", elementName.ascii().data());
 
@@ -255,6 +264,10 @@ public:
             delete static_cast<ThreadSafeWeakPtr<RealtimeIncomingSourceGStreamer>*>(data);
         }));
 #endif
+
+        gst_bin_add(GST_BIN_CAST(m_parent), m_src.get());
+        if (m_transformer)
+            gst_element_link(m_src.get(), m_transformer.get());
     }
 
     virtual ~InternalSource()
@@ -285,6 +298,13 @@ public:
     const MediaStreamTrackPrivate& track() const { return m_track; }
     const String& padName() const { return m_padName; }
     GstElement* get() const { return m_src.get(); }
+
+    GRefPtr<GstPad> sourcePad() {
+        if (m_transformer)
+            return gst_element_get_static_pad(m_transformer.get(), "src");
+
+        return gst_element_get_static_pad(m_src.get(), "src");
+    }
 
     void startObserving()
     {
@@ -612,6 +632,7 @@ private:
     bool m_consumerIsVideoPlayer { false };
     bool m_isIncomingVideoSource { false };
     GRefPtr<GstStream> m_stream;
+    GRefPtr<GstElement> m_transformer;
 };
 
 struct _WebKitMediaStreamSrcPrivate {
