@@ -51,14 +51,32 @@ RealtimeOutgoingMediaSourceGStreamer::RealtimeOutgoingMediaSourceGStreamer(const
 
     m_preEncoderQueue = gst_element_factory_make("queue", nullptr);
     m_postEncoderQueue = gst_element_factory_make("queue", nullptr);
+    m_postPayloaderQueue = gst_element_factory_make("queue", nullptr);
     m_capsFilter = gst_element_factory_make("capsfilter", nullptr);
 
-    gst_bin_add_many(GST_BIN_CAST(m_bin.get()), m_inputSelector.get(), m_preEncoderQueue.get(), m_postEncoderQueue.get(), m_capsFilter.get(), nullptr);
+    gst_bin_add_many(GST_BIN_CAST(m_bin.get()), m_inputSelector.get(), m_preEncoderQueue.get(), m_postEncoderQueue.get(), m_capsFilter.get(), m_postPayloaderQueue.get(), nullptr);
 
     auto srcPad = adoptGRef(gst_element_get_static_pad(m_capsFilter.get(), "src"));
     gst_element_add_pad(m_bin.get(), gst_ghost_pad_new("src", srcPad.get()));
 
     setSource(track.privateTrack());
+
+    auto postEncoderQueueSinkPad = adoptGRef(gst_element_get_static_pad(m_postEncoderQueue.get(), "sink"));
+    gst_pad_add_probe(postEncoderQueueSinkPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+        auto& source = *reinterpret_cast<RealtimeOutgoingMediaSourceGStreamer*>(userData);
+        if (!source.m_transformCallback)
+            return GST_PAD_PROBE_OK;
+
+        auto* buffer = GST_BUFFER_CAST(GST_PAD_PROBE_INFO_DATA(info));
+        auto writableBuffer = adoptGRef(gst_buffer_make_writable(buffer));
+        if (auto transformedBuffer = source.m_transformCallback(WTFMove(writableBuffer))) {
+            GST_PAD_PROBE_INFO_DATA(info) = transformedBuffer.leakRef();
+            GstMappedBuffer mappedBuffer(GST_BUFFER_CAST(GST_PAD_PROBE_INFO_DATA(info)), GST_MAP_READ);
+            GST_MEMDUMP_OBJECT(source.m_bin.get(), "Transformed buffer", mappedBuffer.data(), mappedBuffer.size());
+        }
+
+        return GST_PAD_PROBE_OK;
+    }, this, nullptr);
 }
 
 RealtimeOutgoingMediaSourceGStreamer::~RealtimeOutgoingMediaSourceGStreamer()
@@ -215,7 +233,7 @@ void RealtimeOutgoingMediaSourceGStreamer::initializeFromTrack()
 void RealtimeOutgoingMediaSourceGStreamer::link()
 {
     GST_DEBUG_OBJECT(m_bin.get(), "Linking webrtcbin pad %" GST_PTR_FORMAT, m_webrtcSinkPad.get());
-    gst_element_link(m_postEncoderQueue.get(), m_capsFilter.get());
+    gst_element_link(m_postPayloaderQueue.get(), m_capsFilter.get());
 
     auto srcPad = adoptGRef(gst_element_get_static_pad(m_bin.get(), "src"));
     gst_pad_link(srcPad.get(), m_webrtcSinkPad.get());

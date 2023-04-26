@@ -50,6 +50,7 @@ void GStreamerRtpSenderTransformBackend::setTransformableFrameCallback(Callback&
 
 void GStreamerRtpSenderTransformBackend::requestKeyFrame()
 {
+    WTFLogAlways("phil requesting keyframe");
     ASSERT(mediaType() == MediaType::Video);
     notImplemented();
 }

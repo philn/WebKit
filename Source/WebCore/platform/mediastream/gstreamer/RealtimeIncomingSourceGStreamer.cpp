@@ -61,6 +61,19 @@ RealtimeIncomingSourceGStreamer::RealtimeIncomingSourceGStreamer(const CaptureDe
         auto sinkPad = adoptGRef(gst_element_get_static_pad(source->m_tee.get(), "sink"));
         gst_pad_link(pad, sinkPad.get());
 
+        gst_pad_add_probe(pad, static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+            auto& source = *reinterpret_cast<RealtimeIncomingSourceGStreamer*>(userData);
+            if (!source.m_transformCallback)
+                return GST_PAD_PROBE_OK;
+
+            auto* buffer = GST_BUFFER_CAST(GST_PAD_PROBE_INFO_DATA(info));
+            auto writableBuffer = adoptGRef(gst_buffer_make_writable(buffer));
+            if (auto transformedBuffer = source.m_transformCallback(WTFMove(writableBuffer)))
+                GST_PAD_PROBE_INFO_DATA(info) = transformedBuffer.leakRef();
+
+            return GST_PAD_PROBE_OK;
+        }, source, nullptr);
+
         gst_bin_sync_children_states(GST_BIN_CAST(source->m_bin.get()));
         GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN_CAST(source->m_bin.get()), GST_DEBUG_GRAPH_SHOW_ALL, GST_OBJECT_NAME(source->m_bin.get()));
     }), this);

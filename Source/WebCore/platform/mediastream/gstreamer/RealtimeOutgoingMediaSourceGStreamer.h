@@ -55,6 +55,9 @@ public:
     virtual bool setPayloadType(const GRefPtr<GstCaps>&) { return false; }
     virtual void teardown() { }
 
+    using TransformCallback = Function<GRefPtr<GstBuffer>(GRefPtr<GstBuffer>&&)>;
+    void setTransformCallback(TransformCallback&& callback) { m_transformCallback = WTFMove(callback); }
+
 protected:
     explicit RealtimeOutgoingMediaSourceGStreamer(const RefPtr<UniqueSSRCGenerator>&, const String& mediaStreamId, MediaStreamTrack&);
 
@@ -80,6 +83,7 @@ protected:
     GRefPtr<GstElement> m_encoder;
     GRefPtr<GstElement> m_payloader;
     GRefPtr<GstElement> m_postEncoderQueue;
+    GRefPtr<GstElement> m_postPayloaderQueue;
     GRefPtr<GstElement> m_capsFilter;
     mutable GRefPtr<GstCaps> m_allowedCaps;
     GRefPtr<GstWebRTCRTPTransceiver> m_transceiver;
@@ -104,6 +108,8 @@ private:
     void trackEnabledChanged(MediaStreamTrackPrivate&) override { sourceEnabledChanged(); }
     void trackSettingsChanged(MediaStreamTrackPrivate&) override { initializeFromTrack(); }
     void trackEnded(MediaStreamTrackPrivate&) override { }
+
+    TransformCallback m_transformCallback;
 };
 
 } // namespace WebCore

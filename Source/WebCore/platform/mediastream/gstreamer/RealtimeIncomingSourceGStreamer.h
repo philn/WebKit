@@ -36,6 +36,9 @@ public:
     void handleUpstreamEvent(GRefPtr<GstEvent>&&, int clientId);
     bool handleUpstreamQuery(GstQuery*, int clientId);
 
+    using TransformCallback = Function<GRefPtr<GstBuffer>(GRefPtr<GstBuffer>&&)>;
+    void setTransformCallback(TransformCallback&& callback) { m_transformCallback = WTFMove(callback); }
+
 protected:
     RealtimeIncomingSourceGStreamer(const CaptureDevice&);
 
@@ -52,6 +55,8 @@ private:
     GRefPtr<GstElement> m_tee;
     GQuark m_clientQuark { 0 };
     HashMap<int, GRefPtr<GstElement>> m_clients;
+
+    TransformCallback m_transformCallback;
 };
 
 } // namespace WebCore

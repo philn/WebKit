@@ -52,16 +52,26 @@ Vector<RTCRtpSynchronizationSource> GStreamerRtpReceiverBackend::getSynchronizat
 
 Ref<RealtimeMediaSource> GStreamerRtpReceiverBackend::createSource(const String& trackKind, const String& trackId)
 {
-    if (trackKind == "video"_s)
-        return RealtimeIncomingVideoSourceGStreamer::create(AtomString { trackId });
+    if (trackKind == "video"_s) {
+        auto source = RealtimeIncomingVideoSourceGStreamer::create(AtomString { trackId });
+        m_incomingSource = source.copyRef();
+        return source;
+    }
 
     RELEASE_ASSERT(trackKind == "audio"_s);
-    return RealtimeIncomingAudioSourceGStreamer::create(AtomString { trackId });
+    auto source = RealtimeIncomingAudioSourceGStreamer::create(AtomString { trackId });
+    m_incomingSource = source.copyRef();
+    return source;
 }
 
 Ref<RTCRtpTransformBackend> GStreamerRtpReceiverBackend::rtcRtpTransformBackend()
 {
-    return GStreamerRtpReceiverTransformBackend::create(m_rtcReceiver);
+    auto backend = GStreamerRtpReceiverTransformBackend::create(m_rtcReceiver);
+
+    m_incomingSource->setTransformCallback([backend = backend.copyRef()](GRefPtr<GstBuffer>&& buffer) -> GRefPtr<GstBuffer> {
+        return backend->transform(WTFMove(buffer));
+    });
+    return backend;
 }
 
 std::unique_ptr<RTCDtlsTransportBackend> GStreamerRtpReceiverBackend::dtlsTransportBackend()

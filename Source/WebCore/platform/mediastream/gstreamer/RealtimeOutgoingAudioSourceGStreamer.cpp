@@ -126,7 +126,7 @@ bool RealtimeOutgoingAudioSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
         }
     }
 
-    return gst_element_link_many(m_preEncoderQueue.get(), m_encoder.get(), m_payloader.get(), m_postEncoderQueue.get(), nullptr);
+    return gst_element_link_many(m_preEncoderQueue.get(), m_encoder.get(), m_postEncoderQueue.get(), m_payloader.get(), m_postPayloaderQueue.get(), nullptr);
 }
 
 void RealtimeOutgoingAudioSourceGStreamer::codecPreferencesChanged(const GRefPtr<GstCaps>& codecPreferences)
@@ -135,7 +135,7 @@ void RealtimeOutgoingAudioSourceGStreamer::codecPreferencesChanged(const GRefPtr
     if (m_payloader) {
         gst_element_set_state(m_payloader.get(), GST_STATE_NULL);
         gst_element_set_state(m_encoder.get(), GST_STATE_NULL);
-        gst_element_unlink_many(m_preEncoderQueue.get(), m_encoder.get(), m_payloader.get(), m_postEncoderQueue.get(), nullptr);
+        gst_element_unlink_many(m_preEncoderQueue.get(), m_encoder.get(), m_postEncoderQueue.get(), m_payloader.get(), m_postPayloaderQueue.get(), nullptr);
         gst_bin_remove_many(GST_BIN_CAST(m_bin.get()), m_payloader.get(), m_encoder.get(), nullptr);
         m_payloader.clear();
         m_encoder.clear();
