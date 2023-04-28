@@ -36,6 +36,11 @@
 #include <WebCore/SpeechRecognitionRequestInfo.h>
 #include <WebCore/SpeechRecognitionUpdate.h>
 
+#if USE(GSTREAMER)
+#include <WebCore/SpeechRecognitionCaptureSource.h>
+#include <WebCore/SpeechRecognizer.h>
+#endif
+
 namespace WebKit {
 
 Ref<WebSpeechRecognitionConnection> WebSpeechRecognitionConnection::create(SpeechRecognitionConnectionIdentifier identifier)
@@ -47,7 +52,20 @@ WebSpeechRecognitionConnection::WebSpeechRecognitionConnection(SpeechRecognition
     : m_identifier(identifier)
 {
     WebProcess::singleton().addMessageReceiver(Messages::WebSpeechRecognitionConnection::messageReceiverName(), m_identifier, *this);
+#if USE(GSTREAMER)
+    auto permissionChecker = [](auto& request, auto&& completionHandler) mutable {
+        // FIXME: Send the UI process a request for the speech recognition permission.
+        completionHandler(std::nullopt);
+    };
+    auto checkIfMockCaptureDevicesEnabled = []() {
+        // FIXME: Ask the UI process if the mock capture device is enabled.
+        return false;
+    };
+
+    m_speechRecognitionServer = ThreadedSpeechRecognitionServer::create(*this, m_identifier, WTFMove(permissionChecker), WTFMove(checkIfMockCaptureDevicesEnabled));
+#else
     send(Messages::WebProcessProxy::CreateSpeechRecognitionServer(m_identifier), 0);
+#endif
 
 #if ENABLE(MEDIA_STREAM)
     WebProcess::singleton().ensureSpeechRecognitionRealtimeMediaSourceManager();
@@ -56,7 +74,11 @@ WebSpeechRecognitionConnection::WebSpeechRecognitionConnection(SpeechRecognition
 
 WebSpeechRecognitionConnection::~WebSpeechRecognitionConnection()
 {
+#if USE(GSTREAMER)
+    m_speechRecognitionServer = nullptr;
+#else
     send(Messages::WebProcessProxy::DestroySpeechRecognitionServer(m_identifier), 0);
+#endif
     WebProcess::singleton().removeMessageReceiver(*this);
 }
 
@@ -72,22 +94,38 @@ void WebSpeechRecognitionConnection::unregisterClient(WebCore::SpeechRecognition
 
 void WebSpeechRecognitionConnection::start(WebCore::SpeechRecognitionConnectionClientIdentifier clientIdentifier, const String& lang, bool continuous, bool interimResults, uint64_t maxAlternatives, WebCore::ClientOrigin&& clientOrigin, WebCore::FrameIdentifier frameIdentifier)
 {
+#if USE(GSTREAMER)
+    m_speechRecognitionServer->start(clientIdentifier, lang, continuous, interimResults, maxAlternatives, WTFMove(clientOrigin), frameIdentifier);
+#else
     send(Messages::SpeechRecognitionServer::Start(clientIdentifier, lang, continuous, interimResults, maxAlternatives, WTFMove(clientOrigin), frameIdentifier));
+#endif
 }
 
 void WebSpeechRecognitionConnection::stop(WebCore::SpeechRecognitionConnectionClientIdentifier clientIdentifier)
 {
+#if USE(GSTREAMER)
+    m_speechRecognitionServer->stop(clientIdentifier);
+#else
     send(Messages::SpeechRecognitionServer::Stop(clientIdentifier));
+#endif
 }
 
 void WebSpeechRecognitionConnection::abort(WebCore::SpeechRecognitionConnectionClientIdentifier clientIdentifier)
 {
+#if USE(GSTREAMER)
+    m_speechRecognitionServer->abort(clientIdentifier);
+#else
     send(Messages::SpeechRecognitionServer::Abort(clientIdentifier));
+#endif
 }
 
 void WebSpeechRecognitionConnection::invalidate(WebCore::SpeechRecognitionConnectionClientIdentifier clientIdentifier)
 {
+#if USE(GSTREAMER)
+    m_speechRecognitionServer->invalidate(clientIdentifier);
+#else
     send(Messages::SpeechRecognitionServer::Invalidate(clientIdentifier));
+#endif
 }
 
 void WebSpeechRecognitionConnection::didReceiveUpdate(WebCore::SpeechRecognitionUpdate&& update)
@@ -106,36 +144,47 @@ void WebSpeechRecognitionConnection::didReceiveUpdate(WebCore::SpeechRecognition
 
     switch (update.type()) {
     case WebCore::SpeechRecognitionUpdateType::Start:
+        printf("WebSpeechRecognitionConnection::%s(%d) Start\n", __FUNCTION__, __LINE__);
         client->didStart();
         break;
     case WebCore::SpeechRecognitionUpdateType::AudioStart:
+        printf("WebSpeechRecognitionConnection::%s(%d) AudioStart\n", __FUNCTION__, __LINE__);
         client->didStartCapturingAudio();
         break;
     case WebCore::SpeechRecognitionUpdateType::SoundStart:
+        printf("WebSpeechRecognitionConnection::%s(%d) SoundStart\n", __FUNCTION__, __LINE__);
         client->didStartCapturingSound();
         break;
     case WebCore::SpeechRecognitionUpdateType::SpeechStart:
+        printf("WebSpeechRecognitionConnection::%s(%d) SpeechStart\n", __FUNCTION__, __LINE__);
         client->didStartCapturingSpeech();
         break;
     case WebCore::SpeechRecognitionUpdateType::SpeechEnd:
+        printf("WebSpeechRecognitionConnection::%s(%d) SpeechEnd\n", __FUNCTION__, __LINE__);
         client->didStopCapturingSpeech();
         break;
     case WebCore::SpeechRecognitionUpdateType::SoundEnd:
+        printf("WebSpeechRecognitionConnection::%s(%d) SoundEnd\n", __FUNCTION__, __LINE__);
         client->didStopCapturingSound();
         break;
     case WebCore::SpeechRecognitionUpdateType::AudioEnd:
+        printf("WebSpeechRecognitionConnection::%s(%d) AudioEnd\n", __FUNCTION__, __LINE__);
         client->didStopCapturingAudio();
         break;
     case WebCore::SpeechRecognitionUpdateType::NoMatch:
+        printf("WebSpeechRecognitionConnection::%s(%d) NoMatch\n", __FUNCTION__, __LINE__);
         client->didFindNoMatch();
         break;
     case WebCore::SpeechRecognitionUpdateType::Result:
+        printf("WebSpeechRecognitionConnection::%s(%d) Result\n", __FUNCTION__, __LINE__);
         client->didReceiveResult(update.result());
         break;
     case WebCore::SpeechRecognitionUpdateType::Error:
+        printf("WebSpeechRecognitionConnection::%s(%d) Error\n", __FUNCTION__, __LINE__);
         client->didError(update.error());
         break;
     case WebCore::SpeechRecognitionUpdateType::End:
+        printf("WebSpeechRecognitionConnection::%s(%d) End\n", __FUNCTION__, __LINE__);
         client->didEnd();
     }
 }

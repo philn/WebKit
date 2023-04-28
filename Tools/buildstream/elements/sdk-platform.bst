@@ -45,6 +45,7 @@ depends:
 - sdk/sparkle-cdm.bst
 - sdk/svt-av1.bst
 - sdk/unifdef.bst
+- sdk/whisper.bst
 - sdk/woff2.bst
 - sdk/wpebackend-fdo.bst
 - sdk/xdg-dbus-proxy.bst

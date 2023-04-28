@@ -59,6 +59,7 @@ WEBKIT_OPTION_DEFINE(USE_LIBSECRET "Whether to enable the persistent credential 
 WEBKIT_OPTION_DEFINE(USE_OPENGL_OR_ES "Whether to use OpenGL or ES." PUBLIC ON)
 WEBKIT_OPTION_DEFINE(USE_OPENJPEG "Whether to enable support for JPEG2000 images." PUBLIC ON)
 WEBKIT_OPTION_DEFINE(USE_SOUP2 "Whether to enable usage of Soup 2 instead of Soup 3." PUBLIC OFF)
+WEBKIT_OPTION_DEFINE(USE_WHISPER "Whether to enable support for Speech Recognition." PUBLIC ON)
 WEBKIT_OPTION_DEFINE(USE_WOFF2 "Whether to enable support for WOFF2 Web Fonts." PUBLIC ON)
 
 WEBKIT_OPTION_DEPEND(ENABLE_DOCUMENTATION ENABLE_INTROSPECTION)
@@ -436,6 +437,13 @@ if (USE_OPENJPEG)
     find_package(OpenJPEG 2.2.0)
     if (NOT OpenJPEG_FOUND)
         message(FATAL_ERROR "libopenjpeg 2.2.0 is required for USE_OPENJPEG.")
+    endif ()
+endif ()
+
+if (USE_WHISPER)
+    find_package(Whisper)
+    if (NOT Whisper_FOUND)
+        message(FATAL_ERROR "libwhisper is needed for USE_WHISPER")
     endif ()
 endif ()
 

@@ -4527,6 +4527,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 
     updateSettingsGenerated(store, settings);
 
+    settings.setSpeechRecognitionEnabled(true);
 #if !PLATFORM(GTK) && !PLATFORM(WIN) && !PLATFORM(PLAYSTATION)
     if (!settings.acceleratedCompositingEnabled()) {
         WEBPAGE_RELEASE_LOG(Layers, "updatePreferences: acceleratedCompositingEnabled setting was false. WebKit cannot function in this mode; changing setting to true");

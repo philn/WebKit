@@ -84,7 +84,8 @@ GstElement* GStreamerAudioCapturer::createConverter()
     gst_bin_add_many(GST_BIN_CAST(bin), audioconvert, audioresample, nullptr);
     gst_element_link(audioconvert, audioresample);
 
-#if USE(GSTREAMER_WEBRTC)
+#if USE(GSTREAMER_WEBRTC) && !USE(WHISPER)
+    // FIXME: The following element breaks the speech recognizer.
     if (auto* webrtcdsp = makeGStreamerElement("webrtcdsp", nullptr)) {
         g_object_set(webrtcdsp, "echo-cancel", FALSE, "voice-detection", TRUE, nullptr);
 

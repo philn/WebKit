@@ -27,6 +27,7 @@
 
 #include "SpeechRecognitionConnectionClientIdentifier.h"
 #include "SpeechRecognitionError.h"
+#include "SpeechRecognitionRequest.h"
 #include "SpeechRecognitionResultData.h"
 #include <variant>
 #include <wtf/ArgumentCoder.h>

@@ -192,3 +192,12 @@ if (USE_GBM)
         ${LIBDRM_LIBRARIES}
     )
 endif ()
+
+if (USE_WHISPER)
+    list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
+        ${Whisper_INCLUDE_DIRS}
+    )
+    list(APPEND WebCore_LIBRARIES
+        ${Whisper_LIBRARIES}
+    )
+endif ()

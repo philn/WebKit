@@ -42,6 +42,7 @@ public:
     uint64_t maxAlternatives() const { return m_info.maxAlternatives; }
     const ClientOrigin clientOrigin() const { return m_info.clientOrigin; }
     FrameIdentifier frameIdentifier() const { return m_info.frameIdentifier; }
+    const SpeechRecognitionRequestInfo& info() const { return m_info; }
 
 private:
     SpeechRecognitionRequestInfo m_info;

@@ -34,6 +34,9 @@
 #include <CoreMedia/CMTime.h>
 #include <wtf/RetainPtr.h>
 OBJC_CLASS WebSpeechRecognizerTask;
+#elif USE(GSTREAMER)
+#include "GStreamerSpeechRecognizerTask.h"
+#include "GUniquePtrGStreamer.h"
 #endif
 
 namespace WebCore {
@@ -84,6 +87,10 @@ private:
 #if HAVE(SPEECHRECOGNIZER)
     RetainPtr<WebSpeechRecognizerTask> m_task;
     CMTime m_currentAudioSampleTime;
+#elif USE(GSTREAMER)
+    RefPtr<GStreamerSpeechRecognizerTask> m_task;
+    GUniquePtr<GstAudioConverter> m_converter;
+    String m_recognizerId;
 #endif
 };
 

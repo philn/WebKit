@@ -34,6 +34,9 @@
 #if PLATFORM(COCOA)
 #include "CAAudioStreamDescription.h"
 #include "WebAudioBufferList.h"
+#elif USE(GSTREAMER)
+#include "GStreamerAudioData.h"
+#include "GStreamerAudioStreamDescription.h"
 #endif
 
 namespace WebCore {
@@ -145,6 +148,18 @@ void SpeechRecognitionCaptureSourceImpl::audioSamplesAvailable(const WTF::MediaT
             return;
 
         pullSamplesAndCallDataCallback(dataSource.get(), time, audioDescription, sampleCount);
+    });
+#elif USE(GSTREAMER)
+    auto audioData = static_cast<const GStreamerAudioData&>(data);
+    auto audioDescription = static_cast<const GStreamerAudioStreamDescription&>(description);
+    // FIXME: We are in a media stream thread, not the main thread. The speech
+    // recognition server runs on its own thread, not the main thread. Do we
+    // need to call the dataCallback on the main thread?
+    callOnMainThread([this, weakThis = WeakPtr { *this }, audioData, time, audioDescription, sampleCount] {
+        if (!weakThis)
+            return;
+
+        m_dataCallback(time, audioData, audioDescription, sampleCount);
     });
 #endif
 }
