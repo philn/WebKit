@@ -3678,6 +3678,21 @@ LegacyOverflowScrollingTouchEnabled:
     WebCore:
       default: true
 
+LegacyWebRTCOfferOptionsEnabled:
+  type: bool
+  status: embedder
+  humanReadableName: "WebRTC Peer Connection Legacy Offer options"
+  humanReadableDescription: "Enable RTCPeerConnection Legacy offer options (offerToReceiveAudio, offerToReceiveVideo)"
+  condition: ENABLE(WEB_RTC)
+  defaultValue:
+    WebKitLegacy:
+      default: false
+    WebKit:
+      "USE(GSTREAMER_WEBRTC)": true
+      default: false
+    WebCore:
+      default: false
+
 LineHeightUnitsEnabled:
   type: bool
   status: stable
