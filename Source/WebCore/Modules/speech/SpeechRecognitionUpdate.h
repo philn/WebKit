@@ -27,10 +27,15 @@
 
 #include "SpeechRecognitionConnectionClientIdentifier.h"
 #include "SpeechRecognitionError.h"
+#include "SpeechRecognitionRequest.h"
 #include "SpeechRecognitionResultData.h"
 #include <variant>
 #include <wtf/ArgumentCoder.h>
 #include <wtf/EnumTraits.h>
+
+#if USE(GSTREAMER)
+#include "GStreamerSpeechRecognitionRequest.h"
+#endif
 
 namespace WebCore {
 
@@ -46,6 +51,9 @@ enum class SpeechRecognitionUpdateType : uint8_t {
     NoMatch,
     Error,
     End
+#if USE(GSTREAMER)
+    , StartCapture
+#endif
 };
 
 String convertEnumerationToString(SpeechRecognitionUpdateType);
@@ -55,22 +63,36 @@ public:
     WEBCORE_EXPORT static SpeechRecognitionUpdate create(SpeechRecognitionConnectionClientIdentifier, SpeechRecognitionUpdateType);
     WEBCORE_EXPORT static SpeechRecognitionUpdate createError(SpeechRecognitionConnectionClientIdentifier, const SpeechRecognitionError&);
     WEBCORE_EXPORT static SpeechRecognitionUpdate createResult(SpeechRecognitionConnectionClientIdentifier, const Vector<SpeechRecognitionResultData>&);
+#if USE(GSTREAMER)
+    WEBCORE_EXPORT static SpeechRecognitionUpdate startCapture(SpeechRecognitionConnectionClientIdentifier, SpeechRecognitionRequestInfo, bool mockDeviceCapturesEnabled);
+#endif
 
     SpeechRecognitionConnectionClientIdentifier clientIdentifier() const { return m_clientIdentifier; }
     SpeechRecognitionUpdateType type() const { return m_type; }
     WEBCORE_EXPORT SpeechRecognitionError error() const;
     WEBCORE_EXPORT Vector<SpeechRecognitionResultData> result() const;
 
+#if USE(GSTREAMER)
+    bool mockDeviceCaptureEnabled() const;
+    SpeechRecognitionRequestInfo speechRecognitionRequestInfo();
+#endif
+
 private:
     friend struct IPC::ArgumentCoder<SpeechRecognitionUpdate, void>;
     using Content = std::variant<std::monostate, SpeechRecognitionError, Vector<SpeechRecognitionResultData>>;
     WEBCORE_EXPORT SpeechRecognitionUpdate(SpeechRecognitionConnectionClientIdentifier, SpeechRecognitionUpdateType, Content);
 
+#if USE(GSTREAMER)
+    WEBCORE_EXPORT SpeechRecognitionUpdate(SpeechRecognitionConnectionClientIdentifier, SpeechRecognitionUpdateType, Content, GStreamerSpeechRecognitionRequest);
+#endif
+
     SpeechRecognitionConnectionClientIdentifier m_clientIdentifier;
     SpeechRecognitionUpdateType m_type;
     Content m_content;
-};
-
+#if USE(GSTREAMER)
+    GStreamerSpeechRecognitionRequest m_request;
+#endif
+    };
 
 } // namespace WebCore
 

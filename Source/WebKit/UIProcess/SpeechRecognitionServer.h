@@ -52,7 +52,7 @@ using SpeechRecognitionCheckIfMockSpeechRecognitionEnabled = Function<bool()>;
 class SpeechRecognitionServer : public IPC::MessageReceiver, private IPC::MessageSender {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(MEDIA_STREAM) && !USE(GSTREAMER)
     using RealtimeMediaSourceCreateFunction = Function<WebCore::CaptureSourceOrError()>;
     SpeechRecognitionServer(Ref<IPC::Connection>&&, SpeechRecognitionServerIdentifier, SpeechRecognitionPermissionChecker&&, SpeechRecognitionCheckIfMockSpeechRecognitionEnabled&&, RealtimeMediaSourceCreateFunction&&);
 #else
@@ -86,7 +86,7 @@ private:
     SpeechRecognitionCheckIfMockSpeechRecognitionEnabled m_checkIfMockSpeechRecognitionEnabled;
     bool m_isResetting { false };
 
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(MEDIA_STREAM) && !USE(GSTREAMER)
     RealtimeMediaSourceCreateFunction m_realtimeMediaSourceCreateFunction;
 #endif
 };

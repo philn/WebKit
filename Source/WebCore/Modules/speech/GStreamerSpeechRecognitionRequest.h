@@ -25,27 +25,13 @@
 
 #pragma once
 
-#include "SpeechRecognitionConnectionClientIdentifier.h"
-#include "SpeechRecognitionRequestInfo.h"
+#include "SpeechRecognitionRequest.h"
 
 namespace WebCore {
 
-class SpeechRecognitionRequest : public CanMakeWeakPtr<SpeechRecognitionRequest> {
-    WTF_MAKE_FAST_ALLOCATED;
-public:
-    WEBCORE_EXPORT explicit SpeechRecognitionRequest(SpeechRecognitionRequestInfo&&);
-
-    SpeechRecognitionConnectionClientIdentifier clientIdentifier() const { return m_info.clientIdentifier; }
-    const String& lang() const { return m_info.lang; }
-    bool continuous() const { return m_info.continuous;; }
-    bool interimResults() const { return m_info.interimResults; }
-    uint64_t maxAlternatives() const { return m_info.maxAlternatives; }
-    const ClientOrigin clientOrigin() const { return m_info.clientOrigin; }
-    FrameIdentifier frameIdentifier() const { return m_info.frameIdentifier; }
-    const SpeechRecognitionRequestInfo& info() const { return m_info; }
-
-private:
-    SpeechRecognitionRequestInfo m_info;
+struct GStreamerSpeechRecognitionRequest {
+    SpeechRecognitionRequestInfo info;
+    bool mockDeviceCaptureEnabled;
 };
 
 } // namespace WebCore

@@ -44,6 +44,9 @@ String convertEnumerationToString(SpeechRecognitionUpdateType enumerationValue)
         MAKE_STATIC_STRING_IMPL("UpdateTypeNoMatch"),
         MAKE_STATIC_STRING_IMPL("UpdateTypeError"),
         MAKE_STATIC_STRING_IMPL("UpdateTypeEnd"),
+#if USE(GSTREAMER)
+        MAKE_STATIC_STRING_IMPL("UpdateTypeStartCapture"),
+#endif
     };
     static_assert(static_cast<size_t>(SpeechRecognitionUpdateType::Start) == 0, "SpeechRecognitionUpdateType::Start is not 1 as expected");
     static_assert(static_cast<size_t>(SpeechRecognitionUpdateType::AudioStart) == 1, "SpeechRecognitionUpdateType::AudioStart is not 2 as expected");
@@ -56,6 +59,9 @@ String convertEnumerationToString(SpeechRecognitionUpdateType enumerationValue)
     static_assert(static_cast<size_t>(SpeechRecognitionUpdateType::NoMatch) == 8, "SpeechRecognitionUpdateType::NoMatch is not 9 as expected");
     static_assert(static_cast<size_t>(SpeechRecognitionUpdateType::Error) == 9, "SpeechRecognitionUpdateType::Error is not 10 as expected");
     static_assert(static_cast<size_t>(SpeechRecognitionUpdateType::End) == 10, "SpeechRecognitionUpdateType::End is not 11 as expected");
+#if USE(GSTREAMER)
+    static_assert(static_cast<size_t>(SpeechRecognitionUpdateType::StartCapture) == 11, "SpeechRecognitionUpdateType::StartCapture is not 12 as expected");
+#endif
     ASSERT(static_cast<size_t>(enumerationValue) < std::size(values));
     return values[static_cast<size_t>(enumerationValue)];
 }
@@ -75,12 +81,30 @@ SpeechRecognitionUpdate SpeechRecognitionUpdate::createResult(SpeechRecognitionC
     return SpeechRecognitionUpdate { clientIdentifier, SpeechRecognitionUpdateType::Result, results };
 }
 
+#if USE(GSTREAMER)
+SpeechRecognitionUpdate SpeechRecognitionUpdate::startCapture(SpeechRecognitionConnectionClientIdentifier clientIdentifier, SpeechRecognitionRequestInfo info, bool mockDeviceCapturesEnabled)
+{
+    GStreamerSpeechRecognitionRequest request2 { .info = info, .mockDeviceCaptureEnabled = mockDeviceCapturesEnabled };
+    return SpeechRecognitionUpdate { clientIdentifier, SpeechRecognitionUpdateType::StartCapture, { }, WTFMove(request2) };
+}
+#endif
+
 SpeechRecognitionUpdate::SpeechRecognitionUpdate(SpeechRecognitionConnectionClientIdentifier clientIdentifier, SpeechRecognitionUpdateType type, Content content)
     : m_clientIdentifier(clientIdentifier)
     , m_type(type)
     , m_content(content)
 {
 }
+
+#if USE(GSTREAMER)
+SpeechRecognitionUpdate::SpeechRecognitionUpdate(SpeechRecognitionConnectionClientIdentifier clientIdentifier, SpeechRecognitionUpdateType type, Content content, GStreamerSpeechRecognitionRequest request)
+    : m_clientIdentifier(clientIdentifier)
+    , m_type(type)
+    , m_content(content)
+    , m_request(request)
+{
+}
+#endif
 
 SpeechRecognitionError SpeechRecognitionUpdate::error() const
 {
@@ -97,5 +121,17 @@ Vector<SpeechRecognitionResultData> SpeechRecognitionUpdate::result() const
         [] (const auto&) { return Vector<SpeechRecognitionResultData> { }; }
     );
 }
+
+#if USE(GSTREAMER)
+bool SpeechRecognitionUpdate::mockDeviceCaptureEnabled() const
+{
+    return m_request.mockDeviceCaptureEnabled;
+}
+
+SpeechRecognitionRequestInfo SpeechRecognitionUpdate::speechRecognitionRequestInfo()
+{
+    return m_request.info;
+}
+#endif
 
 } // namespace WebCore

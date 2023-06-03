@@ -34,7 +34,7 @@ namespace WebCore {
 
 class SpeechRecognitionConnectionClient;
 class SpeechRecognitionUpdate;
-
+class SpeechRecognizer;
 }
 
 namespace WebKit {
@@ -66,6 +66,11 @@ private:
     // IPC::MessageSender.
     IPC::Connection* messageSenderConnection() const final;
     uint64_t messageSenderDestinationID() const final;
+
+#if USE(GSTREAMER)
+    void startCapture(WebCore::SpeechRecognitionUpdate&&);
+    std::unique_ptr<WebCore::SpeechRecognizer> m_recognizer;
+#endif
 
     SpeechRecognitionConnectionIdentifier m_identifier;
     HashMap<WebCore::SpeechRecognitionConnectionClientIdentifier, WeakPtr<WebCore::SpeechRecognitionConnectionClient>> m_clientMap;

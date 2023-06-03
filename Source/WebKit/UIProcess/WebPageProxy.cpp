@@ -12227,6 +12227,10 @@ void WebPageProxy::requestSpeechRecognitionPermissionByDefaultAction(const WebCo
 
 void WebPageProxy::requestUserMediaPermissionForSpeechRecognition(FrameIdentifier frameIdentifier, const WebCore::SecurityOrigin& requestingOrigin, const WebCore::SecurityOrigin& topOrigin, CompletionHandler<void(bool)>&& completionHandler)
 {
+    // FIXME: HACK
+    completionHandler(true);
+    return;
+
 #if ENABLE(MEDIA_STREAM)
     auto captureDevice = SpeechRecognitionCaptureSource::findCaptureDevice();
     if (!captureDevice) {
@@ -12245,7 +12249,7 @@ void WebPageProxy::requestMediaKeySystemPermissionByDefaultAction(const WebCore:
     completionHandler(true);
 }
 
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(MEDIA_STREAM) && !USE(GSTREAMER)
 
 WebCore::CaptureSourceOrError WebPageProxy::createRealtimeMediaSourceForSpeechRecognition()
 {

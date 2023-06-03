@@ -2091,7 +2091,7 @@ public:
     CGRect appHighlightsOverlayRect();
 #endif
 
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(MEDIA_STREAM) && !USE(GSTREAMER)
     WebCore::CaptureSourceOrError createRealtimeMediaSourceForSpeechRecognition();
 #endif
 

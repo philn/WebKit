@@ -1021,6 +1021,13 @@ struct WebCore::SpeechRecognitionResultData {
     bool isFinal;
 };
 
+#if USE(GSTREAMER)
+struct WebCore::GStreamerSpeechRecognitionRequest {
+    WebCore::SpeechRecognitionRequestInfo info;
+    bool mockDeviceCaptureEnabled;
+};
+#endif // USE(GSTREAMER)
+
 struct WebCore::WebLockManagerSnapshot {
     Vector<WebCore::WebLockManagerSnapshot::Info> held;
     Vector<WebCore::WebLockManagerSnapshot::Info> pending;
@@ -3465,12 +3472,18 @@ enum class WebCore::SpeechRecognitionUpdateType : uint8_t {
     NoMatch,
     Error,
     End
+#if USE(GSTREAMER)
+    , StartCapture
+#endif
 };
 
 class WebCore::SpeechRecognitionUpdate {
     WebCore::SpeechRecognitionConnectionClientIdentifier m_clientIdentifier;
     WebCore::SpeechRecognitionUpdateType m_type;
     std::variant<std::monostate, WebCore::SpeechRecognitionError, Vector<WebCore::SpeechRecognitionResultData>> m_content;
+#if USE(GSTREAMER)
+    WebCore::GStreamerSpeechRecognitionRequest m_request;
+#endif
 };
 
 #if USE(SYSTEM_PREVIEW)

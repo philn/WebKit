@@ -2088,7 +2088,7 @@ void WebProcessProxy::createSpeechRecognitionServer(SpeechRecognitionServerIdent
         return weakPage && weakPage->preferences().mockCaptureDevicesEnabled();
     };
 
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(MEDIA_STREAM) && !USE(GSTREAMER)
     auto createRealtimeMediaSource = [weakPage = WeakPtr { targetPage }]() {
         return weakPage ? weakPage->createRealtimeMediaSourceForSpeechRecognition() : CaptureSourceOrError { "Page is invalid"_s };
     };
@@ -2120,7 +2120,7 @@ SpeechRecognitionRemoteRealtimeMediaSourceManager& WebProcessProxy::ensureSpeech
 
 void WebProcessProxy::muteCaptureInPagesExcept(WebCore::PageIdentifier pageID)
 {
-#if PLATFORM(COCOA)
+#if PLATFORM(COCOA) || USE(GSTREAMER)
     for (auto& page : globalPages()) {
         if (page && page->webPageID() != pageID)
             page->setMediaStreamCaptureMuted(true);

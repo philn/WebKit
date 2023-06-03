@@ -36,6 +36,16 @@
 OBJC_CLASS WebSpeechRecognizerTask;
 #endif
 
+#if USE(GSTREAMER)
+#include "GUniquePtrGStreamer.h"
+#include <whisper.h>
+
+namespace WTF {
+WTF_DEFINE_GPTR_DELETER(struct whisper_context, whisper_free)
+}
+
+#endif // USE(GSTREAMER)
+
 namespace WebCore {
 
 class SpeechRecognitionRequest;
@@ -84,6 +94,17 @@ private:
 #if HAVE(SPEECHRECOGNIZER)
     RetainPtr<WebSpeechRecognizerTask> m_task;
     CMTime m_currentAudioSampleTime;
+#endif
+#if USE(GSTREAMER)
+    GUniquePtr<struct whisper_context> m_whisperContext;
+    struct whisper_full_params m_whisperParams;
+    GUniquePtr<GstAudioConverter> m_converter;
+    GstAudioInfo m_inputStreamDescription;
+    GstAudioInfo m_outputStreamDescription;
+    GRefPtr<GstAdapter> m_adapter;
+    Vector<float> m_buffer;
+    String m_recognizerId;
+    size_t m_queuedSampleCount { 0 };
 #endif
 };
 

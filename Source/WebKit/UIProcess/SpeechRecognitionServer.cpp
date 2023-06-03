@@ -38,7 +38,7 @@
 namespace WebKit {
 
 SpeechRecognitionServer::SpeechRecognitionServer(Ref<IPC::Connection>&& connection, SpeechRecognitionServerIdentifier identifier, SpeechRecognitionPermissionChecker&& permissionChecker, SpeechRecognitionCheckIfMockSpeechRecognitionEnabled&& checkIfEnabled
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(MEDIA_STREAM) && !USE(GSTREAMER)
     , RealtimeMediaSourceCreateFunction&& function
 #endif
     )
@@ -46,7 +46,7 @@ SpeechRecognitionServer::SpeechRecognitionServer(Ref<IPC::Connection>&& connecti
     , m_identifier(identifier)
     , m_permissionChecker(WTFMove(permissionChecker))
     , m_checkIfMockSpeechRecognitionEnabled(WTFMove(checkIfEnabled))
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(MEDIA_STREAM) && !USE(GSTREAMER)
     , m_realtimeMediaSourceCreateFunction(WTFMove(function))
 #endif
 {
@@ -82,12 +82,18 @@ void SpeechRecognitionServer::requestPermissionForRequest(WebCore::SpeechRecogni
 
 void SpeechRecognitionServer::handleRequest(UniqueRef<WebCore::SpeechRecognitionRequest>&& request)
 {
+#if ENABLE(MEDIA_STREAM)
+    auto clientIdentifier = request->clientIdentifier();
+#if USE(GSTREAMER)
+    WebProcessProxy::muteCaptureInPagesExcept(m_identifier);
+    bool mockDeviceCapturesEnabled = m_checkIfMockSpeechRecognitionEnabled();
+    sendUpdate(WebCore::SpeechRecognitionUpdate::startCapture(clientIdentifier, request->info(), mockDeviceCapturesEnabled));
+#else
     if (m_recognizer) {
         m_recognizer->abort(WebCore::SpeechRecognitionError { WebCore::SpeechRecognitionErrorType::Aborted, "Another request is started"_s });
         m_recognizer->prepareForDestruction();
     }
 
-    auto clientIdentifier = request->clientIdentifier();
     m_recognizer = makeUnique<WebCore::SpeechRecognizer>([this, weakThis = WeakPtr { *this }](auto& update) {
         if (!weakThis)
             return;
@@ -100,7 +106,6 @@ void SpeechRecognitionServer::handleRequest(UniqueRef<WebCore::SpeechRecognition
             m_recognizer->setInactive();
     }, WTFMove(request));
 
-#if ENABLE(MEDIA_STREAM)
     auto sourceOrError = m_realtimeMediaSourceCreateFunction();
     if (!sourceOrError) {
         sendUpdate(WebCore::SpeechRecognitionUpdate::createError(clientIdentifier, WebCore::SpeechRecognitionError { WebCore::SpeechRecognitionErrorType::AudioCapture, sourceOrError.errorMessage }));
@@ -110,9 +115,10 @@ void SpeechRecognitionServer::handleRequest(UniqueRef<WebCore::SpeechRecognition
     WebProcessProxy::muteCaptureInPagesExcept(m_identifier);
     bool mockDeviceCapturesEnabled = m_checkIfMockSpeechRecognitionEnabled();
     m_recognizer->start(sourceOrError.source(), mockDeviceCapturesEnabled);
+#endif // USE(GSTREAMER)
 #else
     sendUpdate(clientIdentifier, WebCore::SpeechRecognitionUpdateType::Error, WebCore::SpeechRecognitionError { WebCore::SpeechRecognitionErrorType::AudioCapture, "Audio capture is not implemented"_s });
-#endif
+#endif // ENABLE(MEDIA_STREAM)
 }
 
 void SpeechRecognitionServer::stop(WebCore::SpeechRecognitionConnectionClientIdentifier clientIdentifier)

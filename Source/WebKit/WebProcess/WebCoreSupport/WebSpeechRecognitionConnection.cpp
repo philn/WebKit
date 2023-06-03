@@ -36,6 +36,11 @@
 #include <WebCore/SpeechRecognitionRequestInfo.h>
 #include <WebCore/SpeechRecognitionUpdate.h>
 
+#if USE(GSTREAMER)
+#include <WebCore/SpeechRecognitionCaptureSource.h>
+#include <WebCore/SpeechRecognizer.h>
+#endif
+
 namespace WebKit {
 
 Ref<WebSpeechRecognitionConnection> WebSpeechRecognitionConnection::create(SpeechRecognitionConnectionIdentifier identifier)
@@ -90,6 +95,83 @@ void WebSpeechRecognitionConnection::invalidate(WebCore::SpeechRecognitionConnec
     send(Messages::SpeechRecognitionServer::Invalidate(clientIdentifier));
 }
 
+#if USE(GSTREAMER)
+void WebSpeechRecognitionConnection::startCapture(WebCore::SpeechRecognitionUpdate&& update)
+{
+    auto captureDevice = WebCore::SpeechRecognitionCaptureSource::findCaptureDevice();
+    if (!captureDevice)
+        return;
+
+    auto sourceOrError = WebCore::SpeechRecognitionCaptureSource::createRealtimeMediaSource(*captureDevice, m_identifier);
+    if (!sourceOrError)
+        return;
+
+    if (m_recognizer) {
+        m_recognizer->abort(WebCore::SpeechRecognitionError { WebCore::SpeechRecognitionErrorType::Aborted, "Another request is started"_s });
+        m_recognizer->prepareForDestruction();
+    }
+    auto request = makeUnique<WebCore::SpeechRecognitionRequest>(update.speechRecognitionRequestInfo());
+    m_recognizer = makeUnique<WebCore::SpeechRecognizer>([this](auto& update) {
+        auto clientIdentifier = update.clientIdentifier();
+        if (!m_clientMap.contains(clientIdentifier))
+            return;
+
+        auto client = m_clientMap.get(clientIdentifier);
+        if (!client) {
+            m_clientMap.remove(clientIdentifier);
+            // Inform server that client does not exist any more.
+            invalidate(clientIdentifier);
+            return;
+        }
+
+        switch (update.type()) {
+#if USE(GSTREAMER)
+        case WebCore::SpeechRecognitionUpdateType::StartCapture:
+            RELEASE_ASSERT_NOT_REACHED();
+            break;
+#endif
+        case WebCore::SpeechRecognitionUpdateType::Start:
+            client->didStart();
+            break;
+        case WebCore::SpeechRecognitionUpdateType::AudioStart:
+            client->didStartCapturingAudio();
+            break;
+        case WebCore::SpeechRecognitionUpdateType::SoundStart:
+            client->didStartCapturingSound();
+            break;
+        case WebCore::SpeechRecognitionUpdateType::SpeechStart:
+            client->didStartCapturingSpeech();
+            break;
+        case WebCore::SpeechRecognitionUpdateType::SpeechEnd:
+            client->didStopCapturingSpeech();
+            break;
+        case WebCore::SpeechRecognitionUpdateType::SoundEnd:
+            client->didStopCapturingSound();
+            break;
+        case WebCore::SpeechRecognitionUpdateType::AudioEnd:
+            client->didStopCapturingAudio();
+            break;
+        case WebCore::SpeechRecognitionUpdateType::NoMatch:
+            client->didFindNoMatch();
+            break;
+        case WebCore::SpeechRecognitionUpdateType::Result:
+            client->didReceiveResult(update.result());
+            break;
+        case WebCore::SpeechRecognitionUpdateType::Error:
+            client->didError(update.error());
+            m_recognizer->abort();
+            break;
+        case WebCore::SpeechRecognitionUpdateType::End:
+            client->didEnd();
+            m_recognizer->setInactive();
+            break;
+        }
+    }, makeUniqueRefFromNonNullUniquePtr(WTFMove(request)));
+
+    m_recognizer->start(sourceOrError.source(), update.mockDeviceCaptureEnabled());
+}
+#endif
+
 void WebSpeechRecognitionConnection::didReceiveUpdate(WebCore::SpeechRecognitionUpdate&& update)
 {
     auto clientIdentifier = update.clientIdentifier();
@@ -105,6 +187,11 @@ void WebSpeechRecognitionConnection::didReceiveUpdate(WebCore::SpeechRecognition
     }
 
     switch (update.type()) {
+#if USE(GSTREAMER)
+    case WebCore::SpeechRecognitionUpdateType::StartCapture:
+        startCapture(WTFMove(update));
+        break;
+#endif
     case WebCore::SpeechRecognitionUpdateType::Start:
         client->didStart();
         break;

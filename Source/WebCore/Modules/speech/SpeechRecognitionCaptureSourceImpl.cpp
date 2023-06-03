@@ -101,7 +101,7 @@ void SpeechRecognitionCaptureSourceImpl::pullSamplesAndCallDataCallback(AudioSam
 
 void SpeechRecognitionCaptureSourceImpl::audioSamplesAvailable(const WTF::MediaTime& time, const PlatformAudioData& data, const AudioStreamDescription& description, size_t sampleCount)
 {
-    if (isMainThread())
+    // if (isMainThread())
         return m_dataCallback(time, data, description, sampleCount);
 
 #if PLATFORM(COCOA)

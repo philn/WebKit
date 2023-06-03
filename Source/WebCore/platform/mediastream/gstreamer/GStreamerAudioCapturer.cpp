@@ -68,8 +68,12 @@ GstElement* GStreamerAudioCapturer::createConverter()
     gst_bin_add_many(GST_BIN_CAST(bin), audioconvert, audioresample, nullptr);
     gst_element_link(audioconvert, audioresample);
 
-#if USE(GSTREAMER_WEBRTC)
-    if (auto* webrtcdsp = makeGStreamerElement("webrtcdsp", nullptr)) {
+#if 0 // USE(GSTREAMER_WEBRTC)
+    if (auto* denoiser = makeGStreamerElement("audiornnoise", nullptr)) {
+        g_object_set(denoiser, "voice-activity-threshold", 0.3, nullptr);
+        gst_bin_add(GST_BIN_CAST(bin), denoiser);
+        gst_element_link(denoiser, audioconvert);
+    } else if (auto* webrtcdsp = makeGStreamerElement("webrtcdsp", nullptr)) {
         g_object_set(webrtcdsp, "echo-cancel", FALSE, "voice-detection", TRUE, nullptr);
         gst_bin_add(GST_BIN_CAST(bin), webrtcdsp);
         gst_element_link(webrtcdsp, audioconvert);
