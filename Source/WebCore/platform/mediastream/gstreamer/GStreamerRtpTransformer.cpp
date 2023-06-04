@@ -128,4 +128,6 @@ GstElement* gstreamerRtpTransformerNew(RealtimeIncomingSourceGStreamer& incoming
     return element;
 }
 
+#undef GST_CAT_DEFAULT
+
 #endif // USE(GSTREAMER_WEBRTC)

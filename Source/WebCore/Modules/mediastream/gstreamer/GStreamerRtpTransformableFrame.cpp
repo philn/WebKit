@@ -44,7 +44,7 @@ GRefPtr<GstBuffer> GStreamerRtpTransformableFrame::takeBuffer()
     return buffer;
 }
 
-Span<const uint8_t> GStreamerRtpTransformableFrame::data() const
+std::span<const uint8_t> GStreamerRtpTransformableFrame::data() const
 {
     if (!m_buffer)
         return { };
@@ -54,7 +54,7 @@ Span<const uint8_t> GStreamerRtpTransformableFrame::data() const
     return bufferData.span();
 }
 
-void GStreamerRtpTransformableFrame::setData(Span<const uint8_t> data)
+void GStreamerRtpTransformableFrame::setData(std::span<const uint8_t> data)
 {
     auto buffer = adoptGRef(gst_buffer_new_allocate(nullptr, data.size_bytes(), nullptr));
     {

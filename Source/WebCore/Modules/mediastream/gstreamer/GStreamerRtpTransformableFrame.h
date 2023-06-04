@@ -40,8 +40,8 @@ private:
     GStreamerRtpTransformableFrame(GRefPtr<GstBuffer>&&, bool isAudioSenderFrame);
 
     // RTCRtpTransformableFrame
-    Span<const uint8_t> data() const final;
-    void setData(Span<const uint8_t>) final;
+    std::span<const uint8_t> data() const final;
+    void setData(std::span<const uint8_t>) final;
     bool isKeyFrame() const final;
     uint64_t timestamp() const final;
     RTCEncodedAudioFrameMetadata audioMetadata() const final;

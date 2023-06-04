@@ -987,13 +987,9 @@ void webkitMediaStreamSrcAddTrack(WebKitMediaStreamSrc* self, MediaStreamTrackPr
     GST_DEBUG_OBJECT(self, "Setup %s source for track %s, only track: %s", sourceType, track->id().utf8().data(), boolForPrinting(onlyTrack));
 
     auto padName = makeString(sourceType, "_src", counter);
-<<<<<<< HEAD
     auto source = makeUnique<InternalSource>(GST_ELEMENT_CAST(self), *track, padName, consumerIsVideoPlayer);
     auto* element = source->get();
     gst_bin_add(GST_BIN_CAST(self), element);
-=======
-    auto source = makeUnique<InternalSource>(GST_ELEMENT_CAST(self), *track, padName);
->>>>>>> 10a47f9db57e (rtp transform wip)
 
     auto pad = source->sourcePad();
     auto tags = mediaStreamTrackPrivateGetTags(*track);
