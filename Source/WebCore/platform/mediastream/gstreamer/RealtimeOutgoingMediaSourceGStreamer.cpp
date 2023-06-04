@@ -68,7 +68,7 @@ RealtimeOutgoingMediaSourceGStreamer::RealtimeOutgoingMediaSourceGStreamer(const
         if (!source.m_transformCallback)
             return GST_PAD_PROBE_OK;
 
-        auto* buffer = GST_BUFFER_CAST(GST_PAD_PROBE_INFO_DATA(info));
+        auto* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
 
         GstMappedRtpBuffer mappedBuffer(buffer, GST_MAP_READ);
         auto* inputRtpBuffer = mappedBuffer.mappedData();
@@ -93,8 +93,8 @@ RealtimeOutgoingMediaSourceGStreamer::RealtimeOutgoingMediaSourceGStreamer(const
 
                 // TODO: copy header extensions data.
             }
-            transformedPacket = gst_buffer_append(transformedPacket, transformedPayload.leakRef());
             mappedBuffer.unmapEarly();
+            transformedPacket = gst_buffer_append(transformedPacket, transformedPayload.leakRef());
             //GST_PAD_PROBE_INFO_DATA(info) = gst_buffer_ref(transformedPacket.get());
             gst_buffer_replace(&buffer, transformedPacket);
         }
