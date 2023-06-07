@@ -61,12 +61,12 @@ protected:
 
     static Seconds renderInterval() { return 60_ms; }
 
+    void startProducingData() override;
+    void stopProducingData() override;
+
 private:
     const RealtimeMediaSourceCapabilities& capabilities() final;
     const RealtimeMediaSourceSettings& settings() final;
-
-    void startProducingData() final;
-    void stopProducingData() final;
 
     bool isCaptureSource() const final { return true; }
     CaptureDevice::DeviceType deviceType() const final { return CaptureDevice::DeviceType::Microphone; }

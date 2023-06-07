@@ -22,13 +22,16 @@
  */
 
 #include "config.h"
+#include "MockRealtimeVideoSource.h"
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "MockRealtimeVideoSourceGStreamer.h"
 
+#include "GStreamerCaptureDeviceManager.h"
 #include "MockRealtimeMediaSourceCenter.h"
 #include "PixelBuffer.h"
 #include "VideoFrameGStreamer.h"
+#include <gst/app/gstappsrc.h>
 
 namespace WebCore {
 
@@ -151,6 +154,41 @@ MockRealtimeVideoSourceGStreamer::MockRealtimeVideoSourceGStreamer(String&& devi
     ensureGStreamerInitialized();
 }
 
+void MockRealtimeVideoSourceGStreamer::startProducingData()
+{
+    if (m_capturer && m_capturer->pipeline())
+        return;
+
+    auto& singleton = GStreamerVideoCaptureDeviceManager::singleton();
+    auto device = singleton.gstreamerDeviceWithUID2(this->captureDevice().label());
+    device.setIsMockDevice(true);
+    m_capturer = makeUnique<GStreamerVideoCapturer>(WTFMove(device));
+
+    m_capturer->setupPipeline();
+
+    if (deviceType() == CaptureDevice::DeviceType::Camera)
+        m_capturer->setSize(size().width(), size().height());
+
+    m_capturer->setFrameRate(frameRate());
+    m_capturer->setSinkVideoFrameCallback([this](auto&& videoFrame) {
+        if (!isProducingData() || muted())
+            return;
+        dispatchVideoFrameToObservers(WTFMove(videoFrame), { });
+    });
+    m_capturer->play();
+
+    MockRealtimeVideoSource::startProducingData();
+}
+
+void MockRealtimeVideoSourceGStreamer::stopProducingData()
+{
+    MockRealtimeVideoSource::stopProducingData();
+
+    GST_INFO("Reset height and width after stopping source");
+    setSize({ 0, 0 });
+    m_capturer->stop();
+}
+
 void MockRealtimeVideoSourceGStreamer::updateSampleBuffer()
 {
     auto imageBuffer = this->imageBuffer();
@@ -165,7 +203,7 @@ void MockRealtimeVideoSourceGStreamer::updateSampleBuffer()
     metadata.captureTime = MonotonicTime::now().secondsSinceEpoch();
     auto presentationTime = MediaTime::createWithDouble((elapsedTime()).seconds());
     auto videoFrame = VideoFrameGStreamer::createFromPixelBuffer(pixelBuffer.releaseNonNull(), VideoFrameGStreamer::CanvasContentType::Canvas2D, videoFrameRotation(), presentationTime, size(), frameRate(), false, WTFMove(metadata));
-    dispatchVideoFrameToObservers(videoFrame.get(), { });
+    gst_app_src_push_sample(GST_APP_SRC_CAST(m_capturer->source()), videoFrame->sample());
 }
 
 } // namespace WebCore

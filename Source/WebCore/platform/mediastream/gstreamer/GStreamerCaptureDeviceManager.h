@@ -38,6 +38,8 @@ public:
     ~GStreamerCaptureDeviceManager();
     std::optional<GStreamerCaptureDevice> gstreamerDeviceWithUID(const String&);
 
+    GStreamerCaptureDevice gstreamerDeviceWithUID2(const String&);
+
     const Vector<CaptureDevice>& captureDevices() final;
     virtual CaptureDevice::DeviceType deviceType() = 0;
 

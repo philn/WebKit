@@ -25,7 +25,9 @@
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "MockRealtimeAudioSourceGStreamer.h"
 
+#include "GStreamerCaptureDeviceManager.h"
 #include "MockRealtimeMediaSourceCenter.h"
+#include <gst/app/gstappsrc.h>
 
 namespace WebCore {
 
@@ -85,6 +87,42 @@ MockRealtimeAudioSourceGStreamer::~MockRealtimeAudioSourceGStreamer()
     allMockRealtimeAudioSourcesStorage().remove(this);
 }
 
+void MockRealtimeAudioSourceGStreamer::startProducingData()
+{
+    if (m_capturer && m_capturer->pipeline())
+        return;
+
+    auto& singleton = GStreamerAudioCaptureDeviceManager::singleton();
+    auto device = singleton.gstreamerDeviceWithUID2(this->captureDevice().label());
+    device.setIsMockDevice(true);
+    m_capturer = makeUnique<GStreamerAudioCapturer>(WTFMove(device));
+
+    m_capturer->setupPipeline();
+
+    // if (m_deviceType == CaptureDevice::DeviceType::Camera)
+    // m_capturer->setSize(size().width(), size().height());
+
+    // m_capturer->reconfigure();
+    m_capturer->setSinkAudioCallback([this](auto&& sample, auto&& presentationTime) {
+        const auto& info = m_streamFormat->getInfo();
+        auto count = gst_buffer_get_size(gst_sample_get_buffer(sample.get())) / m_streamFormat->bytesPerFrame();
+        GStreamerAudioData data(WTFMove(sample), info);
+        audioSamplesAvailable(presentationTime, data, *m_streamFormat, count);
+    });
+    m_capturer->play();
+
+    MockRealtimeAudioSource::startProducingData();
+}
+
+void MockRealtimeAudioSourceGStreamer::stopProducingData()
+{
+    MockRealtimeAudioSource::stopProducingData();
+
+    GST_INFO("Reset height and width after stopping source");
+    setSize({ 0, 0 });
+    m_capturer->stop();
+}
+
 void MockRealtimeAudioSourceGStreamer::render(Seconds delta)
 {
     if (!m_bipBopBuffer.size())
@@ -122,8 +160,7 @@ void MockRealtimeAudioSourceGStreamer::render(Seconds delta)
 
         auto caps = adoptGRef(gst_audio_info_to_caps(&info));
         auto sample = adoptGRef(gst_sample_new(buffer.get(), caps.get(), nullptr, nullptr));
-        GStreamerAudioData data(WTFMove(sample), info);
-        audioSamplesAvailable(presentationTime, data, *m_streamFormat, bipBopCount);
+        gst_app_src_push_sample(GST_APP_SRC_CAST(m_capturer->source()), sample.get());
     }
 }
 

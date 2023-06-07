@@ -20,6 +20,7 @@
  */
 
 #include "config.h"
+#include "GStreamerCaptureDevice.h"
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "GStreamerCaptureDeviceManager.h"
@@ -80,16 +81,27 @@ std::optional<GStreamerCaptureDevice> GStreamerCaptureDeviceManager::gstreamerDe
     return std::nullopt;
 }
 
+GStreamerCaptureDevice GStreamerCaptureDeviceManager::gstreamerDeviceWithUID2(const String& deviceID)
+{
+    captureDevices();
+
+    for (auto& device : m_gstreamerDevices) {
+        if (device.persistentId() == deviceID)
+            return GStreamerCaptureDevice(GRefPtr<GstDevice>(device.device()), deviceID, device.type(), device.label());
+    }
+    return GStreamerCaptureDevice(nullptr, deviceID, CaptureDevice::DeviceType::Unknown, deviceID);
+}
+
 const Vector<CaptureDevice>& GStreamerCaptureDeviceManager::captureDevices()
 {
     ensureGStreamerInitialized();
+    registerWebKitGStreamerElements();
     static std::once_flag onceFlag;
     std::call_once(onceFlag, [] {
         GST_DEBUG_CATEGORY_INIT(webkitGStreamerCaptureDeviceManagerDebugCategory, "webkitcapturedevicemanager", 0, "WebKit Capture Device Manager");
     });
     if (m_devices.isEmpty())
         refreshCaptureDevices();
-
     return m_devices;
 }
 
@@ -191,7 +203,8 @@ void GStreamerCaptureDeviceManager::refreshCaptureDevices()
 
     GList* devices = g_list_sort(gst_device_monitor_get_devices(m_deviceMonitor.get()), sortDevices);
     while (devices) {
-        addDevice(GST_DEVICE_CAST(devices->data));
+        auto device = adoptGRef(GST_DEVICE_CAST(devices->data));
+        addDevice(WTFMove(device));
         devices = g_list_delete_link(devices, devices);
     }
 }

@@ -56,6 +56,7 @@
 
 #if ENABLE(MEDIA_STREAM)
 #include "GStreamerMediaStreamSource.h"
+#include "GStreamerMockDeviceProvider.h"
 #endif
 
 #if ENABLE(SPEECH_SYNTHESIS)
@@ -340,6 +341,7 @@ void registerWebKitGStreamerElements()
 
 #if ENABLE(MEDIA_STREAM)
         gst_element_register(nullptr, "mediastreamsrc", GST_RANK_PRIMARY, WEBKIT_TYPE_MEDIA_STREAM_SRC);
+        gst_device_provider_register(nullptr, "mock-device-provider", GST_RANK_PRIMARY, GST_TYPE_MOCK_DEVICE_PROVIDER);
 #endif
         registerInternalVideoEncoder();
 

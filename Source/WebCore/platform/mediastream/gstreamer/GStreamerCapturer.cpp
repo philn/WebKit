@@ -48,18 +48,17 @@ static void initializeCapturerDebugCategory()
     });
 }
 
-GStreamerCapturer::GStreamerCapturer(GStreamerCaptureDevice device, GRefPtr<GstCaps> caps)
-    : m_device(device.device())
-    , m_caps(caps)
+GStreamerCapturer::GStreamerCapturer(GStreamerCaptureDevice&& device, GRefPtr<GstCaps> caps)
+    : m_caps(caps)
     , m_sourceFactory(nullptr)
     , m_deviceType(device.type())
 {
+    m_device.emplace(WTFMove(device));
     initializeCapturerDebugCategory();
 }
 
 GStreamerCapturer::GStreamerCapturer(const char* sourceFactory, GRefPtr<GstCaps> caps, CaptureDevice::DeviceType deviceType)
-    : m_device(nullptr)
-    , m_caps(caps)
+    : m_caps(caps)
     , m_sourceFactory(sourceFactory)
     , m_deviceType(deviceType)
 {
@@ -124,7 +123,7 @@ GstElement* GStreamerCapturer::createSource()
     } else {
         ASSERT(m_device);
         auto sourceName = makeString(name(), hex(reinterpret_cast<uintptr_t>(this)));
-        m_src = gst_device_create_element(m_device.get(), sourceName.ascii().data());
+        m_src = gst_device_create_element(m_device->device(), sourceName.ascii().data());
         ASSERT(m_src);
         g_object_set(m_src.get(), "do-timestamp", TRUE, nullptr);
     }
@@ -154,7 +153,7 @@ GstCaps* GStreamerCapturer::caps()
     }
 
     ASSERT(m_device);
-    return gst_device_get_caps(m_device.get());
+    return gst_device_get_caps(m_device->device());
 }
 
 void GStreamerCapturer::setupPipeline()

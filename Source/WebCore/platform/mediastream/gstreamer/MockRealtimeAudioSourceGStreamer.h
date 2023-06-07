@@ -24,6 +24,7 @@
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 
+#include "GStreamerAudioCapturer.h"
 #include "GStreamerAudioData.h"
 #include "GStreamerAudioStreamDescription.h"
 #include "MockRealtimeAudioSource.h"
@@ -41,6 +42,9 @@ public:
 protected:
     void render(Seconds) final;
 
+    void startProducingData() final;
+    void stopProducingData() final;
+
 private:
     friend class MockRealtimeAudioSource;
     MockRealtimeAudioSourceGStreamer(String&& deviceID, AtomString&& name, MediaDeviceHashSalts&&);
@@ -56,6 +60,7 @@ private:
     uint64_t m_samplesEmitted { 0 };
     uint64_t m_samplesRendered { 0 };
     bool m_isInterrupted { false };
+    std::unique_ptr<GStreamerAudioCapturer> m_capturer;
 };
 
 } // namespace WebCore

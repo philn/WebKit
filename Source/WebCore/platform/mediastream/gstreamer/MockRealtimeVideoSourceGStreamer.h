@@ -26,6 +26,8 @@
 
 #include "MockRealtimeVideoSource.h"
 
+#include "GStreamerVideoCapturer.h"
+
 namespace WebCore {
 
 class MockRealtimeVideoSourceGStreamer final : public MockRealtimeVideoSource {
@@ -33,11 +35,17 @@ public:
     MockRealtimeVideoSourceGStreamer(String&& deviceID, AtomString&& name, MediaDeviceHashSalts&&);
     ~MockRealtimeVideoSourceGStreamer() = default;
 
+protected:
+    void startProducingData() final;
+    void stopProducingData() final;
+
 private:
     friend class MockRealtimeVideoSource;
 
     void updateSampleBuffer() final;
     bool canResizeVideoFrames() const final { return true; }
+
+    std::unique_ptr<GStreamerVideoCapturer> m_capturer;
 };
 
 class MockDisplayCaptureSourceGStreamer : public RealtimeVideoCaptureSource, RealtimeMediaSource::VideoFrameObserver {
