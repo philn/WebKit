@@ -90,17 +90,20 @@ using SetBitrateFunc = Function<void(GObject* encoder, const char* propertyName,
 using SetupFunc = Function<void(WebKitVideoEncoder*)>;
 using SetBitrateModeFunc = Function<void(GstElement*, BitrateMode)>;
 using SetLatencyModeFunc = Function<void(GstElement*, LatencyMode)>;
+using SupportsOutputFormatFunc = Function<bool(GstElementFactory*, const GstCaps*)>;
 
 struct EncoderDefinition {
     GRefPtr<GstCaps> caps;
     const char* name;
     const char* parserName;
+    const char* inputFilterName;
     GRefPtr<GstElementFactory> factory;
     GRefPtr<GstCaps> encodedFormat;
     SetBitrateFunc setBitrate;
     SetupFunc setupEncoder;
     SetBitrateModeFunc setBitrateMode;
     SetLatencyModeFunc setLatencyMode;
+    SupportsOutputFormatFunc supportsOutputFormatFunc;
     const char* bitratePropertyName;
     const char* keyframeIntervalPropertyName;
 };
@@ -111,6 +114,7 @@ enum EncoderId {
     OpenH264,
     OmxH264,
     VaapiH264,
+    VaapiH264LowPower,
     VaapiH265,
     Vp8,
     Vp9,
@@ -125,8 +129,9 @@ public:
         return encoders;
     }
 
-    static void registerEncoder(EncoderId id, const char* name, const char* parserName, const char* capsString, const char* encodedFormatString,
-        SetupFunc&& setupEncoder, const char* bitratePropertyName, SetBitrateFunc&& setBitrate, const char* keyframeIntervalPropertyName, SetBitrateModeFunc&& setBitrateMode, SetLatencyModeFunc&& setLatency)
+    static void registerEncoder(EncoderId id, const char* inputFilterName, const char* name, const char* parserName, const char* capsString, const char* encodedFormatString,
+        SetupFunc&& setupEncoder, const char* bitratePropertyName, SetBitrateFunc&& setBitrate, const char* keyframeIntervalPropertyName,
+        SetBitrateModeFunc&& setBitrateMode, SetLatencyModeFunc&& setLatency, SupportsOutputFormatFunc supportsOutputFormatFunc = nullptr)
     {
         auto encoderFactory = adoptGRef(gst_element_factory_find(name));
         if (!encoderFactory) {
@@ -156,16 +161,22 @@ public:
             GST_MINI_OBJECT_FLAG_SET(encodedFormat.get(), GST_MINI_OBJECT_FLAG_MAY_BE_LEAKED);
         }
 
+        // auto supportsOutputFormat = supportsOutputFormatFunc.value_or([&](GstElementFactory* factory, const GstCaps* caps) -> gboolean {
+        //     return gst_element_factory_can_src_any_caps(factory, caps);
+        // });
+
         singleton().emplace(std::make_pair(id, EncoderDefinition {
             .caps = WTFMove(caps),
             .name = name,
             .parserName = parserName,
+            .inputFilterName = inputFilterName,
             .factory = WTFMove(encoderFactory),
             .encodedFormat = WTFMove(encodedFormat),
             .setBitrate = WTFMove(setBitrate),
             .setupEncoder = WTFMove(setupEncoder),
             .setBitrateMode = WTFMove(setBitrateMode),
             .setLatencyMode = WTFMove(setLatency),
+            .supportsOutputFormatFunc = WTFMove(supportsOutputFormatFunc),
             .bitratePropertyName = bitratePropertyName,
             .keyframeIntervalPropertyName = keyframeIntervalPropertyName,
         }));
@@ -184,6 +195,7 @@ public:
    parser) ! capsFilter */
 struct _WebKitVideoEncoderPrivate {
     EncoderId encoderId;
+    GRefPtr<GstElement> inputFilter;
     GRefPtr<GstElement> encoder;
     GRefPtr<GstElement> parser;
     GRefPtr<GstElement> capsFilter;
@@ -296,6 +308,10 @@ static void videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
             gst_element_set_state(priv->encoder.get(), GST_STATE_NULL);
             gst_element_unlink(priv->inputCapsFilter.get(), priv->encoder.get());
             gst_bin_remove(GST_BIN_CAST(self), priv->encoder.get());
+            if (priv->inputFilter) {
+                gst_element_unlink(priv->inputFilter.get(), priv->inputCapsFilter.get());
+                gst_bin_remove(GST_BIN_CAST(self), priv->inputFilter.get());
+            }
         }
         priv->encoder = gst_element_factory_create(encoderDefinition->factory.get(), nullptr);
         gst_bin_add(GST_BIN_CAST(self), priv->encoder.get());
@@ -320,22 +336,39 @@ static void videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
         gst_bin_add(GST_BIN_CAST(self), priv->inputCapsFilter.get());
     }
 
-    if (!priv->videoScale) {
-        priv->videoScale = makeGStreamerElement("videoscale", nullptr);
-        gst_bin_add(GST_BIN_CAST(self), priv->videoScale.get());
+    // auto elementClass = makeString(gst_element_get_metadata(priv->encoder.get(), GST_ELEMENT_METADATA_KLASS));
+    // auto classifiers = elementClass.split('/');
+    // auto isHardwareEncoder = classifiers.contains("Hardware"_s);
+
+    GRefPtr<GstPad> sinkPadTarget;
+
+    if (encoderDefinition->inputFilterName) {
+        if (!priv->inputFilter) {
+            priv->inputFilter = makeGStreamerElement(encoderDefinition->inputFilterName, nullptr);
+            gst_bin_add(GST_BIN_CAST(self), priv->inputFilter.get());
+            sinkPadTarget = adoptGRef(gst_element_get_static_pad(priv->inputFilter.get(), "sink"));
+        }
+    } else {
+        if (!priv->videoScale) {
+            priv->videoScale = makeGStreamerElement("videoscale", nullptr);
+            gst_bin_add(GST_BIN_CAST(self), priv->videoScale.get());
+        }
+
+        if (!priv->videoConvert) {
+            priv->videoConvert = makeGStreamerElement("videoconvert", nullptr);
+            gst_bin_add(GST_BIN_CAST(self), priv->videoConvert.get());
+
+            sinkPadTarget = adoptGRef(gst_element_get_static_pad(priv->videoConvert.get(), "sink"));
+        } else {
+            gst_element_unlink(priv->videoConvert.get(), priv->inputCapsFilter.get());
+            auto caps = adoptGRef(gst_caps_new_any());
+            g_object_set(priv->inputCapsFilter.get(), "caps", caps.get(), nullptr);
+        }
     }
 
-    if (!priv->videoConvert) {
-        priv->videoConvert = makeGStreamerElement("videoconvert", nullptr);
-        gst_bin_add(GST_BIN_CAST(self), priv->videoConvert.get());
-
-        auto sinkPadTarget = adoptGRef(gst_element_get_static_pad(priv->videoConvert.get(), "sink"));
+    if (sinkPadTarget) {
         auto sinkPad = adoptGRef(gst_element_get_static_pad(GST_ELEMENT_CAST(self), "sink"));
         gst_ghost_pad_set_target(GST_GHOST_PAD(sinkPad.get()), sinkPadTarget.get());
-    } else {
-        gst_element_unlink(priv->videoConvert.get(), priv->inputCapsFilter.get());
-        auto caps = adoptGRef(gst_caps_new_any());
-        g_object_set(priv->inputCapsFilter.get(), "caps", caps.get(), nullptr);
     }
 
     if (encoderDefinition->parserName) {
@@ -352,7 +385,10 @@ static void videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
     encoderDefinition->setBitrateMode(priv->encoder.get(), priv->bitrateMode);
     encoderDefinition->setLatencyMode(priv->encoder.get(), priv->latencyMode);
 
-    gst_element_link_many(priv->videoConvert.get(), priv->videoScale.get(), priv->inputCapsFilter.get(), nullptr);
+    if (priv->inputFilter)
+        gst_element_link(priv->inputFilter.get(), priv->inputCapsFilter.get());
+    else
+        gst_element_link_many(priv->videoConvert.get(), priv->videoScale.get(), priv->inputCapsFilter.get(), nullptr);
     if (shouldLinkEncoder)
         gst_element_link(priv->inputCapsFilter.get(), priv->encoder.get());
 
@@ -390,10 +426,18 @@ EncoderId videoEncoderFindForFormat(WebKitVideoEncoder* self, const GRefPtr<GstC
     Vector<std::pair<EncoderId, const EncoderDefinition*>> candidates;
     GST_DEBUG_OBJECT(self, "Looking for an encoder matching caps %" GST_PTR_FORMAT, caps.get());
     for (const auto& [id, encoder] : Encoders::singleton()) {
-        if (gst_element_factory_can_src_any_caps(encoder.factory.get(), caps.get())) {
-            GST_DEBUG_OBJECT(self, "Compatible encoder found: %s", encoder.name);
-            candidates.append(std::make_pair(id, &encoder));
+        bool isSupported = false;
+        if (encoder.supportsOutputFormatFunc)
+            isSupported = encoder.supportsOutputFormatFunc(encoder.factory.get(), caps.get());
+        else
+            isSupported = gst_element_factory_can_src_any_caps(encoder.factory.get(), caps.get());
+        if (!isSupported) {
+            GST_DEBUG_OBJECT(self, "Encoder %s cannot output format %" GST_PTR_FORMAT, encoder.name, caps.get());
+            continue;
         }
+
+        GST_DEBUG_OBJECT(self, "Compatible encoder found: %s", encoder.name);
+        candidates.append(std::make_pair(id, &encoder));
     }
 
     if (candidates.isEmpty())
@@ -533,7 +577,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
     gst_element_class_set_static_metadata(elementClass, "WebKit video encoder", "Codec/Encoder/Video", "Encodes video for streaming", "Igalia");
     gst_element_class_add_pad_template(elementClass, gst_static_pad_template_get(&sinkTemplate));
 
-    Encoders::registerEncoder(OmxH264, "omxh264enc", "h264parse", "video/x-h264",
+    Encoders::registerEncoder(OmxH264, nullptr, "omxh264enc", "h264parse", "video/x-h264",
         "video/x-h264,alignment=au,stream-format=byte-stream,profile=baseline",
         [](WebKitVideoEncoder* self) {
             g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
@@ -549,7 +593,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
         }, [](GstElement*, LatencyMode) {
             notImplemented();
         });
-    Encoders::registerEncoder(X264, "x264enc", "h264parse", "video/x-h264",
+    Encoders::registerEncoder(X264, nullptr, "x264enc", "h264parse", "video/x-h264",
         "video/x-h264,alignment=au,stream-format=byte-stream",
         [](WebKitVideoEncoder* self) {
             g_object_set(self->priv->encoder.get(), "key-int-max", 15, "threads", NUMBER_OF_THREADS, nullptr);
@@ -586,7 +630,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
                 break;
             };
         });
-    Encoders::registerEncoder(OpenH264, "openh264enc", "h264parse", "video/x-h264",
+    Encoders::registerEncoder(OpenH264, nullptr, "openh264enc", "h264parse", "video/x-h264",
         "video/x-h264,alignment=au,stream-format=byte-stream",
         [](WebKitVideoEncoder* self) {
             g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
@@ -596,7 +640,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
         }, [](GstElement*, LatencyMode) {
             notImplemented();
         });
-    Encoders::registerEncoder(Vp8, "vp8enc", nullptr, "video/x-vp8", nullptr,
+    Encoders::registerEncoder(Vp8, nullptr, "vp8enc", nullptr, "video/x-vp8", nullptr,
         [](WebKitVideoEncoder* self) {
             gst_util_set_object_arg(G_OBJECT(self->priv->encoder.get()), "keyframe-mode", "disabled");
         }, "target-bitrate", setBitrateBitPerSec, "keyframe-max-dist", [](GstElement* encoder, BitrateMode mode) {
@@ -620,7 +664,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
             };
         });
 
-    Encoders::registerEncoder(Vp9, "vp9enc", nullptr, "video/x-vp9", nullptr,
+    Encoders::registerEncoder(Vp9, nullptr, "vp9enc", nullptr, "video/x-vp9", nullptr,
         [](WebKitVideoEncoder* self) {
             auto inputCaps = adoptGRef(gst_caps_new_any());
             const auto* structure = gst_caps_get_structure(self->priv->encodedCaps.get(), 0);
@@ -654,9 +698,40 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
             };
         });
 
-    Encoders::registerEncoder(VaapiH264, "vah264lpenc", "h264parse", "video/x-h264", nullptr,
-        [](WebKitVideoEncoder* self) {
+    // The va encoder doesn't accept baseline profile, so fallback to constrained-baseline.
+    auto ensureVAH264Profile = [](auto* self) {
+        GRefPtr<GstCaps> inputCaps;
+        g_object_get(self->priv->inputCapsFilter.get(), "caps", &inputCaps.outPtr(), nullptr);
+        if (gst_caps_is_any(inputCaps.get()) || gst_caps_is_empty(inputCaps.get()))
+            return;
+
+        auto modifiedInputCaps = adoptGRef(gst_caps_make_writable(inputCaps.get()));
+        auto* structure = gst_caps_get_structure(modifiedInputCaps.get(), 0);
+        const char* profile = gst_structure_get_string(structure, "profile");
+        if (!g_str_equal(profile, "baseline"))
+            return;
+
+        gst_structure_set(structure, "profile", G_TYPE_STRING, "constrained-baseline", nullptr);
+        g_object_set(self->priv->capsFilter.get(), "caps", modifiedInputCaps.get(), nullptr);
+    };
+
+    auto supportsVAH264Format = [](auto* factory, const auto* caps) -> bool {
+        if (gst_caps_is_any(caps) || gst_caps_is_empty(caps))
+            return gst_element_factory_can_src_any_caps(factory, caps);
+
+        auto modifiedCaps = adoptGRef(gst_caps_copy(caps));
+        auto* structure = gst_caps_get_structure(modifiedCaps.get(), 0);
+        const char* profile = gst_structure_get_string(structure, "profile");
+        if (g_str_equal(profile, "baseline"))
+            gst_structure_set(structure, "profile", G_TYPE_STRING, "constrained-baseline", nullptr);
+
+        return gst_element_factory_can_src_any_caps(factory, modifiedCaps.get());
+    };
+
+    Encoders::registerEncoder(VaapiH264LowPower, "vapostproc", "vah264lpenc", "h264parse", "video/x-h264", nullptr,
+        [&](WebKitVideoEncoder* self) {
             g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
+            ensureVAH264Profile(self);
         }, "bitrate", setBitrateKbitPerSec, "key-int-max", [](GstElement*, BitrateMode) {
             // Not supported.
         }, [](GstElement* encoder, LatencyMode mode) {
@@ -669,11 +744,14 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
                 gst_util_set_object_arg(G_OBJECT(encoder), "rate-control", "cqp");
                 break;
             };
+        }, [&](auto* factory, const auto* caps) -> bool {
+            return supportsVAH264Format(factory, caps);
         });
 
-    Encoders::registerEncoder(VaapiH264, "vah264enc", "h264parse", "video/x-h264", nullptr,
-        [](WebKitVideoEncoder* self) {
+    Encoders::registerEncoder(VaapiH264, "vapostproc", "vah264enc", "h264parse", "video/x-h264", nullptr,
+        [&](WebKitVideoEncoder* self) {
             g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
+            ensureVAH264Profile(self);
         }, "bitrate", setBitrateKbitPerSec, "key-int-max", [](GstElement* encoder, BitrateMode mode) {
             switch (mode) {
             case CONSTANT_BITRATE_MODE:
@@ -693,9 +771,11 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
                 gst_util_set_object_arg(G_OBJECT(encoder), "rate-control", "cqp");
                 break;
             };
+        }, [&](auto* factory, const auto* caps) -> bool {
+            return supportsVAH264Format(factory, caps);
         });
 
-    Encoders::registerEncoder(VaapiH265, "vah265enc", "h265parse", "video/x-h265", nullptr,
+    Encoders::registerEncoder(VaapiH265, "vapostproc", "vah265enc", "h265parse", "video/x-h265", nullptr,
         [](WebKitVideoEncoder* self) {
             g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
         }, "bitrate", setBitrateKbitPerSec, "key-int-max", [](GstElement* encoder, BitrateMode mode) {
@@ -720,7 +800,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
         });
 
     if (webkitGstCheckVersion(1, 22, 0)) {
-        Encoders::registerEncoder(Av1, "av1enc", "av1parse", "video/x-av1", nullptr,
+        Encoders::registerEncoder(Av1, nullptr, "av1enc", "av1parse", "video/x-av1", nullptr,
             [](WebKitVideoEncoder* self) {
                 g_object_set(self->priv->encoder.get(), "threads", NUMBER_OF_THREADS, nullptr);
                 gst_util_set_object_arg(G_OBJECT(self->priv->encoder.get()), "keyframe-mode", "disabled");

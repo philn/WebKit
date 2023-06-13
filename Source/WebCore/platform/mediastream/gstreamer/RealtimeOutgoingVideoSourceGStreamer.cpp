@@ -150,9 +150,18 @@ bool RealtimeOutgoingVideoSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
 
     gst_bin_add(GST_BIN_CAST(m_bin.get()), m_payloader.get());
 
+    auto deviceType = source().deviceType();
+    auto isScreenCapture = deviceType == CaptureDevice::DeviceType::Screen || deviceType == CaptureDevice::DeviceType::Window;
+
     auto encoderSinkPad = adoptGRef(gst_element_get_static_pad(m_encoder.get(), "sink"));
     if (!gst_pad_is_linked(encoderSinkPad.get())) {
-        if (!gst_element_link_many(m_outgoingSource.get(), m_inputSelector.get(), m_videoFlip.get(), m_videoConvert.get(), m_preEncoderQueue.get(), m_encoder.get(), nullptr)) {
+        if (isScreenCapture) {
+            if (!gst_element_link_many(m_outgoingSource.get(), m_inputSelector.get(), m_preEncoderQueue.get(), m_encoder.get(), nullptr)) {
+                GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN_CAST(m_bin.get()), GST_DEBUG_GRAPH_SHOW_ALL, "error");
+                GST_ERROR_OBJECT(m_bin.get(), "Unable to link outgoing screen capture source to encoder");
+                return false;
+            }
+        } else if (!gst_element_link_many(m_outgoingSource.get(), m_inputSelector.get(), m_videoFlip.get(), m_videoConvert.get(), m_preEncoderQueue.get(), m_encoder.get(), nullptr)) {
             GST_ERROR_OBJECT(m_bin.get(), "Unable to link outgoing source to encoder");
             return false;
         }
