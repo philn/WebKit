@@ -110,6 +110,7 @@
 #include <@API_INCLUDE_PREFIX@/WebKitSecurityManager.h>
 #include <@API_INCLUDE_PREFIX@/WebKitSecurityOrigin.h>
 #include <@API_INCLUDE_PREFIX@/WebKitSettings.h>
+#include <@API_INCLUDE_PREFIX@/WebKitUtilities.h>
 #include <@API_INCLUDE_PREFIX@/WebKitURIRequest.h>
 #include <@API_INCLUDE_PREFIX@/WebKitURIResponse.h>
 #include <@API_INCLUDE_PREFIX@/WebKitURISchemeRequest.h>

@@ -171,6 +171,7 @@ set(WPE_API_HEADER_TEMPLATES
     ${WEBKIT_DIR}/UIProcess/API/glib/WebKitSecurityManager.h.in
     ${WEBKIT_DIR}/UIProcess/API/glib/WebKitSecurityOrigin.h.in
     ${WEBKIT_DIR}/UIProcess/API/glib/WebKitSettings.h.in
+    ${WEBKIT_DIR}/UIProcess/API/glib/WebKitUtilities.h.in
     ${WEBKIT_DIR}/UIProcess/API/glib/WebKitURIRequest.h.in
     ${WEBKIT_DIR}/UIProcess/API/glib/WebKitURIResponse.h.in
     ${WEBKIT_DIR}/UIProcess/API/glib/WebKitURISchemeRequest.h.in
