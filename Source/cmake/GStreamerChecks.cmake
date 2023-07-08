@@ -69,6 +69,11 @@ if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO)
 endif ()
 
 if (ENABLE_MEDIA_STREAM AND ENABLE_WEB_RTC)
+    find_package(PipeWire)
+    if (NOT PipeWire_FOUND)
+        message(FATAL_ERROR "PipeWire is needed for ENABLE_MEDIA_STREAM.")
+    endif ()
+
     if (USE_GSTREAMER_WEBRTC)
         SET_AND_EXPOSE_TO_BUILD(USE_LIBWEBRTC FALSE)
 

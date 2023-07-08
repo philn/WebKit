@@ -102,6 +102,10 @@ if (ENABLE_VIDEO)
         )
     endif ()
 
+    if (ENABLE_MEDIA_STREAM AND ENABLE_WEB_RTC)
+        list(APPEND WebCore_LIBRARIES PipeWire::PipeWire)
+    endif ()
+
     if (USE_LIBWEBRTC)
         list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
             ${GSTREAMER_CODECPARSERS_INCLUDE_DIRS}
