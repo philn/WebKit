@@ -28,6 +28,7 @@
 #include "GStreamerCaptureDevice.h"
 #include "GStreamerCapturer.h"
 #include "GStreamerVideoCapturer.h"
+#include "PipewireCaptureDevice.h"
 #include "RealtimeMediaSourceCenter.h"
 #include "RealtimeMediaSourceFactory.h"
 
@@ -67,6 +68,7 @@ private:
 
     GRefPtr<GstDeviceMonitor> m_deviceMonitor;
     Vector<GStreamerCaptureDevice> m_gstreamerDevices;
+    // Vector<PipewireCaptureDevice> m_pipewireDevices;
     Vector<CaptureDevice> m_devices;
     Vector<RefPtr<GStreamerCapturer>> m_capturers;
     bool m_isTearingDown { false };
@@ -83,6 +85,7 @@ class GStreamerVideoCaptureDeviceManager final : public GStreamerCaptureDeviceMa
     friend class NeverDestroyed<GStreamerVideoCaptureDeviceManager>;
 public:
     static GStreamerVideoCaptureDeviceManager& singleton();
+    void computeCaptureDevices(CompletionHandler<void()>&&) final;
     CaptureDevice::DeviceType deviceType() final { return CaptureDevice::DeviceType::Camera; }
 };
 

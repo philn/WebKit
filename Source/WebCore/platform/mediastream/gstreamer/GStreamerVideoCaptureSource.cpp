@@ -21,6 +21,7 @@
  */
 
 #include "config.h"
+#include "PipewireCaptureDevice.h"
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "GStreamerVideoCaptureSource.h"
@@ -83,9 +84,9 @@ CaptureSourceOrError GStreamerVideoCaptureSource::create(String&& deviceID, Medi
     return CaptureSourceOrError(WTFMove(source));
 }
 
-CaptureSourceOrError GStreamerVideoCaptureSource::createPipewireSource(String&& deviceID, const NodeAndFD& nodeAndFd, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints, CaptureDevice::DeviceType deviceType)
+CaptureSourceOrError GStreamerVideoCaptureSource::createPipewireSource(PipewireCaptureDevice&& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)
 {
-    auto source = adoptRef(*new GStreamerVideoCaptureSource(WTFMove(deviceID), { }, WTFMove(hashSalts), "pipewiresrc", deviceType, nodeAndFd));
+    auto source = adoptRef(*new GStreamerVideoCaptureSource(WTFMove(device), WTFMove(hashSalts)));
     if (constraints) {
         if (auto result = source->applyConstraints(*constraints))
             return CaptureSourceOrError({ WTFMove(result->badConstraint), MediaAccessDenialReason::InvalidConstraint });
@@ -105,13 +106,13 @@ DisplayCaptureFactory& GStreamerVideoCaptureSource::displayFactory()
     return factory.get();
 }
 
-GStreamerVideoCaptureSource::GStreamerVideoCaptureSource(String&& deviceID, AtomString&& name, MediaDeviceHashSalts&& hashSalts, const gchar* sourceFactory, CaptureDevice::DeviceType deviceType, const NodeAndFD& nodeAndFd)
-    : RealtimeVideoCaptureSource(CaptureDevice { WTFMove(deviceID), CaptureDevice::DeviceType::Camera, WTFMove(name) }, WTFMove(hashSalts), { })
-    , m_capturer(adoptRef(*new GStreamerVideoCapturer(sourceFactory, deviceType)))
-    , m_deviceType(deviceType)
+GStreamerVideoCaptureSource::GStreamerVideoCaptureSource(PipewireCaptureDevice&& device, MediaDeviceHashSalts&& hashSalts)
+    : RealtimeVideoCaptureSource(device, WTFMove(hashSalts), { })
+    , m_capturer(adoptRef(*new GStreamerVideoCapturer("pipewiresrc", device.type())))
 {
     initializeVideoCaptureSourceDebugCategory();
-    m_capturer->setPipewireNodeAndFD(nodeAndFd);
+    m_deviceType = m_capturer->deviceType();
+    m_capturer->setPipewireNodeAndFD({device.node(), device.fd()});
     m_capturer->addObserver(*this);
 
     auto& singleton = GStreamerVideoCaptureDeviceManager::singleton();

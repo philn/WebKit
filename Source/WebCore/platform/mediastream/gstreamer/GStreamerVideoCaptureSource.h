@@ -25,6 +25,7 @@
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "CaptureDevice.h"
 #include "GStreamerVideoCapturer.h"
+#include "PipewireCaptureDevice.h"
 #include "RealtimeVideoCaptureSource.h"
 #include "VideoFrameGStreamer.h"
 
@@ -35,7 +36,7 @@ using NodeAndFD = GStreamerVideoCapturer::NodeAndFD;
 class GStreamerVideoCaptureSource : public RealtimeVideoCaptureSource, GStreamerCapturer::Observer {
 public:
     static CaptureSourceOrError create(String&& deviceID, MediaDeviceHashSalts&&, const MediaConstraints*);
-    static CaptureSourceOrError createPipewireSource(String&& deviceID, const NodeAndFD&, MediaDeviceHashSalts&&, const MediaConstraints*, CaptureDevice::DeviceType);
+    static CaptureSourceOrError createPipewireSource(PipewireCaptureDevice&&, MediaDeviceHashSalts&&, const MediaConstraints*);
 
     WEBCORE_EXPORT static VideoCaptureFactory& factory();
 
@@ -51,8 +52,9 @@ public:
     void captureEnded() final;
 
 protected:
-    GStreamerVideoCaptureSource(String&& deviceID, AtomString&& name, MediaDeviceHashSalts&&, const gchar* source_factory, CaptureDevice::DeviceType, const NodeAndFD&);
+    // GStreamerVideoCaptureSource(String&& deviceID, AtomString&& name, MediaDeviceHashSalts&&, const gchar* source_factory, CaptureDevice::DeviceType, const NodeAndFD&);
     GStreamerVideoCaptureSource(GStreamerCaptureDevice&&, MediaDeviceHashSalts&&);
+    GStreamerVideoCaptureSource(PipewireCaptureDevice&&, MediaDeviceHashSalts&&);
     virtual ~GStreamerVideoCaptureSource();
     void startProducingData() override;
     void stopProducingData() override;
