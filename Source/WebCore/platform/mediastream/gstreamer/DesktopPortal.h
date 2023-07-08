@@ -1,0 +1,76 @@
+/*
+ * Copyright (C) 2023 Metrological Group B.V.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Library General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Library General Public License for more details.
+ *
+ * You should have received a copy of the GNU Library General Public License
+ * aint with this library; see the file COPYING.LIB.  If not, write to
+ * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
+ */
+
+#pragma once
+
+#include <gio/gio.h>
+#include <wtf/CompletionHandler.h>
+#include <wtf/Forward.h>
+#include <wtf/RefCounted.h>
+#include <wtf/glib/GRefPtr.h>
+#include <wtf/text/WTFString.h>
+
+namespace WebCore {
+
+class DesktopPortal : public RefCounted<DesktopPortal> {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    static RefPtr<DesktopPortal> create(const String& interfaceName);
+    DesktopPortal(const String&, GRefPtr<GDBusProxy>&&);
+
+    class Session {
+    public:
+        Session(String&& path, const GRefPtr<GDBusProxy>&);
+
+        const String& path() const { return m_path; }
+        std::optional<int> openPipewireRemote();
+
+    protected:
+        String m_path;
+        const GRefPtr<GDBusProxy>& m_proxy;
+    };
+
+    class ScreencastSession : public Session {
+    public:
+        ScreencastSession(String&& path, const GRefPtr<GDBusProxy>& proxy)
+            : Session(WTFMove(path), proxy)
+        {
+        }
+        GRefPtr<GVariant> selectSources(GVariantBuilder&);
+        GRefPtr<GVariant> start();
+    };
+
+    std::optional<Session> createSession();
+    void closeSession(const String& path);
+
+    GRefPtr<GVariant> getProperty(const char* name);
+
+    using ResponseCallback = CompletionHandler<void(GVariant*)>;
+    void waitResponseSignal(const char* objectPath, ResponseCallback&& = [](GVariant*) {});
+
+protected:
+    void notifyResponse(GVariant* parameters) { m_currentResponseCallback(parameters); }
+
+private:
+    String m_interfaceName;
+    GRefPtr<GDBusProxy> m_proxy;
+    ResponseCallback m_currentResponseCallback;
+};
+
+} // namespace WebCore

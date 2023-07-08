@@ -113,6 +113,7 @@ platform/mediastream/libwebrtc/gstreamer/RealtimeIncomingVideoSourceLibWebRTC.cp
 platform/mediastream/libwebrtc/gstreamer/RealtimeOutgoingAudioSourceLibWebRTC.cpp
 platform/mediastream/libwebrtc/gstreamer/RealtimeOutgoingVideoSourceLibWebRTC.cpp
 
+platform/mediastream/gstreamer/DesktopPortal.cpp
 platform/mediastream/gstreamer/GStreamerAudioCaptureSource.cpp
 platform/mediastream/gstreamer/GStreamerAudioCapturer.cpp
 platform/mediastream/gstreamer/GStreamerCaptureDeviceManager.cpp

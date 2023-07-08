@@ -24,6 +24,7 @@
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 
 #include "DisplayCaptureManager.h"
+#include "DesktopPortal.h"
 #include "GRefPtrGStreamer.h"
 #include "GStreamerCaptureDevice.h"
 #include "GStreamerCapturer.h"
@@ -107,23 +108,16 @@ public:
     // DisplayCaptureManager interface
     bool requiresCaptureDevicesEnumeration() const final { return true; }
 
-protected:
-    void notifyResponse(GVariant* parameters) { m_currentResponseCallback(parameters); }
-
 private:
     GStreamerDisplayCaptureDeviceManager();
     ~GStreamerDisplayCaptureDeviceManager();
-
-    using ResponseCallback = CompletionHandler<void(GVariant*)>;
-
-    void waitResponseSignal(const char* objectPath, ResponseCallback&& = [](GVariant*) { });
 
     Vector<CaptureDevice> m_devices;
 
     struct Session {
         WTF_MAKE_STRUCT_FAST_ALLOCATED;
         WTF_MAKE_NONCOPYABLE(Session);
-        Session(const NodeAndFD& nodeAndFd, String&& path)
+        Session(const NodeAndFD& nodeAndFd, const String& path)
             : nodeAndFd(nodeAndFd)
             , path(WTFMove(path)) { }
 
@@ -133,13 +127,12 @@ private:
         }
 
         NodeAndFD nodeAndFd;
-        String path;
+        const String& path;
     };
     HashMap<String, std::unique_ptr<Session>> m_sessions;
-
-    GRefPtr<GDBusProxy> m_proxy;
-    ResponseCallback m_currentResponseCallback;
+    RefPtr<DesktopPortal> m_portal;
 };
-}
+
+} // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
