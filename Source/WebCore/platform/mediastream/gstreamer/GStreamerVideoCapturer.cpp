@@ -75,8 +75,9 @@ GstElement* GStreamerVideoCapturer::createSource()
     if (m_nodeAndFd) {
         auto& [node, fd] = *m_nodeAndFd;
         auto path = AtomString::number(node);
+        WTFLogAlways(">>>> %s<<< fd: %d", path.string().ascii().data(), fd);
         // FIXME: The path property is deprecated in favor of target-object but the portal doesn't expose this object.
-        g_object_set(m_src.get(), "path", path.string().ascii().data(), nullptr);
+        // g_object_set(m_src.get(), "path", path.string().ascii().data(), nullptr);
         g_object_set(m_src.get(), "fd", fd, nullptr);
     }
     return src;
