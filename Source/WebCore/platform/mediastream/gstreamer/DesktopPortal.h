@@ -39,7 +39,8 @@ public:
         Session(String&& path, const GRefPtr<GDBusProxy>&);
 
         const String& path() const { return m_path; }
-        std::optional<int> openPipewireRemote();
+
+        GRefPtr<GVariant> accessCamera();
 
     protected:
         String m_path;
@@ -54,10 +55,14 @@ public:
         }
         GRefPtr<GVariant> selectSources(GVariantBuilder&);
         GRefPtr<GVariant> start();
+        std::optional<int> openPipewireRemote();
     };
 
-    std::optional<Session> createSession();
+    std::optional<ScreencastSession> createScreencastSession();
     void closeSession(const String& path);
+
+    GRefPtr<GVariant> accessCamera();
+    std::optional<int> openCameraPipewireRemote();
 
     GRefPtr<GVariant> getProperty(const char* name);
 

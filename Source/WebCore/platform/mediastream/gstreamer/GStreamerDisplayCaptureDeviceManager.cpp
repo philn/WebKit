@@ -72,7 +72,7 @@ CaptureSourceOrError GStreamerDisplayCaptureDeviceManager::createDisplayCaptureS
     if (!m_portal)
         return CaptureSourceOrError({ { }, MediaAccessDenialReason::PermissionDenied });
 
-    auto session = m_portal->createSession();
+    auto session = m_portal->createScreencastSession();
     if (!session)
         return CaptureSourceOrError({ { }, MediaAccessDenialReason::PermissionDenied });
 
@@ -92,8 +92,7 @@ CaptureSourceOrError GStreamerDisplayCaptureDeviceManager::createDisplayCaptureS
         }
     }
 
-    auto& screencastSession = reinterpret_cast<DesktopPortal::ScreencastSession&>(session.value());
-    auto result = screencastSession.selectSources(options);
+    auto result = session->selectSources(options);
     if (!result)
         return CaptureSourceOrError({ { }, MediaAccessDenialReason::PermissionDenied });
 
@@ -101,7 +100,7 @@ CaptureSourceOrError GStreamerDisplayCaptureDeviceManager::createDisplayCaptureS
     g_variant_get(result.get(), "(o)", &objectPath.outPtr());
     m_portal->waitResponseSignal(objectPath.get());
 
-    result = screencastSession.start();
+    result = session->start();
     if (!result)
         return CaptureSourceOrError({ { }, MediaAccessDenialReason::PermissionDenied });
 
@@ -143,7 +142,7 @@ CaptureSourceOrError GStreamerDisplayCaptureDeviceManager::createDisplayCaptureS
         return CaptureSourceOrError({ { }, MediaAccessDenialReason::PermissionDenied });
 
     NodeAndFD nodeAndFd = { *nodeId, *fd };
-    auto sessionData = makeUnique<GStreamerDisplayCaptureDeviceManager::Session>(nodeAndFd, session->path());
+    auto sessionData = makeUnique<PipewireSession>(nodeAndFd, session->path());
     m_sessions.add(device.persistentId(), WTFMove(sessionData));
 
     PipewireCaptureDevice pipewireCaptureDevice { *nodeId, *fd, device.persistentId(), device.type(), device.label(), device.groupId() };

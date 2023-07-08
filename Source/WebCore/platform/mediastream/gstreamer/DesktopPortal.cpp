@@ -88,7 +88,7 @@ GRefPtr<GVariant> DesktopPortal::ScreencastSession::start()
     return result;
 }
 
-std::optional<int> DesktopPortal::Session::openPipewireRemote()
+std::optional<int> DesktopPortal::ScreencastSession::openPipewireRemote()
 {
     GRefPtr<GUnixFDList> fdList;
     int fd = -1;
@@ -108,7 +108,49 @@ std::optional<int> DesktopPortal::Session::openPipewireRemote()
     return fd;
 }
 
-std::optional<DesktopPortal::Session> DesktopPortal::createSession()
+GRefPtr<GVariant> DesktopPortal::accessCamera()
+{
+    auto token = makeString("WebKit", weakRandomNumber<uint32_t>());
+    GVariantBuilder options;
+    g_variant_builder_init(&options, G_VARIANT_TYPE_VARDICT);
+    g_variant_builder_add(&options, "{sv}", "handle_token", g_variant_new_string(token.ascii().data()));
+
+    GUniqueOutPtr<GError> error;
+    auto result = adoptGRef(g_dbus_proxy_call_sync(m_proxy.get(), "AccessCamera",
+        g_variant_new("(a{sv})", &options), G_DBUS_CALL_FLAGS_NONE, s_dbusCallTimeout.millisecondsAs<int>(), nullptr, &error.outPtr()));
+    if (error) {
+        WTFLogAlways("AccessCamera error: %s", error->message);
+        return { };
+    }
+
+    GUniqueOutPtr<char> objectPath;
+    g_variant_get(result.get(), "(o)", &objectPath.outPtr());
+    waitResponseSignal(objectPath.get());
+
+    return result;
+}
+
+std::optional<int> DesktopPortal::openCameraPipewireRemote()
+{
+    GRefPtr<GUnixFDList> fdList;
+    int fd = -1;
+    GVariantBuilder options;
+    g_variant_builder_init(&options, G_VARIANT_TYPE_VARDICT);
+    GUniqueOutPtr<GError> error;
+    auto result = adoptGRef(g_dbus_proxy_call_with_unix_fd_list_sync(m_proxy.get(), "OpenPipeWireRemote",
+        g_variant_new("(a{sv})", &options), G_DBUS_CALL_FLAGS_NONE, s_dbusCallTimeout.millisecondsAs<int>(), nullptr, &fdList.outPtr(), nullptr, &error.outPtr()));
+    if (error) {
+        WTFLogAlways("Unable to open pipewire remote. Error: %s", error->message);
+        return {};
+    }
+
+    int fdOut;
+    g_variant_get(result.get(), "(h)", &fdOut);
+    fd = g_unix_fd_list_get(fdList.get(), fdOut, nullptr);
+    return fd;
+}
+
+std::optional<DesktopPortal::ScreencastSession> DesktopPortal::createScreencastSession()
 {
     auto token = makeString("WebKit", weakRandomNumber<uint32_t>());
     auto sessionToken = makeString("WebKit", weakRandomNumber<uint32_t>());
@@ -132,10 +174,12 @@ std::optional<DesktopPortal::Session> DesktopPortal::createSession()
     auto requestPath = String::fromLatin1(objectPath.get());
     auto sessionPath = makeStringByReplacingAll(requestPath, "/request/"_s, "/session/"_s);
     sessionPath = makeStringByReplacingAll(sessionPath, token, sessionToken);
-    if (m_interfaceName == "org.freedesktop.portal.ScreenCast"_s)
+    // if (m_interfaceName == "org.freedesktop.portal.ScreenCast"_s)
         return { ScreencastSession { WTFMove(sessionPath), m_proxy } };
+    // if (m_interfaceName == "org.freedesktop.portal.Camera"_s)
+    //     return { CameraSession { WTFMove(sessionPath), m_proxy } };
 
-    return { Session { WTFMove(sessionPath), m_proxy } };
+    // return { Session { WTFMove(sessionPath), m_proxy } };
 }
 
 GRefPtr<GVariant> DesktopPortal::getProperty(const char* name)

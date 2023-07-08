@@ -47,16 +47,6 @@ static void initializeVideoCaptureSourceDebugCategory()
     });
 }
 
-class GStreamerVideoCaptureSourceFactory final : public VideoCaptureFactory {
-public:
-    CaptureSourceOrError createVideoCaptureSource(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints, PageIdentifier) final
-    {
-        return GStreamerVideoCaptureSource::create(String { device.persistentId() }, WTFMove(hashSalts), constraints);
-    }
-private:
-    CaptureDeviceManager& videoCaptureDeviceManager() final { return GStreamerVideoCaptureDeviceManager::singleton(); }
-};
-
 class GStreamerDisplayCaptureSourceFactory final : public DisplayCaptureFactory {
 public:
     CaptureSourceOrError createDisplayCaptureSource(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints, PageIdentifier) final

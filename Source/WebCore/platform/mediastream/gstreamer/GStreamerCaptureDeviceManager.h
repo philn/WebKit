@@ -39,7 +39,26 @@ namespace WebCore {
 
 using NodeAndFD = GStreamerVideoCapturer::NodeAndFD;
 
+
 void teardownGStreamerCaptureDeviceManagers();
+
+struct PipewireSession {
+    WTF_MAKE_STRUCT_FAST_ALLOCATED;
+    WTF_MAKE_NONCOPYABLE(PipewireSession);
+    PipewireSession(const NodeAndFD& nodeAndFd, const String& path)
+        : nodeAndFd(nodeAndFd)
+        , path(WTFMove(path))
+    {
+    }
+
+    ~PipewireSession()
+    {
+        close(nodeAndFd.second);
+    }
+
+    NodeAndFD nodeAndFd;
+    const String& path;
+};
 
 class GStreamerCaptureDeviceManager : public CaptureDeviceManager, public RealtimeMediaSourceCenter::Observer {
     WTF_MAKE_NONCOPYABLE(GStreamerCaptureDeviceManager)
@@ -61,6 +80,9 @@ public:
 
     void teardown();
 
+protected:
+    Vector<CaptureDevice> m_devices;
+
 private:
     void addDevice(GRefPtr<GstDevice>&&);
     void removeDevice(GRefPtr<GstDevice>&&);
@@ -69,8 +91,6 @@ private:
 
     GRefPtr<GstDeviceMonitor> m_deviceMonitor;
     Vector<GStreamerCaptureDevice> m_gstreamerDevices;
-    // Vector<PipewireCaptureDevice> m_pipewireDevices;
-    Vector<CaptureDevice> m_devices;
     Vector<RefPtr<GStreamerCapturer>> m_capturers;
     bool m_isTearingDown { false };
 };
@@ -88,6 +108,11 @@ public:
     static GStreamerVideoCaptureDeviceManager& singleton();
     void computeCaptureDevices(CompletionHandler<void()>&&) final;
     CaptureDevice::DeviceType deviceType() final { return CaptureDevice::DeviceType::Camera; }
+    CaptureSourceOrError createVideoCaptureSource(const CaptureDevice&, MediaDeviceHashSalts&&, const MediaConstraints*);
+
+private:
+    HashMap<String, std::unique_ptr<PipewireSession>> m_sessions;
+    RefPtr<DesktopPortal> m_portal;
 };
 
 class GStreamerDisplayCaptureDeviceManager final : public DisplayCaptureManager {
@@ -114,22 +139,7 @@ private:
 
     Vector<CaptureDevice> m_devices;
 
-    struct Session {
-        WTF_MAKE_STRUCT_FAST_ALLOCATED;
-        WTF_MAKE_NONCOPYABLE(Session);
-        Session(const NodeAndFD& nodeAndFd, const String& path)
-            : nodeAndFd(nodeAndFd)
-            , path(WTFMove(path)) { }
-
-        ~Session()
-        {
-            close(nodeAndFd.second);
-        }
-
-        NodeAndFD nodeAndFd;
-        const String& path;
-    };
-    HashMap<String, std::unique_ptr<Session>> m_sessions;
+    HashMap<String, std::unique_ptr<PipewireSession>> m_sessions;
     RefPtr<DesktopPortal> m_portal;
 };
 
