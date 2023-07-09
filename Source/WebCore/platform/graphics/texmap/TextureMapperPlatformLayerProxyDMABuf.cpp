@@ -266,6 +266,10 @@ void TextureMapperPlatformLayerProxyDMABuf::DMABufLayer::paintToTextureMapper(Te
         texmapGL.drawTexturePackedYUV(data.texture[0],
             yuvToRGB, m_flags, IntSize(data.width, data.height), targetRect, modelViewMatrix, opacity);
         break;
+    case DMABufFormat::FourCC::P010:
+        texmapGL.drawTextureSemiPlanarYUV(std::array<GLuint, 2> { data.texture[0], data.texture[1] },
+            false, yuvToRGB, m_flags, IntSize(data.width, data.height), targetRect, modelViewMatrix, opacity);
+        break;
     default:
         break;
     }

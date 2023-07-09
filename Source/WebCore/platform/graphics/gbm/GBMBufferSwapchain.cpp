@@ -68,6 +68,7 @@ static inline bool isBufferFormatSupported(const DMABufFormat& format)
     case DMABufFormat::FourCC::Y444:
     case DMABufFormat::FourCC::Y41B:
     case DMABufFormat::FourCC::Y42B:
+    case DMABufFormat::FourCC::P010:
         return true;
     default:
         return false;

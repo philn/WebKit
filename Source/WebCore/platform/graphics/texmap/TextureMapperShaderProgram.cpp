@@ -265,8 +265,8 @@ static const char* fragmentTemplateCommon =
         }
         void applyTextureNV12(inout vec4 color, vec2 texCoord)
         {
-            float y = texture2D(s_samplerY, texCoord).r;
-            vec2 uv = texture2D(s_samplerU, texCoord).rg;
+            float y = texture2D(s_samplerY, texCoord).r  - 0.5;
+            vec2 uv = texture2D(s_samplerU, texCoord).gr - vec2(0.5, 0.5);
             vec4 data = vec4(yuvToRgb(y, uv.x, uv.y), 1.0);
             color = u_textureColorSpaceMatrix * data;
         }
