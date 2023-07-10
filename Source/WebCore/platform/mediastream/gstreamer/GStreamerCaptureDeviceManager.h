@@ -53,6 +53,7 @@ struct PipewireSession {
 
     ~PipewireSession()
     {
+        WTFLogAlways(">>>>>>>>>>>>>>>>>> closing");
         close(nodeAndFd.second);
     }
 

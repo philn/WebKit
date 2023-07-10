@@ -83,12 +83,12 @@ CaptureSourceOrError GStreamerVideoCaptureDeviceManager::createVideoCaptureSourc
     if (!m_portal)
         return GStreamerVideoCaptureSource::create(String { device.persistentId() }, WTFMove(hashSalts), constraints);
 
-    const auto it = m_sessions.find(device.persistentId());
-    if (it != m_sessions.end()) {
-        auto& [node, fd] = it->value->nodeAndFd;
-        PipewireCaptureDevice pipewireCaptureDevice { node, fd, device.persistentId(), device.type(), device.label(), device.groupId() };
-        return GStreamerVideoCaptureSource::createPipewireSource(WTFMove(pipewireCaptureDevice), WTFMove(hashSalts), constraints);
-    }
+    // const auto it = m_sessions.find(device.persistentId());
+    // if (it != m_sessions.end()) {
+    //     auto& [node, fd] = it->value->nodeAndFd;
+    //     PipewireCaptureDevice pipewireCaptureDevice { node, fd, device.persistentId(), device.type(), device.label(), device.groupId() };
+    //     return GStreamerVideoCaptureSource::createPipewireSource(WTFMove(pipewireCaptureDevice), WTFMove(hashSalts), constraints);
+    // }
 
     auto result = m_portal->accessCamera();
     if (!result)
