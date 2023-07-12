@@ -111,6 +111,7 @@ struct EncoderDefinition {
 enum EncoderId {
     None,
     X264,
+    X265,
     OpenH264,
     OmxH264,
     VaapiH264,
@@ -837,6 +838,86 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
                 }
             });
     }
+
+    Encoders::registerEncoder(X265, "x265enc", "h265parse", "video/x-h265",
+        "video/x-h265,alignment=au,stream-format=byte-stream",
+        [](WebKitVideoEncoder* self) {
+            g_object_set(self->priv->encoder.get(), "key-int-max", 15, nullptr);
+
+            const auto* structure = gst_caps_get_structure(self->priv->encodedCaps.get(), 0);
+            auto inputCaps = adoptGRef(gst_caps_new_any());
+            if (const char* profileString = gst_structure_get_string(structure, "profile")) {
+                const char* pixelFormat = nullptr;
+                auto pad = adoptGRef(gst_element_get_static_pad(self->priv->encoder.get(), "sink"));
+                auto allowedCaps = adoptGRef(gst_pad_query_caps(pad.get(), nullptr));
+                const auto* structure = gst_caps_get_structure(allowedCaps.get(), 0);
+                const auto* formatValue = gst_structure_get_value(structure, "format");
+                unsigned size = gst_value_list_get_size(formatValue);
+                bool supports10BitsLittleEndian = false;
+                bool supports10BitsBigEndian = false;
+
+                for (unsigned i = 0; i < size; i++) {
+                    auto* value = gst_value_list_get_value(formatValue, i);
+                    const char* format = g_value_get_string(value);
+                    if (g_str_has_suffix(format, "_10LE")) {
+                        supports10BitsLittleEndian = true;
+                        break;
+                    }
+                    if (g_str_has_suffix(format, "_10BE")) {
+                        supports10BitsBigEndian = true;
+                        break;
+                    }
+                }
+
+                // XXX: 12-bits support
+                if (g_strrstr(profileString, "-444")) {
+                    if (supports10BitsLittleEndian)
+                        pixelFormat = "Y444_10LE";
+                    else if (supports10BitsBigEndian)
+                        pixelFormat = "Y444_10BE";
+                    else
+                        pixelFormat = "Y444";
+                } else if (g_strrstr(profileString, "-422")) {
+                    if (supports10BitsLittleEndian)
+                        pixelFormat = "Y422_10LE";
+                    else if (supports10BitsBigEndian)
+                        pixelFormat = "Y422_10BE";
+                    else
+                        pixelFormat = "Y42B";
+                    // XXX
+                } else if (g_str_has_prefix(profileString, "high-10")) {
+                    if (supports10BitsLittleEndian)
+                        pixelFormat = "Y420_10LE";
+                    else if (supports10BitsBigEndian)
+                        pixelFormat = "Y420_10BE";
+                } else
+                    pixelFormat = "I420";
+                if (pixelFormat)
+                    inputCaps = adoptGRef(gst_caps_new_simple("video/x-raw", "format", G_TYPE_STRING, pixelFormat, nullptr));
+            }
+            g_object_set(self->priv->inputCapsFilter.get(), "caps", inputCaps.get(), nullptr);
+            g_object_set(self->priv->outputCapsFilter.get(), "caps", self->priv->encodedCaps.get(), nullptr);
+        }, "bitrate", setBitrateKbitPerSec, "key-int-max", [](GstElement* encoder, BitrateMode mode) {
+            switch (mode) {
+            case CONSTANT_BITRATE_MODE:
+                // XXX
+                break;
+            case VARIABLE_BITRATE_MODE:
+                // XXX
+                break;
+            };
+        }, [](GstElement* encoder, LatencyMode mode) {
+            switch (mode) {
+            case REALTIME_LATENCY_MODE:
+                gst_util_set_object_arg(G_OBJECT(encoder), "tune", "zerolatency");
+                gst_util_set_object_arg(G_OBJECT(encoder), "speed-preset", "ultrafast");
+                break;
+            case QUALITY_LATENCY_MODE:
+                g_object_set(encoder, "tune", 0, nullptr);
+                gst_util_set_object_arg(G_OBJECT(encoder), "speed-preset", "No preset");
+                break;
+            };
+        });
 
     auto srcPadTemplateCaps = createSrcPadTemplateCaps();
     gst_element_class_add_pad_template(elementClass, gst_pad_template_new("src", GST_PAD_SRC, GST_PAD_ALWAYS, srcPadTemplateCaps.get()));
