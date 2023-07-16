@@ -20,10 +20,12 @@
 #pragma once
 
 #include <gio/gio.h>
+#include <pipewire/pipewire.h>
 #include <wtf/CompletionHandler.h>
 #include <wtf/Forward.h>
 #include <wtf/RefCounted.h>
 #include <wtf/glib/GRefPtr.h>
+#include <wtf/glib/WTFGType.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -62,7 +64,7 @@ public:
     void closeSession(const String& path);
 
     GRefPtr<GVariant> accessCamera();
-    std::optional<int> openCameraPipewireRemote();
+    std::optional<std::pair<uint32_t, int>> openCameraPipewireRemote();
 
     GRefPtr<GVariant> getProperty(const char* name);
 
@@ -76,6 +78,29 @@ private:
     String m_interfaceName;
     GRefPtr<GDBusProxy> m_proxy;
     ResponseCallback m_currentResponseCallback;
+
+    struct PipeWireCore {
+        ~PipeWireCore()
+        {
+            pw_context_destroy(context);
+            pw_thread_loop_destroy(loop);
+        }
+        int fd;
+        struct pw_thread_loop* loop;
+        struct pw_context* context;
+        struct pw_core* core;
+        struct spa_hook coreListener;
+        int lastSeq;
+        int lastError;
+    };
+    WEBKIT_DEFINE_ASYNC_DATA_STRUCT(PipeWireCore)
+
+    struct PipeWireCore* m_pipewireCore { nullptr };
+    struct pw_registry* m_registry { nullptr };
+    struct spa_hook m_registryListener;
+    int m_seq { 0 };
+    bool m_loopDone { false };
+    uint32_t m_nodeId;
 };
 
 } // namespace WebCore

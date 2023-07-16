@@ -75,10 +75,8 @@ GstElement* GStreamerVideoCapturer::createSource()
     if (m_nodeAndFd) {
         auto& [node, fd] = *m_nodeAndFd;
         auto path = AtomString::number(node);
-        WTFLogAlways(">>>> %s<<< fd: %d", path.string().ascii().data(), fd);
         // FIXME: The path property is deprecated in favor of target-object but the portal doesn't expose this object.
-        // g_object_set(m_src.get(), "path", path.string().ascii().data(), nullptr);
-        g_object_set(m_src.get(), "fd", fd, nullptr);
+        g_object_set(m_src.get(), "path", path.string().ascii().data(), "fd", fd, nullptr);
     }
     return src;
 }
@@ -137,11 +135,11 @@ GstVideoInfo GStreamerVideoCapturer::getBestFormat()
 
 bool GStreamerVideoCapturer::setSize(int width, int height)
 {
-    // if (isCapturingDisplay()) {
-    //     // Pipewiresrc doesn't seem to support caps re-negotiation and framerate configuration properly.
-    //     GST_FIXME_OBJECT(m_pipeline.get(), "Resizing disabled on display capture source");
-    //     return true;
-    // }
+    if (isCapturingDisplay()) {
+        // Pipewiresrc doesn't seem to support caps re-negotiation and framerate configuration properly.
+        GST_FIXME_OBJECT(m_pipeline.get(), "Resizing disabled on display capture source");
+        return true;
+    }
 
     if (!width || !height)
         return false;
@@ -165,11 +163,11 @@ bool GStreamerVideoCapturer::setSize(int width, int height)
 
 bool GStreamerVideoCapturer::setFrameRate(double frameRate)
 {
-    // if (isCapturingDisplay()) {
-    //     // Pipewiresrc doesn't seem to support caps re-negotiation and framerate configuration properly.
-    //     GST_FIXME_OBJECT(m_pipeline.get(), "Framerate override disabled on display capture source");
-    //     return true;
-    // }
+    if (isCapturingDisplay()) {
+        // Pipewiresrc doesn't seem to support caps re-negotiation and framerate configuration properly.
+        GST_FIXME_OBJECT(m_pipeline.get(), "Framerate override disabled on display capture source");
+        return true;
+    }
 
     int numerator, denominator;
 
@@ -278,11 +276,11 @@ static std::optional<double> getMaxFractionValueFromStructure(const GstStructure
 
 void GStreamerVideoCapturer::reconfigure()
 {
-    // if (isCapturingDisplay()) {
-    //     // Pipewiresrc doesn't seem to support caps re-negotiation and framerate configuration properly.
-    //     GST_FIXME_OBJECT(m_pipeline.get(), "Caps re-negotiation disabled on display capture source");
-    //     return;
-    // }
+    if (isCapturingDisplay()) {
+        // Pipewiresrc doesn't seem to support caps re-negotiation and framerate configuration properly.
+        GST_FIXME_OBJECT(m_pipeline.get(), "Caps re-negotiation disabled on display capture source");
+        return;
+    }
 
     if (!m_videoSrcMIMETypeFilter)
         return;

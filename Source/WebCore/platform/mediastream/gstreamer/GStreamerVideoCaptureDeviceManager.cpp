@@ -83,29 +83,28 @@ CaptureSourceOrError GStreamerVideoCaptureDeviceManager::createVideoCaptureSourc
     if (!m_portal)
         return GStreamerVideoCaptureSource::create(String { device.persistentId() }, WTFMove(hashSalts), constraints);
 
-    // const auto it = m_sessions.find(device.persistentId());
-    // if (it != m_sessions.end()) {
-    //     auto& [node, fd] = it->value->nodeAndFd;
-    //     PipewireCaptureDevice pipewireCaptureDevice { node, fd, device.persistentId(), device.type(), device.label(), device.groupId() };
-    //     return GStreamerVideoCaptureSource::createPipewireSource(WTFMove(pipewireCaptureDevice), WTFMove(hashSalts), constraints);
-    // }
+    const auto it = m_sessions.find(device.persistentId());
+    if (it != m_sessions.end()) {
+        auto& [node, fd] = it->value->nodeAndFd;
+        PipewireCaptureDevice pipewireCaptureDevice { node, fd, device.persistentId(), device.type(), device.label(), device.groupId() };
+        return GStreamerVideoCaptureSource::createPipewireSource(WTFMove(pipewireCaptureDevice), WTFMove(hashSalts), constraints);
+    }
 
     auto result = m_portal->accessCamera();
     if (!result)
         return { };
 
-    auto fd = m_portal->openCameraPipewireRemote();
-    if (!fd)
+    auto fds = m_portal->openCameraPipewireRemote();
+    if (!fds)
         return { };
 
-    WTFLogAlways("FD: %d", *fd);
+    WTFLogAlways("FD: %d", fds->second);
 
-    uint32_t nodeId = 42;
-    NodeAndFD nodeAndFd = { nodeId, *fd };
+    NodeAndFD nodeAndFd = { fds->first, fds->second };
     auto sessionData = makeUnique<PipewireSession>(nodeAndFd, emptyString());
     m_sessions.add(device.persistentId(), WTFMove(sessionData));
 
-    PipewireCaptureDevice pipewireCaptureDevice { nodeId, *fd, device.persistentId(), device.type(), device.label(), device.groupId() };
+    PipewireCaptureDevice pipewireCaptureDevice { nodeAndFd.first, nodeAndFd.second, device.persistentId(), device.type(), device.label(), device.groupId() };
     return GStreamerVideoCaptureSource::createPipewireSource(WTFMove(pipewireCaptureDevice), WTFMove(hashSalts), constraints);
 }
 

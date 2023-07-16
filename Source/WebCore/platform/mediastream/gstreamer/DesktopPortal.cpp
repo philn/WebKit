@@ -20,10 +20,20 @@
 #include "config.h"
 
 #include "DesktopPortal.h"
-#include <wtf/glib/GUniquePtr.h>
+#include "wtf/Compiler.h"
+#include <fcntl.h>
 #include <gio/gunixfdlist.h>
+#include <pipewire/context.h>
+#include <pipewire/main-loop.h>
+#include <pipewire/thread-loop.h>
+#include <spa/utils/dict.h>
+#include <spa/utils/result.h>
+#include <unistd.h>
+#include <wtf/Scope.h>
 #include <wtf/UUID.h>
 #include <wtf/WeakRandomNumber.h>
+#include <wtf/glib/GUniquePtr.h>
+#include <wtf/glib/WTFGType.h>
 
 namespace WebCore {
 
@@ -130,7 +140,7 @@ GRefPtr<GVariant> DesktopPortal::accessCamera()
     return result;
 }
 
-std::optional<int> DesktopPortal::openCameraPipewireRemote()
+std::optional<std::pair<uint32_t, int>> DesktopPortal::openCameraPipewireRemote()
 {
     GRefPtr<GUnixFDList> fdList;
     int fd = -1;
@@ -141,7 +151,7 @@ std::optional<int> DesktopPortal::openCameraPipewireRemote()
         g_variant_new("(a{sv})", &options), G_DBUS_CALL_FLAGS_NONE, s_dbusCallTimeout.millisecondsAs<int>(), nullptr, &fdList.outPtr(), nullptr, &error.outPtr()));
     if (error) {
         WTFLogAlways("Unable to open pipewire remote. Error: %s", error->message);
-        return {};
+        return { };
     }
 
     int fdOut;
@@ -149,7 +159,115 @@ std::optional<int> DesktopPortal::openCameraPipewireRemote()
     fd = g_unix_fd_list_get(fdList.get(), fdOut, nullptr);
 
     // TODO: get node ID, see also https://github.com/bilelmoussaoui/ashpd/blob/master/src/desktop/camera.rs#L184
-    return fd;
+
+    m_pipewireCore = createPipeWireCore();
+    auto scopeExit = makeScopeExit([&] {
+        destroyPipeWireCore(m_pipewireCore);
+    });
+    m_pipewireCore->fd = fd;
+    m_pipewireCore->loop = pw_thread_loop_new("pipewire-main-loop", nullptr);
+    m_pipewireCore->context = pw_context_new(pw_thread_loop_get_loop(m_pipewireCore->loop), nullptr, 0);
+    m_pipewireCore->lastSeq = -1;
+    m_pipewireCore->lastError = 0;
+
+    if (pw_thread_loop_start(m_pipewireCore->loop) < 0) {
+        WTFLogAlways("Unable to start PipeWire context loop");
+        return { };
+    }
+
+    pw_thread_loop_lock(m_pipewireCore->loop);
+
+    m_pipewireCore->core = pw_context_connect_fd(m_pipewireCore->context, fcntl(fd, F_DUPFD_CLOEXEC, 3), nullptr, 0);
+    if (!m_pipewireCore->core) {
+        WTFLogAlways("Unable to connect to PipeWire");
+        pw_thread_loop_unlock(m_pipewireCore->loop);
+        return { };
+    }
+
+    static const struct pw_core_events coreEvents = {
+        PW_VERSION_CORE_EVENTS,
+        nullptr,
+        [](void* data, uint32_t id, int seq) {
+            auto* portal = reinterpret_cast<DesktopPortal*>(data);
+            auto* core = portal->m_pipewireCore;
+            WTFLogAlways("Stopping! 0");
+            if (id != PW_ID_CORE)
+                return;
+            WTFLogAlways("Stopping! 1");
+            if (seq == portal->m_seq) {
+                WTFLogAlways("Stopping!");
+                portal->m_loopDone = true;
+                pw_thread_loop_stop(core->loop);
+                return;
+            }
+            WTFLogAlways("Stopping! 2");
+            core->lastSeq = seq;
+            pw_thread_loop_signal(core->loop, FALSE);
+        },
+        nullptr,
+        [](void* data, uint32_t id, int seq, int res, const char* message) {
+            auto* portal = reinterpret_cast<DesktopPortal*>(data);
+            auto* core = portal->m_pipewireCore;
+
+            pw_log_warn("error id:%u seq:%d res:%d (%s): %s", id, seq, res, spa_strerror(res), message);
+            if (id == PW_ID_CORE)
+                core->lastError = res;
+
+            pw_thread_loop_signal(core->loop, FALSE);
+        },
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr
+    };
+
+    pw_core_add_listener(m_pipewireCore->core, &m_pipewireCore->coreListener, &coreEvents, this);
+
+    m_registry = pw_core_get_registry(m_pipewireCore->core, PW_VERSION_REGISTRY, 0);
+
+    static const struct pw_registry_events registryEvents = {
+        PW_VERSION_REGISTRY_EVENTS,
+        .global = [](void* data, uint32_t nodeId, uint32_t permissions, const char* type, uint32_t version, const struct spa_dict* properties) {
+            UNUSED_PARAM(permissions);
+            UNUSED_PARAM(type);
+            UNUSED_PARAM(version);
+            if (!properties)
+                return;
+
+            const char* role = spa_dict_lookup(properties, "media.role");
+            WTFLogAlways("role: %s", role);
+            if (!role || !g_str_equal(role, "Camera"))
+                return;
+
+            // TODO: notify nodeId (converted to string) to DesktopPortal
+            auto* portal = reinterpret_cast<DesktopPortal*>(data);
+            portal->m_nodeId = nodeId;
+        },
+        .global_remove = nullptr
+    };
+
+    pw_registry_add_listener(m_registry, &m_registryListener, &registryEvents, this);
+
+    pw_thread_loop_unlock(m_pipewireCore->loop);
+
+    m_seq = pw_core_sync(m_pipewireCore->core, PW_ID_CORE, m_seq);
+    if (!m_seq) {
+        WTFLogAlways("PipeWire sync failed");
+        return { };
+    }
+
+    m_loopDone = false;
+    WTFLogAlways("Pipewire loop starting");
+    for (;;) {
+        if (m_loopDone)
+            break;
+        // pw_thread_loop_lock(m_pipewireCore->loop);
+        pw_thread_loop_wait(m_pipewireCore->loop);
+        // pw_thread_loop_unlock(m_pipewireCore->loop);
+    }
+    WTFLogAlways("Pipewire loop ended node ID: %u", m_nodeId);
+    return { { m_nodeId, fd } };
 }
 
 std::optional<DesktopPortal::ScreencastSession> DesktopPortal::createScreencastSession()
