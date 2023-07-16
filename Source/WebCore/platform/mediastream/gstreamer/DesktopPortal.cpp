@@ -147,6 +147,8 @@ std::optional<int> DesktopPortal::openCameraPipewireRemote()
     int fdOut;
     g_variant_get(result.get(), "(h)", &fdOut);
     fd = g_unix_fd_list_get(fdList.get(), fdOut, nullptr);
+
+    // TODO: get node ID, see also https://github.com/bilelmoussaoui/ashpd/blob/master/src/desktop/camera.rs#L184
     return fd;
 }
 
