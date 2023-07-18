@@ -160,6 +160,8 @@ std::optional<std::pair<uint32_t, int>> DesktopPortal::openCameraPipewireRemote(
 
     // TODO: get node ID, see also https://github.com/bilelmoussaoui/ashpd/blob/master/src/desktop/camera.rs#L184
 
+    pw_init(nullptr, nullptr);
+
     m_pipewireCore = createPipeWireCore();
     auto scopeExit = makeScopeExit([&] {
         destroyPipeWireCore(m_pipewireCore);
@@ -235,7 +237,7 @@ std::optional<std::pair<uint32_t, int>> DesktopPortal::openCameraPipewireRemote(
             if (!properties)
                 return;
 
-            const char* role = spa_dict_lookup(properties, "media.role");
+            const char* role = spa_dict_lookup(properties, PW_KEY_MEDIA_ROLE);
             WTFLogAlways("role: %s", role);
             if (!role || !g_str_equal(role, "Camera"))
                 return;

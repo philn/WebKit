@@ -82,6 +82,7 @@ private:
     struct PipeWireCore {
         ~PipeWireCore()
         {
+            WTFLogAlways("Closing pipewire things");
             pw_context_destroy(context);
             pw_thread_loop_destroy(loop);
         }
