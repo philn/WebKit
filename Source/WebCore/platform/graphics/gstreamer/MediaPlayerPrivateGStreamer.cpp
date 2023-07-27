@@ -3984,7 +3984,14 @@ static void setRectangleToVideoSink(GstElement* videoSink, const IntRect& rect)
     return;
 #endif
 
-    UNUSED_PARAM(rect);
+    if (!GST_IS_VIDEO_OVERLAY(videoSink)) {
+        UNUSED_PARAM(rect);
+        return;
+    }
+
+    auto* overlay = GST_VIDEO_OVERLAY(videoSink);
+    gst_video_overlay_set_render_rectangle(overlay, rect.x(), rect.y(), rect.width(), rect.height());
+    gst_video_overlay_expose(overlay);
 }
 
 class GStreamerHolePunchClient : public TextureMapperPlatformLayerBuffer::HolePunchClient {
@@ -4020,7 +4027,10 @@ GstElement* MediaPlayerPrivateGStreamer::createHolePunchVideoSink()
     return nullptr;
 #endif
 
-    return makeGStreamerElement("fakevideosink", nullptr);
+    const char* sinkType = g_getenv("WEBKIT_GST_HOLE_PUNCH_SINK");
+    if (!sinkType)
+        sinkType = "fakevideosink";
+    return makeGStreamerElement(sinkType, nullptr);
 }
 
 void MediaPlayerPrivateGStreamer::pushNextHolePunchBuffer()
