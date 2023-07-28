@@ -429,6 +429,9 @@ Modules/webauthn/fido/FidoParsingUtils.cpp
 Modules/webauthn/fido/Pin.cpp
 Modules/webauthn/fido/U2fCommandConstructor.cpp
 Modules/webauthn/fido/U2fResponseConverter.cpp
+Modules/webcodecs/WebCodecsAudioDecoder.cpp
+Modules/webcodecs/WebCodecsAudioData.cpp
+Modules/webcodecs/WebCodecsEncodedAudioChunk.cpp
 Modules/webcodecs/WebCodecsEncodedVideoChunk.cpp
 Modules/webcodecs/WebCodecsVideoDecoder.cpp
 Modules/webcodecs/WebCodecsVideoEncoder.cpp
@@ -2005,6 +2008,8 @@ page/scrolling/ScrollingTreeStickyNode.cpp
 page/scrolling/ThreadedScrollingCoordinator.cpp
 page/scrolling/ThreadedScrollingTree.cpp
 page/scrolling/ThreadedScrollingTreeScrollingNodeDelegate.cpp
+platform/AudioDecoder.cpp
+platform/AudioSampleFormat.cpp
 platform/CaretAnimator.cpp
 platform/CommonAtomStrings.cpp
 platform/ContentType.cpp
@@ -3165,6 +3170,7 @@ JSBeforeUnloadEvent.cpp
 JSBiquadFilterNode.cpp
 JSBiquadFilterOptions.cpp
 JSBiquadFilterType.cpp
+JSAudioSampleFormat.cpp
 JSAvcEncoderConfig.cpp
 JSBackgroundFetchEvent.cpp
 JSBackgroundFetchEventInit.cpp
@@ -4318,6 +4324,13 @@ JSWaveShaperNode.cpp
 JSWaveShaperOptions.cpp
 JSWebAnimation.cpp
 JSWebCodecsAlphaOption.cpp
+JSWebCodecsAudioData.cpp
+JSWebCodecsAudioDataOutputCallback.cpp
+JSWebCodecsAudioDecoder.cpp
+JSWebCodecsAudioDecoderConfig.cpp
+JSWebCodecsAudioDecoderSupport.cpp
+JSWebCodecsEncodedAudioChunk.cpp
+JSWebCodecsEncodedAudioChunkType.cpp
 JSWebCodecsEncodedVideoChunk.cpp
 JSWebCodecsEncodedVideoChunkMetadata.cpp
 JSWebCodecsEncodedVideoChunkOutputCallback.cpp
