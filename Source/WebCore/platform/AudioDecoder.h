@@ -35,7 +35,7 @@
 
 namespace WebCore {
 
-class AudioData;
+class PlatformRawAudioData;
 
 class AudioDecoder {
 public:
@@ -55,9 +55,9 @@ public:
         std::optional<uint64_t> duration;
     };
     struct DecodedData {
-        Ref<AudioData> data;
-        int64_t timestamp { 0 };
-        std::optional<uint64_t> duration;
+        Ref<PlatformRawAudioData> data;
+        /* int64_t timestamp { 0 }; */
+        /* std::optional<uint64_t> duration; */
     };
 
     using PostTaskCallback = Function<void(Function<void()>&&)>;

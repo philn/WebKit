@@ -28,130 +28,67 @@
 
 #if ENABLE(WEB_CODECS)
 
+#include "AudioSampleFormat.h"
+#include "BufferSource.h"
 #include "ContextDestructionObserver.h"
-#include "DOMRectReadOnly.h"
-#include "JSDOMPromiseDeferredForward.h"
-#include "WebCodecsAudioDataData.h"
+#include "WebCodecsAudioInternalData.h"
+#include <wtf/RefCounted.h>
 
 namespace WebCore {
 
-class BufferSource;
-// class CSSStyleImageValue;
-// class DOMRectReadOnly;
-// class HTMLCanvasElement;
-// class HTMLImageElement;
-// class HTMLVideoElement;
-// class ImageBitmap;
-// class ImageBuffer;
-// class NativeImage;
-// class OffscreenCanvas;
-// class SVGImageElement;
-// class VideoColorSpace;
-
+class PlatformRawAudioData;
 template<typename> class ExceptionOr;
 
 class WebCodecsAudioData : public RefCounted<WebCodecsAudioData>, public ContextDestructionObserver {
 public:
     ~WebCodecsAudioData();
 
-//     using CanvasImageSource = std::variant<RefPtr<HTMLImageElement>
-//         , RefPtr<SVGImageElement>
-//         , RefPtr<HTMLCanvasElement>
-//         , RefPtr<ImageBitmap>
-//         , RefPtr<CSSStyleImageValue>
-// #if ENABLE(OFFSCREEN_CANVAS)
-//         , RefPtr<OffscreenCanvas>
-// #endif
-// #if ENABLE(VIDEO)
-//         , RefPtr<HTMLVideoElement>
-// #endif
-//     >;
-
-    enum class AlphaOption { Keep, Discard };
     struct Init {
-        std::optional<uint64_t> duration;
-        std::optional<int64_t> timestamp;
-        // WebCodecsAlphaOption alpha { WebCodecsAlphaOption::Keep };
-
-        std::optional<DOMRectInit> visibleRect;
-
-        std::optional<size_t> displayWidth;
-        std::optional<size_t> displayHeight;
-    };
-    struct BufferInit {
-        // VideoPixelFormat format { VideoPixelFormat::I420 };
-        size_t codedWidth { 0 };
-        size_t codedHeight { 0 };
+        AudioSampleFormat format { AudioSampleFormat::U8 };
+        float sampleRate;
         int64_t timestamp { 0 };
-        std::optional<uint64_t> duration;
 
-        // std::optional<Vector<PlaneLayout>> layout;
-
-        std::optional<DOMRectInit> visibleRect;
-
-        std::optional<size_t> displayWidth;
-        std::optional<size_t> displayHeight;
-
-        // std::optional<VideoColorSpaceInit> colorSpace;
+        BufferSource data;
+        size_t numberOfFrames;
+        size_t numberOfChannels;
     };
 
-    static ExceptionOr<Ref<WebCodecsAudioData>> create(ScriptExecutionContext&, CanvasImageSource&&, Init&&);
-    static ExceptionOr<Ref<WebCodecsAudioData>> create(ScriptExecutionContext&, Ref<WebCodecsAudioData>&&, Init&&);
-    static ExceptionOr<Ref<WebCodecsAudioData>> create(ScriptExecutionContext&, BufferSource&&, BufferInit&&);
-    static ExceptionOr<Ref<WebCodecsAudioData>> create(ScriptExecutionContext&, ImageBuffer&, IntSize, Init&&);
-    static Ref<WebCodecsAudioData> create(ScriptExecutionContext&, Ref<AudioData>&&, BufferInit&&);
-    static Ref<WebCodecsAudioData> create(ScriptExecutionContext& context, WebCodecsAudioDataData&& data) { return adoptRef(*new WebCodecsAudioData(context, WTFMove(data))); }
+    static ExceptionOr<Ref<WebCodecsAudioData>> create(ScriptExecutionContext&, Init&&);
+    static Ref<WebCodecsAudioData> create(ScriptExecutionContext&, Ref<PlatformRawAudioData>&&);
 
-    // std::optional<VideoPixelFormat> format() const { return m_data.format; }
-    // size_t codedWidth() const { return m_data.codedWidth; }
-    // size_t codedHeight() const { return m_data.codedHeight; }
-
-    // DOMRectReadOnly* codedRect() const;
-    // DOMRectReadOnly* visibleRect() const;
-
-    // size_t displayWidth() const { return m_data.displayWidth; }
-    // size_t displayHeight() const { return m_data.displayHeight; }
-    std::optional<uint64_t> duration() const { return m_data.duration; }
-    int64_t timestamp() const { return m_data.timestamp; }
-    // VideoColorSpace& colorSpace() const;
+    std::optional<AudioSampleFormat> format() const;
+    float sampleRate() const;
+    size_t numberOfFrames() const;
+    size_t numberOfChannels() const;
+    std::optional<uint64_t> duration();
+    int64_t timestamp() const;
 
     struct CopyToOptions {
-        std::optional<DOMRectInit> rect;
-        // std::optional<Vector<PlaneLayout>> layout;
+        std::optional<size_t> planeIndex;
+        std::optional<size_t> frameOffset;
+        std::optional<size_t> frameCount;
+        std::optional<AudioSampleFormat> format;
     };
     ExceptionOr<size_t> allocationSize(const CopyToOptions&);
 
-    using CopyToPromise = DOMPromiseDeferred<IDLSequence<IDLDictionary<PlaneLayout>>>;
-    void copyTo(BufferSource&&, CopyToOptions&&, CopyToPromise&&);
+    ExceptionOr<void> copyTo(BufferSource&&, CopyToOptions&&);
     ExceptionOr<Ref<WebCodecsAudioData>> clone(ScriptExecutionContext&);
     void close();
 
     bool isDetached() const { return m_isDetached; }
-    // RefPtr<AudioData> internalFrame() const { return m_data.internalFrame; }
 
-    void setDisplaySize(size_t, size_t);
-    void setVisibleRect(const DOMRectInit&);
-    // bool shoudlDiscardAlpha() const { return m_data.format && (*m_data.format == VideoPixelFormat::RGBX || *m_data.format == VideoPixelFormat::BGRX); }
-
-    const WebCodecsAudioDataData& data() const { return m_data; }
+    const WebCodecsAudioInternalData& data() const { return m_data; }
 
     size_t memoryCost() const { return m_data.memoryCost(); }
 
 private:
     explicit WebCodecsAudioData(ScriptExecutionContext&);
-    WebCodecsAudioData(ScriptExecutionContext&, WebCodecsAudioDataData&&);
+    WebCodecsAudioData(ScriptExecutionContext&, WebCodecsAudioInternalData&&);
 
-    static ExceptionOr<Ref<WebCodecsAudioData>> initializeFrameFromOtherFrame(ScriptExecutionContext&, Ref<WebCodecsAudioData>&&, Init&&);
-    static ExceptionOr<Ref<WebCodecsAudioData>> initializeFrameFromOtherFrame(ScriptExecutionContext&, Ref<AudioData>&&, Init&&);
-    static ExceptionOr<Ref<WebCodecsAudioData>> initializeFrameWithResourceAndSize(ScriptExecutionContext&, Ref<NativeImage>&&, Init&&);
-
-    WebCodecsAudioDataData m_data;
-    // mutable RefPtr<VideoColorSpace> m_colorSpace;
-    // mutable RefPtr<DOMRectReadOnly> m_codedRect;
-    // mutable RefPtr<DOMRectReadOnly> m_visibleRect;
+    WebCodecsAudioInternalData m_data;
     bool m_isDetached { false };
 };
 
-}
+} // namespace WebCore
 
 #endif

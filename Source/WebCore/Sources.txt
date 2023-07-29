@@ -431,6 +431,7 @@ Modules/webauthn/fido/U2fCommandConstructor.cpp
 Modules/webauthn/fido/U2fResponseConverter.cpp
 Modules/webcodecs/WebCodecsAudioDecoder.cpp
 Modules/webcodecs/WebCodecsAudioData.cpp
+Modules/webcodecs/WebCodecsAudioDataAlgorithms.cpp
 Modules/webcodecs/WebCodecsEncodedAudioChunk.cpp
 Modules/webcodecs/WebCodecsEncodedVideoChunk.cpp
 Modules/webcodecs/WebCodecsVideoDecoder.cpp

@@ -329,6 +329,7 @@ PlatformVideoColorSpace videoColorSpaceFromCaps(const GstCaps*);
 PlatformVideoColorSpace videoColorSpaceFromInfo(const GstVideoInfo&);
 void fillVideoInfoColorimetryFromColorSpace(GstVideoInfo*, const PlatformVideoColorSpace&);
 
+void configureAudioDecoderForHarnessing(const GRefPtr<GstElement>&);
 void configureVideoDecoderForHarnessing(const GRefPtr<GstElement>&);
 
 bool gstObjectHasProperty(GstElement*, const char* name);

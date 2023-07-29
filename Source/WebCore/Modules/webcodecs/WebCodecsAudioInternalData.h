@@ -24,55 +24,29 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "AudioDecoder.h"
+#pragma once
 
 #if ENABLE(WEB_CODECS)
 
-#if USE(GSTREAMER)
-#include "AudioDecoderGStreamer.h"
-#endif
-
-#include <wtf/UniqueRef.h>
-#include <wtf/text/WTFString.h>
+#include "PlatformRawAudioData.h"
+#include <wtf/RefPtr.h>
 
 namespace WebCore {
 
-AudioDecoder::CreatorFunction AudioDecoder::s_customCreator = nullptr;
+struct WebCodecsAudioInternalData {
+    // XXX
+    size_t memoryCost() const { return 4; }
 
-void AudioDecoder::setCreatorCallback(CreatorFunction&& function)
-{
-    s_customCreator = WTFMove(function);
+    RefPtr<PlatformRawAudioData> audioData;
+
+    /* AudioSampleFormat format; */
+    /* size_t sampleRate; */
+    /* size_t numberOfChannels; */
+    /* size_t numberOfFrames; */
+    /* std::optional<uint64_t> duration { 0 }; */
+    /* int64_t timestamp { 0 }; */
+};
+
 }
 
-void AudioDecoder::create(const String& codecName, const Config& config, CreateCallback&& callback, OutputCallback&& outputCallback, PostTaskCallback&& postCallback)
-{
-    if (s_customCreator) {
-        s_customCreator(codecName, config, WTFMove(callback), WTFMove(outputCallback), WTFMove(postCallback));
-        return;
-    }
-    createLocalDecoder(codecName, config, WTFMove(callback), WTFMove(outputCallback), WTFMove(postCallback));
-}
-
-
-void AudioDecoder::createLocalDecoder(const String& codecName, const Config& config, CreateCallback&& callback, OutputCallback&& outputCallback, PostTaskCallback&& postCallback)
-{
-#if USE(GSTREAMER)
-    if (GStreamerAudioDecoder::create(codecName, config, WTFMove(callback), WTFMove(outputCallback), WTFMove(postCallback)))
-        return;
-#else
-    UNUSED_PARAM(codecName);
-    UNUSED_PARAM(config);
-    UNUSED_PARAM(outputCallback);
-    UNUSED_PARAM(postCallback);
 #endif
-
-    callback(makeUnexpected("Not supported"_s));
-}
-
-AudioDecoder::AudioDecoder() = default;
-AudioDecoder::~AudioDecoder() = default;
-
-}
-
-#endif // ENABLE(WEB_CODECS)

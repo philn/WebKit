@@ -58,7 +58,6 @@ WebCodecsAudioDecoder::~WebCodecsAudioDecoder()
 
 static bool isValidDecoderConfig(const WebCodecsAudioDecoderConfig& config, const Settings::Values& settings)
 {
-    // FIXME: Check codec more accurately.
     // XXX
     return true;
 }
@@ -125,13 +124,13 @@ ExceptionOr<void> WebCodecsAudioDecoder::configure(ScriptExecutionContext& conte
             }
 
             auto decodedResult = WTFMove(result).value();
-            WebCodecsAudioData::BufferInit init;
-            init.sampleRate = decodedResult.frame->sampleRate();
-            init.numberOfChannels = decodedResult.frame->numberOfChannels();
-            init.timestamp = decodedResult.timestamp;
-            init.duration = decodedResult.duration;
+            // WebCodecsAudioData::BufferInit init;
+            // init.sampleRate = decodedResult.frame->sampleRate();
+            // init.numberOfChannels = decodedResult.frame->numberOfChannels();
+            // init.timestamp = decodedResult.timestamp;
+            // init.duration = decodedResult.duration;
 
-            auto audioData = WebCodecsAudioData::create(*scriptExecutionContext(), WTFMove(decodedResult.frame), WTFMove(init));
+            auto audioData = WebCodecsAudioData::create(*scriptExecutionContext(), WTFMove(decodedResult.data));
             m_output->handleEvent(WTFMove(audioData));
         }, WTFMove(postTaskCallback));
     });
@@ -204,8 +203,8 @@ void WebCodecsAudioDecoder::isConfigSupported(ScriptExecutionContext& context, W
     auto* promisePtr = promise.ptr();
     context.addDeferredPromise(WTFMove(promise));
 
-    auto videoDecoderConfig = createAudioDecoderConfig(config);
-    Vector<uint8_t> description { videoDecoderConfig.description };
+    auto audioDecoderConfig = createAudioDecoderConfig(config);
+    Vector<uint8_t> description { audioDecoderConfig.description };
     AudioDecoder::create(config.codec, createAudioDecoderConfig(config), [identifier = context.identifier(), config = config.isolatedCopyWithoutDescription(), description = WTFMove(description), promisePtr](auto&& result) mutable {
         ScriptExecutionContext::postTaskTo(identifier, [success = result.has_value(), config = WTFMove(config).isolatedCopyWithoutDescription(), description = WTFMove(description), promisePtr](auto& context) mutable {
             if (auto promise = context.takeDeferredPromise(promisePtr)) {
