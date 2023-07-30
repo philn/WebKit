@@ -30,9 +30,9 @@ namespace WebCore {
 
 class PlatformRawAudioDataGStreamer final : public PlatformRawAudioData {
 public:
-    static Ref<PlatformRawAudioData> create(GRefPtr<GstSample>&& sample)
+    static Ref<PlatformRawAudioData> create(GRefPtr<GstSample>&& sample, std::optional<int64_t>&& timestamp = { })
     {
-        return adoptRef(*new PlatformRawAudioDataGStreamer(WTFMove(sample)));
+        return adoptRef(*new PlatformRawAudioDataGStreamer(WTFMove(sample), WTFMove(timestamp)));
     }
 
     AudioSampleFormat format() const final;
@@ -43,10 +43,11 @@ public:
     int64_t timestamp() const final;
 
 private:
-    PlatformRawAudioDataGStreamer(GRefPtr<GstSample>&&);
+    PlatformRawAudioDataGStreamer(GRefPtr<GstSample>&&, std::optional<int64_t>&&);
 
     GRefPtr<GstSample> m_sample;
     GstAudioInfo m_info;
+    std::optional<int64_t> m_timestamp;
 };
 
 }

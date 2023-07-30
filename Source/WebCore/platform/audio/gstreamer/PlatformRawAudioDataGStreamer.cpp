@@ -83,14 +83,17 @@ RefPtr<PlatformRawAudioData> PlatformRawAudioData::create(std::span<const uint8_
     auto caps = adoptGRef(gst_audio_info_to_caps(&info));
     GST_TRACE("Creating raw audio wrapper with caps %" GST_PTR_FORMAT, caps.get());
     auto buffer = adoptGRef(gst_buffer_new_memdup(data.data(), data.size_bytes()));
-    GST_BUFFER_PTS(buffer.get()) = timestamp * 1000;
+    if (timestamp)
+        GST_BUFFER_PTS(buffer.get()) = timestamp * 1000;
+    GST_BUFFER_DURATION(buffer.get()) = (numberOfFrames / sampleRate) * 1000000000;
 
     auto sample = adoptGRef(gst_sample_new(buffer.get(), caps.get(), nullptr, nullptr));
-    return PlatformRawAudioDataGStreamer::create(WTFMove(sample));
+    return PlatformRawAudioDataGStreamer::create(WTFMove(sample), timestamp);
 }
 
-PlatformRawAudioDataGStreamer::PlatformRawAudioDataGStreamer(GRefPtr<GstSample>&& sample)
+PlatformRawAudioDataGStreamer::PlatformRawAudioDataGStreamer(GRefPtr<GstSample>&& sample, std::optional<int64_t>&& timestamp)
     : m_sample(WTFMove(sample))
+    , m_timestamp(WTFMove(timestamp))
 {
     ensureAudioDataDebugCategoryInitialized();
     auto* caps = gst_sample_get_caps(m_sample.get());
@@ -137,8 +140,8 @@ size_t PlatformRawAudioDataGStreamer::numberOfChannels() const
 
 size_t PlatformRawAudioDataGStreamer::numberOfFrames() const
 {
-    auto size = gst_buffer_get_size(gst_sample_get_buffer(m_sample.get()));
-    return size / GST_AUDIO_INFO_BPF(&m_info);
+    auto totalFrames = gst_buffer_get_size(gst_sample_get_buffer(m_sample.get())) / GST_AUDIO_INFO_BPS(&m_info);
+    return totalFrames / numberOfChannels();
 }
 
 std::optional<uint64_t> PlatformRawAudioDataGStreamer::duration() const
@@ -152,8 +155,13 @@ std::optional<uint64_t> PlatformRawAudioDataGStreamer::duration() const
 
 int64_t PlatformRawAudioDataGStreamer::timestamp() const
 {
+    // According to spec the timestamp can be negative, so we can't rely solely on the buffer PTS
+    // (which is unsigned).
+    if (m_timestamp)
+        return *m_timestamp;
+
     auto* buffer = gst_sample_get_buffer(m_sample.get());
-    return GST_TIME_AS_USECONDS(GST_BUFFER_DTS_OR_PTS(buffer));
+    return GST_TIME_AS_USECONDS(GST_BUFFER_PTS(buffer));
 }
 
 } // namespace WebCore

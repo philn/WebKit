@@ -50,14 +50,12 @@
 
 [Conditional=WEB_CODECS]
 dictionary AudioDataInit {
-    AudioSampleFormat format;
-    float sampleRate;
+    required AudioSampleFormat format;
+    required float sampleRate;
     required [EnforceRange] long long timestamp;
-
-    (ArrayBufferView or ArrayBuffer) data;
-
-    [EnforceRange] unsigned long numberOfFrames;
-    [EnforceRange] unsigned long numberOfChannels;
+    required (ArrayBufferView or ArrayBuffer) data;
+    required [EnforceRange] unsigned long numberOfFrames;
+    required [EnforceRange] unsigned long numberOfChannels;
 };
 
 [Conditional=WEB_CODECS]

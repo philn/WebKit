@@ -64,8 +64,8 @@ public:
     int64_t timestamp() const;
 
     struct CopyToOptions {
-        std::optional<size_t> planeIndex;
-        std::optional<size_t> frameOffset;
+        size_t planeIndex;
+        std::optional<size_t> frameOffset { 0 };
         std::optional<size_t> frameCount;
         std::optional<AudioSampleFormat> format;
     };

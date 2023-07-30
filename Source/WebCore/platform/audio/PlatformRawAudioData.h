@@ -37,13 +37,8 @@ public:
     virtual size_t numberOfFrames() const = 0;
     virtual std::optional<uint64_t> duration() const = 0;
     virtual int64_t timestamp() const = 0;
+
+    void copyTo(std::span<uint8_t>, AudioSampleFormat, std::optional<size_t> planeIndex, size_t frameOffset, std::optional<size_t> frameCount, unsigned long copyElementCount);
 };
 
-#if !USE(GSTREAMER)
-RefPtr<PlatformRawAudioData> PlatformRawAudioData::create(std::span<const uint8_t>&&, AudioSampleFormat, float, int64_t, size_t, size_t)
-{
-    return nullptr;
-}
-#endif
-
-}
+} // namespace WebCore

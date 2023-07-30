@@ -49,11 +49,8 @@ bool isValidAudioDataInit(const WebCodecsAudioData::Init& init)
     auto totalSamples = init.numberOfFrames * init.numberOfChannels;
     auto bytesPerSample = computeBytesPerSample(init.format);
     auto totalSize = totalSamples * bytesPerSample;
-    auto dataSize = init.data.span().size_bytes();
-    if (dataSize < totalSize)
-        return false;
-
-    return true;
+    auto dataSize = init.data.span().size();
+    return dataSize >= totalSize;
 }
 
 bool isAudioSampleFormatInterleaved(const AudioSampleFormat& format)
@@ -76,15 +73,29 @@ bool isAudioSampleFormatInterleaved(const AudioSampleFormat& format)
 
 size_t computeBytesPerSample(const AudioSampleFormat& format)
 {
-    // XXX
-    return 4;
+    switch (format) {
+    case AudioSampleFormat::U8:
+    case AudioSampleFormat::U8Planar:
+        return 1;
+    case AudioSampleFormat::S16:
+    case AudioSampleFormat::S16Planar:
+        return 2;
+    case AudioSampleFormat::S32:
+    case AudioSampleFormat::F32:
+    case AudioSampleFormat::S32Planar:
+    case AudioSampleFormat::F32Planar:
+        return 4;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+    return 0;
 }
 
 // https://www.w3.org/TR/webcodecs/#compute-copy-element-count
 ExceptionOr<size_t> computeCopyElementCount(const WebCodecsAudioData& data, const WebCodecsAudioData::CopyToOptions& options)
 {
     auto destFormat = options.format.value_or(*data.format());
-    if (isAudioSampleFormatInterleaved(destFormat) && options.planeIndex > 0)
+    auto isInterleaved = isAudioSampleFormatInterleaved(destFormat);
+    if (isInterleaved && options.planeIndex > 0)
         return Exception { RangeError, "Invalid planeIndex for interleaved format"_s };
     else if (options.planeIndex >= data.numberOfChannels())
         return Exception { RangeError, "Invalid planeIndex for planar format"_s };
@@ -92,8 +103,31 @@ ExceptionOr<size_t> computeCopyElementCount(const WebCodecsAudioData& data, cons
     if (options.format && *options.format != destFormat && destFormat != AudioSampleFormat::F32Planar)
         return Exception { NotSupportedError, "AudioData currently only supports copy conversion to f32-planar"_s };
 
-    auto frameCount = data.data();
-    return 0;
+    auto platformData = data.data().audioData;
+    if (!platformData)
+        return Exception { InvalidAccessError, "Internal AudioData storage is null"_s };
+
+    auto frameCount = platformData->numberOfFrames();
+    // XXX this looks fishy.
+    if (options.planeIndex)
+        frameCount /= options.planeIndex;
+    if (options.frameOffset && *options.frameOffset > frameCount)
+        return Exception { RangeError, "frameOffset is too large"_s };
+
+    auto copyFrameCount = frameCount;
+    if (options.frameOffset)
+        copyFrameCount -= *options.frameOffset;
+    if (options.frameCount) {
+        if (*options.frameCount > copyFrameCount)
+            return Exception { RangeError, "frameCount is too large"_s };
+
+        copyFrameCount = *options.frameCount;
+    }
+
+    if (isInterleaved)
+        copyFrameCount *= data.numberOfChannels();
+
+    return copyFrameCount;
 }
 
 } // namespace WebCore

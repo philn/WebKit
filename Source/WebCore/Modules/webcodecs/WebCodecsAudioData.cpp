@@ -123,10 +123,11 @@ int64_t WebCodecsAudioData::timestamp() const
     return m_data.audioData->timestamp();
 }
 
+// https://www.w3.org/TR/webcodecs/#dom-audiodata-allocationsize
 ExceptionOr<size_t> WebCodecsAudioData::allocationSize(const CopyToOptions& options)
 {
     if (isDetached())
-        return Exception { InvalidStateError,  "AudioData is detached"_s };
+        return Exception { InvalidStateError, "AudioData is detached"_s };
 
     auto copyElementCount = computeCopyElementCount(*this, options);
     if (copyElementCount.hasException())
@@ -141,35 +142,23 @@ ExceptionOr<size_t> WebCodecsAudioData::allocationSize(const CopyToOptions& opti
 ExceptionOr<void> WebCodecsAudioData::copyTo(BufferSource&& source, CopyToOptions&& options)
 {
     if (isDetached())
-        return Exception { InvalidStateError,  "AudioData is detached"_s };
+        return Exception { InvalidStateError, "AudioData is detached"_s };
 
-    // XXX
+    auto copyElementCount = computeCopyElementCount(*this, options);
+    if (copyElementCount.hasException())
+        return copyElementCount.releaseException();
 
-    // if (!m_data.format) {
-    //     promise.reject(Exception { NotSupportedError,  "AudioData has no format"_s });
-    //     return;
-    // }
+    auto destFormat = options.format.value_or(*format());
+    auto bytesPerSample = computeBytesPerSample(destFormat);
+    auto maxCopyElementCount = copyElementCount.releaseReturnValue();
+    auto allocationSize = maxCopyElementCount * bytesPerSample;
 
-    // auto combinedLayoutOrException = parseAudioDataCopyToOptions(*this, options);
-    // if (combinedLayoutOrException.hasException()) {
-    //     promise.reject(combinedLayoutOrException.releaseException());
-    //     return;
-    // }
+    if (allocationSize > source.length())
+        return Exception { RangeError, "Buffer is too small"_s };
 
-    // auto combinedLayout = combinedLayoutOrException.releaseReturnValue();
-    // if (source.length() < combinedLayout.allocationSize) {
-    //     promise.reject(Exception { TypeError,  "Buffer is too small"_s });
-    //     return;
-    // }
-
-    // std::span<uint8_t> buffer { static_cast<uint8_t*>(source.mutableData()), source.length() };
-    // m_data.internalFrame->copyTo(buffer, *m_data.format, WTFMove(combinedLayout.computedLayouts), [source = WTFMove(source), promise = WTFMove(promise)](auto planeLayouts) mutable {
-    //     if (!planeLayouts) {
-    //         promise.reject(Exception { TypeError,  "Unable to copy data"_s });
-    //         return;
-    //     }
-    //     promise.resolve(WTFMove(*planeLayouts));
-    // });
+    std::span<uint8_t> buffer { static_cast<uint8_t*>(source.mutableData()), source.length() };
+    m_data.audioData->copyTo(buffer, destFormat, options.planeIndex, *options.frameOffset, options.frameCount, maxCopyElementCount);
+    return { };
 }
 
 // https://www.w3.org/TR/webcodecs/#dom-audiodata-clone

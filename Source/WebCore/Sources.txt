@@ -2137,6 +2137,7 @@ platform/audio/MultiChannelResampler.cpp
 platform/audio/Panner.cpp
 platform/audio/PlatformMediaSession.cpp
 platform/audio/PlatformMediaSessionManager.cpp
+platform/audio/PlatformRawAudioData.cpp
 platform/audio/PushPullFIFO.cpp
 platform/audio/Reverb.cpp
 platform/audio/ReverbAccumulationBuffer.cpp
