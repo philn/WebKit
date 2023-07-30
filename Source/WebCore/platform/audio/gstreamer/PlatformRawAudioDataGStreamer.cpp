@@ -83,17 +83,21 @@ RefPtr<PlatformRawAudioData> PlatformRawAudioData::create(std::span<const uint8_
     auto caps = adoptGRef(gst_audio_info_to_caps(&info));
     GST_TRACE("Creating raw audio wrapper with caps %" GST_PTR_FORMAT, caps.get());
     auto buffer = adoptGRef(gst_buffer_new_memdup(data.data(), data.size_bytes()));
-    if (timestamp)
-        GST_BUFFER_PTS(buffer.get()) = timestamp * 1000;
     GST_BUFFER_DURATION(buffer.get()) = (numberOfFrames / sampleRate) * 1000000000;
 
-    auto sample = adoptGRef(gst_sample_new(buffer.get(), caps.get(), nullptr, nullptr));
-    return PlatformRawAudioDataGStreamer::create(WTFMove(sample), timestamp);
+    GstSegment segment;
+    gst_segment_init(&segment, GST_FORMAT_TIME);
+    if (timestamp < 0)
+        segment.rate = -1.0;
+
+    GST_BUFFER_PTS(buffer.get()) = abs(timestamp) * 1000;
+
+    auto sample = adoptGRef(gst_sample_new(buffer.get(), caps.get(), &segment, nullptr));
+    return PlatformRawAudioDataGStreamer::create(WTFMove(sample));
 }
 
-PlatformRawAudioDataGStreamer::PlatformRawAudioDataGStreamer(GRefPtr<GstSample>&& sample, std::optional<int64_t>&& timestamp)
+PlatformRawAudioDataGStreamer::PlatformRawAudioDataGStreamer(GRefPtr<GstSample>&& sample)
     : m_sample(WTFMove(sample))
-    , m_timestamp(WTFMove(timestamp))
 {
     ensureAudioDataDebugCategoryInitialized();
     auto* caps = gst_sample_get_caps(m_sample.get());
@@ -155,13 +159,12 @@ std::optional<uint64_t> PlatformRawAudioDataGStreamer::duration() const
 
 int64_t PlatformRawAudioDataGStreamer::timestamp() const
 {
-    // According to spec the timestamp can be negative, so we can't rely solely on the buffer PTS
-    // (which is unsigned).
-    if (m_timestamp)
-        return *m_timestamp;
-
     auto* buffer = gst_sample_get_buffer(m_sample.get());
-    return GST_TIME_AS_USECONDS(GST_BUFFER_PTS(buffer));
+    auto timestamp = GST_TIME_AS_USECONDS(GST_BUFFER_PTS(buffer));
+    auto* segment = gst_sample_get_segment(m_sample.get());
+    if (segment->rate < 0)
+        return -timestamp;
+    return timestamp;
 }
 
 } // namespace WebCore
