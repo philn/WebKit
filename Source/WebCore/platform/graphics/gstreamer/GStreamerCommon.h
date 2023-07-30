@@ -173,6 +173,23 @@ private:
 
 using GstMappedBuffer = GstBufferMapper<GstMapInfo, gst_buffer_map, gst_buffer_unmap>;
 
+inline gboolean mapAudioBuffer(GstBuffer* buffer, GstAudioBuffer* audioBuffer, GstMapFlags flags)
+{
+    auto* meta = gst_buffer_get_audio_meta(buffer);
+    if (!meta)
+        return false;
+
+    const auto& info = meta->info;
+    return gst_audio_buffer_map(audioBuffer, &info, buffer, flags);
+}
+
+inline void unmapAudioBuffer(GstBuffer*, GstAudioBuffer* audioBuffer)
+{
+    gst_audio_buffer_unmap(audioBuffer);
+}
+
+using GstMappedAudioBuffer = GstBufferMapper<GstAudioBuffer, mapAudioBuffer, unmapAudioBuffer>;
+
 // This class maps only buffers in GST_MAP_READ mode to be able to
 // bump the reference count and keep it alive during the life of this
 // object.

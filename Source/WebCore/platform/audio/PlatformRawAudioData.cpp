@@ -21,18 +21,21 @@
 
 #include "PlatformRawAudioData.h"
 
+#include "NotImplemented.h"
+
 namespace WebCore {
 
 #if !USE(GSTREAMER)
 RefPtr<PlatformRawAudioData> PlatformRawAudioData::create(std::span<const uint8_t>&&, AudioSampleFormat, float, int64_t, size_t, size_t)
 {
+    notImplemented();
     return nullptr;
 }
-#endif
 
-void PlatformRawAudioData::copyTo(std::span<uint8_t> destination, AudioSampleFormat format, size_t planeIndex, std::optional<size_t> frameOffset, std::optional<size_t> frameCount, unsigned long copyElementCount)
+void PlatformRawAudioData::copyTo(std::span<uint8_t>, AudioSampleFormat, size_t, std::optional<size_t>, std::optional<size_t>, unsigned long)
 {
-    // XXX
+    notImplemented();
 }
+#endif
 
 } // namespace WebCore

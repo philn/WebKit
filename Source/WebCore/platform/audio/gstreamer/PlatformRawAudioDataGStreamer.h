@@ -42,6 +42,9 @@ public:
     std::optional<uint64_t> duration() const final;
     int64_t timestamp() const final;
 
+    GstSample* sample() const { return m_sample.get(); }
+    const GstAudioInfo* info() const { return &m_info; }
+
 private:
     PlatformRawAudioDataGStreamer(GRefPtr<GstSample>&&);
 

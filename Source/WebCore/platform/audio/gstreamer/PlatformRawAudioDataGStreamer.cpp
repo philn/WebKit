@@ -18,9 +18,15 @@
  */
 
 #include "config.h"
+
 #include "PlatformRawAudioDataGStreamer.h"
 
 #if USE(GSTREAMER)
+
+#include "GStreamerCommon.h"
+#include "GUniquePtrGStreamer.h"
+#include "WebCodecsAudioDataAlgorithms.h"
+#include <gst/audio/audio-converter.h>
 
 GST_DEBUG_CATEGORY(webkit_audio_data_debug);
 #define GST_CAT_DEFAULT webkit_audio_data_debug
@@ -35,46 +41,35 @@ static void ensureAudioDataDebugCategoryInitialized()
     });
 }
 
+static std::pair<GstAudioFormat, GstAudioLayout> convertAudioSampleFormatToGStreamerFormat(const AudioSampleFormat& format)
+{
+    switch (format) {
+    case AudioSampleFormat::U8:
+        return { GST_AUDIO_FORMAT_U8, GST_AUDIO_LAYOUT_INTERLEAVED };
+    case AudioSampleFormat::S16:
+        return { GST_AUDIO_FORMAT_S16, GST_AUDIO_LAYOUT_INTERLEAVED };
+    case AudioSampleFormat::S32:
+        return { GST_AUDIO_FORMAT_S32, GST_AUDIO_LAYOUT_INTERLEAVED };
+    case AudioSampleFormat::F32:
+        return { GST_AUDIO_FORMAT_F32, GST_AUDIO_LAYOUT_INTERLEAVED };
+    case AudioSampleFormat::U8Planar:
+        return { GST_AUDIO_FORMAT_U8, GST_AUDIO_LAYOUT_NON_INTERLEAVED };
+    case AudioSampleFormat::S16Planar:
+        return { GST_AUDIO_FORMAT_S16, GST_AUDIO_LAYOUT_NON_INTERLEAVED };
+    case AudioSampleFormat::S32Planar:
+        return { GST_AUDIO_FORMAT_S32, GST_AUDIO_LAYOUT_NON_INTERLEAVED };
+    case AudioSampleFormat::F32Planar:
+        return { GST_AUDIO_FORMAT_F32, GST_AUDIO_LAYOUT_NON_INTERLEAVED };
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+    return { GST_AUDIO_FORMAT_UNKNOWN, GST_AUDIO_LAYOUT_INTERLEAVED };
+}
+
 RefPtr<PlatformRawAudioData> PlatformRawAudioData::create(std::span<const uint8_t>&& data, AudioSampleFormat format, float sampleRate, int64_t timestamp, size_t numberOfFrames, size_t numberOfChannels)
 {
     UNUSED_PARAM(numberOfFrames);
     ensureAudioDataDebugCategoryInitialized();
-    GstAudioLayout layout;
-    GstAudioFormat gstFormat;
-    switch (format) {
-    case AudioSampleFormat::U8:
-        gstFormat = GST_AUDIO_FORMAT_U8;
-        layout = GST_AUDIO_LAYOUT_INTERLEAVED;
-        break;
-    case AudioSampleFormat::S16:
-        gstFormat = GST_AUDIO_FORMAT_S16;
-        layout = GST_AUDIO_LAYOUT_INTERLEAVED;
-        break;
-    case AudioSampleFormat::S32:
-        gstFormat = GST_AUDIO_FORMAT_S32;
-        layout = GST_AUDIO_LAYOUT_INTERLEAVED;
-        break;
-    case AudioSampleFormat::F32:
-        gstFormat = GST_AUDIO_FORMAT_F32;
-        layout = GST_AUDIO_LAYOUT_INTERLEAVED;
-        break;
-    case AudioSampleFormat::U8Planar:
-        gstFormat = GST_AUDIO_FORMAT_U8;
-        layout = GST_AUDIO_LAYOUT_NON_INTERLEAVED;
-        break;
-    case AudioSampleFormat::S16Planar:
-        gstFormat = GST_AUDIO_FORMAT_S16;
-        layout = GST_AUDIO_LAYOUT_NON_INTERLEAVED;
-        break;
-    case AudioSampleFormat::S32Planar:
-        gstFormat = GST_AUDIO_FORMAT_S32;
-        layout = GST_AUDIO_LAYOUT_NON_INTERLEAVED;
-        break;
-    case AudioSampleFormat::F32Planar:
-        gstFormat = GST_AUDIO_FORMAT_F32;
-        layout = GST_AUDIO_LAYOUT_NON_INTERLEAVED;
-        break;
-    }
+    auto [gstFormat, layout] = convertAudioSampleFormatToGStreamerFormat(format);
 
     GstAudioInfo info;
     gst_audio_info_set_format(&info, gstFormat, static_cast<int>(sampleRate), numberOfChannels, nullptr);
@@ -82,7 +77,7 @@ RefPtr<PlatformRawAudioData> PlatformRawAudioData::create(std::span<const uint8_
 
     auto caps = adoptGRef(gst_audio_info_to_caps(&info));
     GST_TRACE("Creating raw audio wrapper with caps %" GST_PTR_FORMAT, caps.get());
-    auto buffer = adoptGRef(gst_buffer_new_memdup(data.data(), data.size_bytes()));
+    auto buffer = adoptGRef(gst_buffer_new_memdup(data.data(), data.size()));
     GST_BUFFER_DURATION(buffer.get()) = (numberOfFrames / sampleRate) * 1000000000;
 
     GstSegment segment;
@@ -91,6 +86,8 @@ RefPtr<PlatformRawAudioData> PlatformRawAudioData::create(std::span<const uint8_
         segment.rate = -1.0;
 
     GST_BUFFER_PTS(buffer.get()) = abs(timestamp) * 1000;
+
+    gst_buffer_add_audio_meta(buffer.get(), &info, numberOfFrames, nullptr);
 
     auto sample = adoptGRef(gst_sample_new(buffer.get(), caps.get(), &segment, nullptr));
     return PlatformRawAudioDataGStreamer::create(WTFMove(sample));
@@ -165,6 +162,49 @@ int64_t PlatformRawAudioDataGStreamer::timestamp() const
     if (segment->rate < 0)
         return -timestamp;
     return timestamp;
+}
+
+void PlatformRawAudioData::copyTo(std::span<uint8_t> destination, AudioSampleFormat format, size_t planeIndex, std::optional<size_t> frameOffset, std::optional<size_t> frameCount, unsigned long copyElementCount)
+{
+    auto& self = *reinterpret_cast<PlatformRawAudioDataGStreamer*>(this);
+
+    auto [sourceFormat, sourceLayout] = convertAudioSampleFormatToGStreamerFormat(this->format());
+    auto [destinationFormat, destinationLayout] = convertAudioSampleFormatToGStreamerFormat(format);
+
+    auto size = computeBytesPerSample(format) * copyElementCount;
+    auto destinationOffset = planeIndex * size;
+    auto sourceOffset = frameOffset.value_or(0);
+    const char* destinationFormatDescription = gst_audio_format_to_string(destinationFormat);
+
+    GST_TRACE("Copying %s data at planeIndex %zu, destination format is %s, source offset: %zu, destination offset: %zu, size: %zu", gst_audio_format_to_string(sourceFormat), planeIndex, destinationFormatDescription, sourceOffset, destinationOffset, size);
+
+    GstMappedAudioBuffer mappedBuffer(gst_sample_get_buffer(self.sample()), GST_MAP_READ);
+    const auto* inputBuffer = mappedBuffer.mappedData();
+
+    if (this->format() == format && destinationLayout == GST_AUDIO_LAYOUT_NON_INTERLEAVED) {
+        memcpy(destination.data() + destinationOffset, static_cast<uint8_t*>(inputBuffer->planes[planeIndex]) + sourceOffset, size);
+        return;
+    }
+
+    GUniquePtr<GstAudioInfo> sourceInfo(gst_audio_info_copy(self.info()));
+    GstAudioInfo destinationInfo;
+    gst_audio_info_set_format(&destinationInfo, destinationFormat, static_cast<int>(this->sampleRate()), this->numberOfChannels(), nullptr);
+    GST_AUDIO_INFO_LAYOUT(&destinationInfo) = destinationLayout;
+
+    // XXX: This needs tuning.
+    auto* options = gst_structure_new("options", GST_AUDIO_CONVERTER_OPT_RESAMPLER_METHOD, GST_TYPE_AUDIO_RESAMPLER_METHOD, GST_AUDIO_RESAMPLER_METHOD_NEAREST, nullptr);
+    GUniquePtr<GstAudioConverter> converter(gst_audio_converter_new(GST_AUDIO_CONVERTER_FLAG_NONE, sourceInfo.get(), &destinationInfo, options));
+
+    auto inFrames = gst_buffer_get_size(gst_sample_get_buffer(self.sample())) / GST_AUDIO_INFO_BPF(sourceInfo.get());
+    auto outFrames = gst_audio_converter_get_out_frames(converter.get(), inFrames);
+    auto destinationBuffer = adoptGRef(gst_buffer_new_and_alloc(outFrames * GST_AUDIO_INFO_BPF(&destinationInfo)));
+    gst_buffer_add_audio_meta(destinationBuffer.get(), &destinationInfo, this->numberOfFrames(), nullptr);
+
+    GstMappedAudioBuffer mappedDestinationBuffer(destinationBuffer.get(), GST_MAP_WRITE);
+    auto* outputBuffer = mappedDestinationBuffer.mappedData();
+    gst_audio_converter_samples(converter.get(), GST_AUDIO_CONVERTER_FLAG_NONE, inputBuffer->planes, inputBuffer->n_samples, outputBuffer->planes, inputBuffer->n_samples);
+
+    memcpy(destination.data() + destinationOffset, static_cast<uint8_t*>(outputBuffer->planes[planeIndex]) + sourceOffset, size);
 }
 
 } // namespace WebCore
