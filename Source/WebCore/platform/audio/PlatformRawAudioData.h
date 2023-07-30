@@ -38,7 +38,7 @@ public:
     virtual std::optional<uint64_t> duration() const = 0;
     virtual int64_t timestamp() const = 0;
 
-    void copyTo(std::span<uint8_t>, AudioSampleFormat, std::optional<size_t> planeIndex, size_t frameOffset, std::optional<size_t> frameCount, unsigned long copyElementCount);
+    void copyTo(std::span<uint8_t>, AudioSampleFormat, size_t planeIndex, std::optional<size_t> frameOffset, std::optional<size_t> frameCount, unsigned long copyElementCount);
 };
 
 } // namespace WebCore

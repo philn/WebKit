@@ -107,10 +107,7 @@ ExceptionOr<size_t> computeCopyElementCount(const WebCodecsAudioData& data, cons
     if (!platformData)
         return Exception { InvalidAccessError, "Internal AudioData storage is null"_s };
 
-    auto frameCount = platformData->numberOfFrames();
-    // XXX this looks fishy.
-    if (options.planeIndex)
-        frameCount /= options.planeIndex;
+    auto frameCount = platformData->numberOfFrames() / data.numberOfChannels();
     if (options.frameOffset && *options.frameOffset > frameCount)
         return Exception { RangeError, "frameOffset is too large"_s };
 

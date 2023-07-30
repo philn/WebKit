@@ -30,7 +30,7 @@ RefPtr<PlatformRawAudioData> PlatformRawAudioData::create(std::span<const uint8_
 }
 #endif
 
-void PlatformRawAudioData::copyTo(std::span<uint8_t> destination, AudioSampleFormat format, std::optional<size_t> planeIndex, size_t frameOffset, std::optional<size_t> frameCount, unsigned long copyElementCount)
+void PlatformRawAudioData::copyTo(std::span<uint8_t> destination, AudioSampleFormat format, size_t planeIndex, std::optional<size_t> frameOffset, std::optional<size_t> frameCount, unsigned long copyElementCount)
 {
     // XXX
 }
