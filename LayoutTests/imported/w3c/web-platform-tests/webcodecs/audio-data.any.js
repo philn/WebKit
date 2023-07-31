@@ -183,7 +183,7 @@ test(t => {
   assert_array_approx_equals(
       dest, testVectorPlanarResult[1], epsilon, 'planar channel 1');
 }, 'Test conversion of uint8 data to float32');
-/*
+
 test(t => {
   const INT16_MIN = (-0x7fff - 1);
   const INT16_MAX = 0x7fff;
@@ -210,7 +210,7 @@ test(t => {
   data.copyTo(dest, {planeIndex: 1, format: 'f32-planar'});
   assert_array_approx_equals(
       dest, testVectorInterleavedResult[1], epsilon, 'interleaved channel 1');
-
+/*
   data = new AudioData({
     timestamp: defaultInit.timestamp,
     data: new Int16Array(testVectorInt16),
@@ -225,9 +225,9 @@ test(t => {
       dest, testVectorPlanarResult[0], epsilon, 'planar channel 0');
   data.copyTo(dest, {planeIndex: 1, format: 'f32-planar'});
   assert_array_approx_equals(
-      dest, testVectorPlanarResult[1], epsilon, 'planar channel 1');
+      dest, testVectorPlanarResult[1], epsilon, 'planar channel 1');*/
 }, 'Test conversion of int16 data to float32');
-
+/*
 test(t => {
   const INT32_MIN = (-0x7fffffff - 1);
   const INT32_MAX = 0x7fffffff;
