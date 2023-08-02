@@ -361,6 +361,83 @@ static std::optional<PeerConnectionBackend::DescriptionStates> descriptionsFromW
     };
 }
 
+struct GStreamerMediaEndpointTransceiverState {
+    String mid;
+    Vector<String> receiverStreamIds;
+    std::optional<RTCRtpTransceiverDirection> firedDirection;
+
+    GStreamerMediaEndpointTransceiverState isolatedCopy() &&;
+};
+
+inline GStreamerMediaEndpointTransceiverState GStreamerMediaEndpointTransceiverState::isolatedCopy() &&
+{
+    return {
+        WTFMove(mid).isolatedCopy(),
+        crossThreadCopy(WTFMove(receiverStreamIds)),
+        firedDirection
+    };
+}
+
+static std::optional<GStreamerMediaEndpointTransceiverState> toGStreamerMediaEndpointTransceiverState(GstElement* webrtcBin, GstWebRTCRTPTransceiver* transceiver)
+{
+    GRefPtr<GstWebRTCRTPReceiver> receiver;
+    GUniqueOutPtr<char> mid;
+    GstWebRTCRTPTransceiverDirection currentDirection;
+    g_object_get(transceiver, "receiver", &receiver.outPtr(), "current-direction", &currentDirection, "mid", &mid.outPtr(), nullptr);
+    if (!mid)
+        return { };
+
+    GST_DEBUG_OBJECT(webrtcBin, "phil getting stream IDs for transceiver %" GST_PTR_FORMAT " with mid %s", transceiver, mid.get());
+    Vector<String> streamIds;
+    
+    GUniquePtr<GstIterator> it;
+    it.reset(gst_element_iterate_src_pads(webrtcBin));
+    for (auto pad : GstIteratorAdaptor<GstPad>(WTFMove(it))) {
+        // if (gst_pad_is_linked(pad))
+        //     continue;
+
+        GRefPtr<GstWebRTCRTPTransceiver> padTransceiver;
+        g_object_get(pad, "transceiver", &padTransceiver.outPtr(), nullptr);
+
+        if (!padTransceiver || padTransceiver != transceiver) {
+            GST_DEBUG_OBJECT(webrtcBin, "phil pad associated with another transceiver");
+            continue;
+        }
+
+        if (!gstObjectHasProperty(pad, "msid")) {
+            GST_DEBUG_OBJECT(webrtcBin, "phil no msid property on pad");
+            continue;
+        }
+
+        GUniqueOutPtr<char> msid;
+        g_object_get(pad, "msid", &msid.outPtr(), nullptr);
+        GST_DEBUG_OBJECT(webrtcBin, "phil msid: %s", msid.get());
+        streamIds.append(String::fromUTF8(msid.get()));
+    }
+
+    return { { String::fromUTF8(mid.get()), WTFMove(streamIds), { toRTCRtpTransceiverDirection(currentDirection) } } };
+}
+
+static Vector<GStreamerMediaEndpointTransceiverState> transceiverStatesFromWebRTCBin(GstElement* webrtcBin)
+{
+    Vector<GStreamerMediaEndpointTransceiverState> states;
+    GRefPtr<GArray> transceivers;
+    g_signal_emit_by_name(webrtcBin, "get-transceivers", &transceivers.outPtr());
+    if (!transceivers || !transceivers->len)
+        return states;
+
+    states.reserveInitialCapacity(transceivers->len);
+    for (unsigned i = 0; i < transceivers->len; i++) {
+        GstWebRTCRTPTransceiver* transceiver = g_array_index(transceivers.get(), GstWebRTCRTPTransceiver*, i);
+        auto state = toGStreamerMediaEndpointTransceiverState(webrtcBin, transceiver);
+        if (!state)
+            continue;
+        states.uncheckedAppend(WTFMove(*state));
+    }
+
+    return states;
+}
+
 void GStreamerMediaEndpoint::doSetLocalDescription(const RTCSessionDescription* description)
 {
     auto initialSDP = description ? description->sdp().isolatedCopy() : emptyString();
@@ -397,10 +474,19 @@ void GStreamerMediaEndpoint::doSetLocalDescription(const RTCSessionDescription* 
 
         GRefPtr<GstWebRTCSCTPTransport> transport;
         g_object_get(m_webrtcBin.get(), "sctp-transport", &transport.outPtr(), nullptr);
-        m_peerConnectionBackend.setLocalDescriptionSucceeded(WTFMove(descriptions), { }, transport ? makeUnique<GStreamerSctpTransportBackend>(WTFMove(transport)) : nullptr);
+
+        auto rtcTransceiverStates = transceiverStatesFromWebRTCBin(m_webrtcBin.get());
+        auto transceiverStates = WTF::map(rtcTransceiverStates, [this](auto& state) -> PeerConnectionBackend::TransceiverState {
+            auto streams = WTF::map(state.receiverStreamIds, [this](auto& id) -> RefPtr<MediaStream> {
+                return &mediaStreamFromRTCStream(id);
+            });
+            return { WTFMove(state.mid), WTFMove(streams), state.firedDirection };
+        });
+        m_peerConnectionBackend.setLocalDescriptionSucceeded(WTFMove(descriptions), WTFMove(transceiverStates), transport ? makeUnique<GStreamerSctpTransportBackend>(WTFMove(transport)) : nullptr);
 
         if (isIceGatheringComplete && *isIceGatheringComplete)
             m_peerConnectionBackend.doneGatheringCandidates();
+
     }, [protectedThis = Ref(*this), this](const GError* error) {
         if (protectedThis->isStopped())
             return;
@@ -480,10 +566,20 @@ void GStreamerMediaEndpoint::doSetRemoteDescription(const RTCSessionDescription&
 
         GRefPtr<GstWebRTCSCTPTransport> transport;
         g_object_get(m_webrtcBin.get(), "sctp-transport", &transport.outPtr(), nullptr);
-        m_peerConnectionBackend.setRemoteDescriptionSucceeded(WTFMove(descriptions), { }, transport ? makeUnique<GStreamerSctpTransportBackend>(WTFMove(transport)) : nullptr);
+
+        auto rtcTransceiverStates = transceiverStatesFromWebRTCBin(m_webrtcBin.get());
+        auto transceiverStates = WTF::map(rtcTransceiverStates, [this](auto& state) -> PeerConnectionBackend::TransceiverState {
+            auto streams = WTF::map(state.receiverStreamIds, [this](auto& id) -> RefPtr<MediaStream> {
+                return &mediaStreamFromRTCStream(id);
+            });
+            return { WTFMove(state.mid), WTFMove(streams), state.firedDirection };
+        });
+
+        m_peerConnectionBackend.setRemoteDescriptionSucceeded(WTFMove(descriptions), WTFMove(transceiverStates), transport ? makeUnique<GStreamerSctpTransportBackend>(WTFMove(transport)) : nullptr);
 
         if (isIceGatheringComplete && *isIceGatheringComplete)
             m_peerConnectionBackend.doneGatheringCandidates();
+
     }, [protectedThis = Ref(*this), this](const GError* error) {
         if (protectedThis->isStopped())
             return;
@@ -901,6 +997,17 @@ void GStreamerMediaEndpoint::addRemoteStream(GstPad* pad)
         if (msid) {
             mediaStreamId = String::fromUTF8(msid.get());
             GST_DEBUG_OBJECT(m_pipeline.get(), "msid set from pad msid property: %s", mediaStreamId.utf8().data());
+// =======
+//         if (msid)
+//             mediaStreamId = String::fromLatin1(msid.get());
+//     }
+
+//     if (!mediaStreamId) {
+//         if (const char* msidAttribute = gst_sdp_media_get_attribute_val(media, "msid")) {
+//             auto components = makeString(msidAttribute).split(' ');
+//             if (components.size() == 2)
+//                 mediaStreamId = components[1];
+// >>>>>>> cc440ad043c6 (wip)
         }
     }
 
@@ -949,28 +1056,28 @@ void GStreamerMediaEndpoint::addRemoteStream(GstPad* pad)
     gst_pad_link(pad, sinkPad.get());
     gst_element_sync_state_with_parent(bin);
 
-    track.setEnabled(true);
-    source.setMuted(false);
+    // track.setEnabled(true);
+    // source.setMuted(false);
 
-    auto& mediaStream = mediaStreamFromRTCStream(mediaStreamId);
-    mediaStream.addTrackFromPlatform(track);
-    m_peerConnectionBackend.addPendingTrackEvent({ Ref(transceiver->receiver()), Ref(transceiver->receiver().track()), { }, Ref(*transceiver) });
+    // auto& mediaStream = mediaStreamFromRTCStream(mediaStreamId);
+    // mediaStream.addTrackFromPlatform(track);
+    // m_peerConnectionBackend.addPendingTrackEvent({ Ref(transceiver->receiver()), Ref(transceiver->receiver().track()), { }, Ref(*transceiver) });
 
-    unsigned totalAudioVideoMedias = 0;
-    unsigned totalMedias = gst_sdp_message_medias_len(description->sdp);
-    for (unsigned mediaIndex = 0; mediaIndex < totalMedias; mediaIndex++) {
-        const auto* media = gst_sdp_message_get_media(description->sdp, mediaIndex);
-        const char* mediaType = gst_sdp_media_get_media(media);
-        if (!g_str_equal(mediaType, "audio") && !g_str_equal(mediaType, "video"))
-            continue;
-        totalAudioVideoMedias++;
-    }
+    // unsigned totalAudioVideoMedias = 0;
+    // unsigned totalMedias = gst_sdp_message_medias_len(description->sdp);
+    // for (unsigned mediaIndex = 0; mediaIndex < totalMedias; mediaIndex++) {
+    //     const auto* media = gst_sdp_message_get_media(description->sdp, mediaIndex);
+    //     const char* mediaType = gst_sdp_media_get_media(media);
+    //     if (!g_str_equal(mediaType, "audio") && !g_str_equal(mediaType, "video"))
+    //         continue;
+    //     totalAudioVideoMedias++;
+    // }
 
-    if (m_pendingIncomingStreams == totalAudioVideoMedias) {
-        GST_DEBUG_OBJECT(m_pipeline.get(), "Incoming streams gathered, now firing track events");
-        m_pendingIncomingStreams = 0;
-        m_peerConnectionBackend.dispatchPendingTrackEvents(mediaStream);
-    }
+    // if (m_pendingIncomingStreams == totalAudioVideoMedias) {
+    //     GST_DEBUG_OBJECT(m_pipeline.get(), "Incoming streams gathered, now firing track events");
+    //     m_pendingIncomingStreams = 0;
+    //     m_peerConnectionBackend.dispatchPendingTrackEvents(mediaStream);
+    // }
 
 #ifndef GST_DISABLE_GST_DEBUG
     auto dotFileName = makeString(GST_OBJECT_NAME(m_pipeline.get()), ".incoming-", mediaType, '-', GST_OBJECT_NAME(pad));
