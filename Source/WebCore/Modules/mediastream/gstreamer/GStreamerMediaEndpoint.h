@@ -127,6 +127,8 @@ private:
     void setDescription(const RTCSessionDescription*, DescriptionType, Function<void(const GstSDPMessage&)>&& preProcessCallback, Function<void(const GstSDPMessage&)>&& successCallback, Function<void(const GError*)>&& failureCallback);
     void initiate(bool isInitiator, GstStructure*);
 
+    void notifySetRemoteDescriptionSucceeded();
+
     void onNegotiationNeeded();
     void onIceConnectionChange();
     void onIceGatheringChange();
@@ -195,6 +197,11 @@ private:
     HashMap<DataChannelHandlerIdentifier, UniqueRef<GStreamerDataChannelHandler>> m_incomingDataChannels;
 
     RefPtr<UniqueSSRCGenerator> m_ssrcGenerator;
+
+    GUniqueOutPtr<GstSDPMessage> m_pendingRemoteDescription;
+    String m_requestedRemoteDescription;
+    Condition m_condition;
+    Lock m_conditionLock;
 };
 
 } // namespace WebCore
