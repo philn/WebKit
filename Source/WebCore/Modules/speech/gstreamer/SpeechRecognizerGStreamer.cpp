@@ -59,6 +59,7 @@ static Vector<float> createAudioSampleBuffer(const PlatformAudioData& audioData,
 
     gpointer convertedSamplesRawData;
     gsize convertedSamplesSize;
+    // FIXME: We shouldn't use this API, it's broken. https://gitlab.freedesktop.org/gstreamer/gstreamer/-/issues/2448
     if (!gst_audio_converter_convert(converter, GST_AUDIO_CONVERTER_FLAG_NONE, mappedBuffer.data(), mappedBuffer.size(), &convertedSamplesRawData, &convertedSamplesSize))
         return { };
 

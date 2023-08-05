@@ -24,6 +24,9 @@
  */
 
 #include "config.h"
+
+#if USE(GSTREAMER) && ENABLE(SPEECH_SYNTHESIS)
+
 #include "GStreamerSpeechRecognizerTask.h"
 
 #if USE(GLIB_EVENT_LOOP)
@@ -50,9 +53,7 @@ GStreamerSpeechRecognizerTask::GStreamerSpeechRecognizerTask(SpeechRecognitionCo
     m_audioSampleProcessingTimer.setName("[WebKit] GStreamerSpeechRecognizerTask");
 #endif
 
-#if USE(WHISPER)
     initializeWhisper(localeIdentifier);
-#endif
 }
 
 GStreamerSpeechRecognizerTask::~GStreamerSpeechRecognizerTask()
@@ -151,7 +152,6 @@ void GStreamerSpeechRecognizerTask::audioSampleProcessingTimerFired()
 
     Vector<WebCore::SpeechRecognitionAlternativeData> alternatives;
 
-#if USE(WHISPER)
     static constexpr size_t retainedSampleCount = WHISPER_SAMPLE_RATE * 0.2; // 0.2s
     static constexpr size_t minSampleCount = WHISPER_SAMPLE_RATE * 3 + retainedSampleCount;
 
@@ -194,7 +194,6 @@ void GStreamerSpeechRecognizerTask::audioSampleProcessingTimerFired()
         if (alternatives.size() >= m_maxAlternatives)
             break;
     }
-#endif
 
     callOnMainThread([this, weakThis = WeakPtr { *this }, alternatives = WTFMove(alternatives)] {
         if (!weakThis)
@@ -203,7 +202,6 @@ void GStreamerSpeechRecognizerTask::audioSampleProcessingTimerFired()
     });
 }
 
-#if USE(WHISPER)
 static CString whisperModelPath()
 {
     if (const char* path = g_getenv("WEBKIT_WHISPER_MODEL_PATH"))
@@ -255,6 +253,7 @@ void GStreamerSpeechRecognizerTask::initializeWhisper(const String& localeIdenti
         task->sendSpeechEndIfNeeded();
     };
 }
-#endif
 
 } // namespace WebCore
+
+#endif // USE(GSTREAMER) && ENABLE(SPEECH_SYNTHESIS)

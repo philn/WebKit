@@ -25,6 +25,8 @@
 
 #pragma once
 
+#if USE(GSTREAMER) && ENABLE(SPEECH_SYNTHESIS)
+
 #include "GUniquePtrGStreamer.h"
 #include "SpeechRecognitionConnectionClientIdentifier.h"
 #include "SpeechRecognitionUpdate.h"
@@ -32,13 +34,11 @@
 #include <wtf/RunLoop.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/WeakPtr.h>
-
-#if USE(WHISPER)
 #include <whisper.h>
+
 namespace WTF {
 WTF_DEFINE_GPTR_DELETER(struct whisper_context, whisper_free)
 }
-#endif
 
 namespace WebCore {
 
@@ -62,9 +62,7 @@ private:
     GStreamerSpeechRecognizerTask(SpeechRecognitionConnectionClientIdentifier, const String& localeIdentifier, uint64_t alternatives, DelegateCallback&&);
     void audioSampleProcessingTimerFired();
 
-#if USE(WHISPER)
     void initializeWhisper(const String& localeIdentifier);
-#endif
 
     Lock m_lock;
     Ref<RunLoop> m_runLoop;
@@ -78,11 +76,11 @@ private:
     bool m_hasSentSpeechStart { false };
     bool m_hasSentSpeechEnd { false };
     bool m_hasSentEnd { false };
-#if USE(WHISPER)
+
     GUniquePtr<struct whisper_context> m_whisperContext;
     struct whisper_full_params m_whisperParams;
-#endif
-
 };
 
 } // namespace WebCore
+
+#endif // USE(GSTREAMER) && ENABLE(SPEECH_SYNTHESIS)

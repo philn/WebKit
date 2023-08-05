@@ -447,6 +447,12 @@ if (ENABLE_MEDIA_STREAM)
     )
 endif ()
 
+if (ENABLE_SPEECH_SYNTHESIS)
+    list(APPEND WebKit_SYSTEM_INCLUDE_DIRECTORIES
+        "${THIRDPARTY_DIR}/whisper.cpp"
+    )
+endif ()
+
 if (ENABLE_BREAKPAD)
     list(APPEND WebKit_SOURCES
         Shared/unix/BreakpadExceptionHandler.cpp

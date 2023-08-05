@@ -152,8 +152,11 @@ if (ENABLE_ENCRYPTED_MEDIA AND ENABLE_THUNDER)
     )
 endif ()
 
-if (USE_WHISPER)
+if (ENABLE_SPEECH_SYNTHESIS)
     list(APPEND WebCore_PRIVATE_INCLUDE_DIRECTORIES
         "${WEBCORE_DIR}/Modules/speech/gstreamer"
+    )
+    list(APPEND WebCore_PRIVATE_FRAMEWORK_HEADERS
+        Modules/speech/gstreamer/GStreamerSpeechRecognizerTask.h
     )
 endif ()

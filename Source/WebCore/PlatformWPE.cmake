@@ -143,8 +143,16 @@ endif ()
 if (ENABLE_SPEECH_SYNTHESIS)
     list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
         ${Flite_INCLUDE_DIRS}
+        ${THIRDPARTY_DIR}/whisper.cpp
     )
     list(APPEND WebCore_LIBRARIES
         ${Flite_LIBRARIES}
+    )
+    list(APPEND WebCore_SOURCES
+        ${THIRDPARTY_DIR}/whisper.cpp/whisper.cpp
+        ${THIRDPARTY_DIR}/whisper.cpp/ggml.c
+    )
+    set_source_files_properties(${THIRDPARTY_DIR}/whisper.cpp/ggml.c
+        PROPERTIES COMPILE_FLAGS "-Wno-cast-align -Wno-unused-variable"
     )
 endif ()
