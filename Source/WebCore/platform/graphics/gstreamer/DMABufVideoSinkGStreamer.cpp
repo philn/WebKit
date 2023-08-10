@@ -47,8 +47,17 @@ struct _WebKitDMABufVideoSinkPrivate {
 GST_DEBUG_CATEGORY_STATIC(webkit_dmabuf_video_sink_debug);
 #define GST_CAT_DEFAULT webkit_dmabuf_video_sink_debug
 
-#define GST_WEBKIT_DMABUF_SINK_CAPS_FORMAT_LIST "{ RGBA, RGBx, BGRA, BGRx, I420, YV12, A420, NV12, NV21, Y444, Y41B, Y42B, VUYA, P010_10LE, P010_10BE, P016_LE, P016BE }"
-static GstStaticPadTemplate sinkTemplate = GST_STATIC_PAD_TEMPLATE("sink", GST_PAD_SINK, GST_PAD_ALWAYS, GST_STATIC_CAPS_ANY);
+#define GST_WEBKIT_DMABUF_SINK_CAPS_BASE_FORMAT_LIST "RGBA, RGBx, BGRA, BGRx, I420, YV12, A420, NV12, NV21, Y444, Y41B, Y42B, VUYA, P010_10LE, P010_10BE, P016_LE, P016BE"
+
+#if GST_CHECK_VERSION(1, 23, 0)
+#define GST_WEBKIT_DMABUF_SINK_CAPS_FORMAT_LIST "{ " GST_WEBKIT_DMABUF_SINK_CAPS_BASE_FORMAT_LIST \
+    ", DMA_DRM }"
+#else
+#define GST_WEBKIT_DMABUF_SINK_CAPS_FORMAT_LIST "{ " GST_WEBKIT_DMABUF_SINK_CAPS_BASE_FORMAT_LIST "}"
+#endif
+
+static GstStaticPadTemplate sinkTemplate = GST_STATIC_PAD_TEMPLATE("sink", GST_PAD_SINK, GST_PAD_ALWAYS,
+    GST_STATIC_CAPS(GST_VIDEO_CAPS_MAKE_WITH_FEATURES("ANY", GST_WEBKIT_DMABUF_SINK_CAPS_FORMAT_LIST)));
 
 // TODO: this is a list of remaining YUV formats we want to support, but don't currently work (due to improper handling in TextureMapper):
 //     YUY2, YVYU, UYVY, VYUY, AYUV
@@ -95,8 +104,9 @@ static void webKitDMABufVideoSinkConstructed(GObject* object)
     // In case of dmabuf data, that dmabuf is handled most optimally and just relayed to the graphics pipeline.
     // In case of raw data, dmabuf objects are produced on the spot and filled with that data, and then pushed to the graphics pipeline.
     static GstStaticCaps s_dmabufCaps = GST_STATIC_CAPS(
-        GST_VIDEO_CAPS_MAKE_WITH_FEATURES(GST_CAPS_FEATURE_MEMORY_DMABUF, GST_WEBKIT_DMABUF_SINK_CAPS_FORMAT_LIST));
-    static GstStaticCaps s_fallbackCaps = GST_STATIC_CAPS(GST_VIDEO_CAPS_MAKE(GST_WEBKIT_DMABUF_SINK_CAPS_FORMAT_LIST));
+        GST_VIDEO_CAPS_MAKE_WITH_FEATURES(GST_CAPS_FEATURE_MEMORY_DMABUF, GST_WEBKIT_DMABUF_SINK_CAPS_FORMAT_LIST)
+    );
+    static GstStaticCaps s_fallbackCaps = GST_STATIC_CAPS(GST_VIDEO_CAPS_MAKE("{ " GST_WEBKIT_DMABUF_SINK_CAPS_BASE_FORMAT_LIST " }"));
 
     GRefPtr<GstCaps> caps = adoptGRef(gst_caps_new_empty());
     {

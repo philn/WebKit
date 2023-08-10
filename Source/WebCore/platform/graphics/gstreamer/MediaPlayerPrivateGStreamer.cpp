@@ -2879,7 +2879,7 @@ void MediaPlayerPrivateGStreamer::setPlaybackFlags(bool isMediaStream)
     hasText = 0x0;
 #endif
 
-#if USE(GSTREAMER_NATIVE_VIDEO)
+#if 1 //USE(GSTREAMER_NATIVE_VIDEO)
     hasSoftwareColorBalance = 0x0;
 #else
     hasNativeVideo = 0x0;
@@ -3381,12 +3381,14 @@ void MediaPlayerPrivateGStreamer::pushDMABufToCompositor()
                 // but left for later.
                 object.releaseFlag = DMABufReleaseFlag { };
 
-                // No way (yet) to retrieve the modifier information. Until then, no modifiers are specified
-                // for this DMABufObject (via the modifierPresent and modifierValue member variables).
+                bool modifierPresent = false;
+#if GST_CHECK_VERSION(1, 23, 0)
+                GstVideoInfoDmaDrm drmInfo;
+                modifierPresent = gst_video_info_dma_drm_from_caps(&drmInfo, caps);
+#endif
 
                 // For each plane, the relevant data (stride, offset, skip, dmabuf fd) is retrieved and assigned
-                // as appropriate. Modifier values are zeroed out for now, since GStreamer doesn't yet provide
-                // the information.
+                // as appropriate.
                 for (unsigned i = 0; i < object.format.numPlanes; ++i) {
                     gsize offset = GST_VIDEO_INFO_PLANE_OFFSET(&videoInfo, i);
                     guint memid = 0;
@@ -3403,6 +3405,10 @@ void MediaPlayerPrivateGStreamer::pushDMABufToCompositor()
                     gst_video_format_info_component(videoInfo.finfo, i, comp);
                     object.offset[i] = offset;
                     object.stride[i] = GST_VIDEO_INFO_PLANE_STRIDE(&videoInfo, i);
+                    object.modifierPresent[i] = modifierPresent;
+#if GST_CHECK_VERSION(1, 23, 0)
+                    object.modifierValue[i] = drmInfo.drm_modifier;
+#endif
                 }
                 return WTFMove(object);
             }, m_textureMapperFlags);
