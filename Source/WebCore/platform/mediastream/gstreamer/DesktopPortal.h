@@ -92,6 +92,7 @@ private:
         struct pw_core* core;
         struct spa_hook coreListener;
         int lastSeq;
+        int pendingSeq;
         int lastError;
     };
     WEBKIT_DEFINE_ASYNC_DATA_STRUCT(PipeWireCore)

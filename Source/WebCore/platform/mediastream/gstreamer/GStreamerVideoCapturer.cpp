@@ -21,6 +21,7 @@
  */
 
 #include "config.h"
+#include "CaptureDevice.h"
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "GStreamerVideoCapturer.h"
@@ -67,6 +68,12 @@ void GStreamerVideoCapturer::setSinkVideoFrameCallback(SinkVideoFrameCallback&& 
         capturer->m_sinkVideoFrameCallback.second(VideoFrameGStreamer::create(WTFMove(gstSample), WebCore::FloatSize(), presentationTime));
         return GST_FLOW_OK;
     }), this);
+}
+
+bool GStreamerVideoCapturer::isCapturingDisplay() const
+{
+    auto deviceType = this->deviceType();
+    return deviceType == CaptureDevice::DeviceType::Screen || deviceType == CaptureDevice::DeviceType::Window;
 }
 
 GstElement* GStreamerVideoCapturer::createSource()

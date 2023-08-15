@@ -44,7 +44,7 @@ RefPtr<DesktopPortal> DesktopPortal::create(const String& interfaceName)
     GUniqueOutPtr<GError> error;
     auto proxy = adoptGRef(g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SESSION,
         static_cast<GDBusProxyFlags>(G_DBUS_PROXY_FLAGS_DO_NOT_CONNECT_SIGNALS | G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES), nullptr,
-                                                         "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop", interfaceName.ascii().data(), nullptr, &error.outPtr()));
+        "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop", interfaceName.ascii().data(), nullptr, &error.outPtr()));
     if (error) {
         WTFLogAlways("Unable to connect to the Deskop portal: %s", error->message);
         return nullptr;
@@ -224,13 +224,17 @@ std::optional<std::pair<uint32_t, int>> DesktopPortal::openCameraPipewireRemote(
         nullptr
     };
 
-    pw_core_add_listener(m_pipewireCore->core, &m_pipewireCore->coreListener, &coreEvents, this);
+    {
+        IGNORE_WARNINGS_BEGIN("unused-value")
+        pw_core_add_listener(m_pipewireCore->core, &m_pipewireCore->coreListener, &coreEvents, this);
+        IGNORE_WARNINGS_END
+    }
 
     m_registry = pw_core_get_registry(m_pipewireCore->core, PW_VERSION_REGISTRY, 0);
 
     static const struct pw_registry_events registryEvents = {
         PW_VERSION_REGISTRY_EVENTS,
-        .global = [](void* data, uint32_t nodeId, uint32_t permissions, const char* type, uint32_t version, const struct spa_dict* properties) {
+        [](void* data, uint32_t nodeId, uint32_t permissions, const char* type, uint32_t version, const struct spa_dict* properties) {
             UNUSED_PARAM(permissions);
             UNUSED_PARAM(type);
             UNUSED_PARAM(version);
@@ -246,14 +250,23 @@ std::optional<std::pair<uint32_t, int>> DesktopPortal::openCameraPipewireRemote(
             auto* portal = reinterpret_cast<DesktopPortal*>(data);
             portal->m_nodeId = nodeId;
         },
-        .global_remove = nullptr
+        [](void*, uint32_t) { }
     };
 
-    pw_registry_add_listener(m_registry, &m_registryListener, &registryEvents, this);
+    {
+        IGNORE_WARNINGS_BEGIN("unused-value")
+        pw_registry_add_listener(m_registry, &m_registryListener, &registryEvents, this);
+        IGNORE_WARNINGS_END
+    }
 
     pw_thread_loop_unlock(m_pipewireCore->loop);
 
-    m_seq = pw_core_sync(m_pipewireCore->core, PW_ID_CORE, m_seq);
+    {
+        IGNORE_WARNINGS_BEGIN("unused-value")
+        m_seq = pw_core_sync(m_pipewireCore->core, PW_ID_CORE, m_seq);
+        IGNORE_WARNINGS_END
+    }
+
     if (!m_seq) {
         WTFLogAlways("PipeWire sync failed");
         return { };
@@ -261,11 +274,25 @@ std::optional<std::pair<uint32_t, int>> DesktopPortal::openCameraPipewireRemote(
 
     m_loopDone = false;
     WTFLogAlways("Pipewire loop starting");
+    struct timespec abstime;
+    m_pipewireCore->pendingSeq = pw_core_sync(m_pipewireCore->core, 0, m_pipewireCore->pendingSeq);
+    pw_thread_loop_get_time(m_pipewireCore->loop, &abstime,
+        30 * SPA_NSEC_PER_SEC);
+
+    auto sync = [&] {
+        while (true) {
+            if (m_pipewireCore->lastSeq == m_pipewireCore->pendingSeq || m_pipewireCore->lastError < 0)
+                break;
+            if (pw_thread_loop_timed_wait_full(m_pipewireCore->loop, &abstime) < 0)
+                break;
+        }
+    };
     for (;;) {
         if (m_loopDone)
             break;
         // pw_thread_loop_lock(m_pipewireCore->loop);
-        pw_thread_loop_wait(m_pipewireCore->loop);
+        //pw_thread_loop_wait(m_pipewireCore->loop);
+        sync();
         // pw_thread_loop_unlock(m_pipewireCore->loop);
     }
     WTFLogAlways("Pipewire loop ended node ID: %u", m_nodeId);

@@ -55,7 +55,7 @@ private:
     GstVideoInfo getBestFormat();
 
     void setPipewireNodeAndFD(const NodeAndFD& nodeAndFd) { m_nodeAndFd = nodeAndFd; }
-    bool isCapturingDisplay() const { return m_nodeAndFd.has_value(); }
+    bool isCapturingDisplay() const;
 
     std::optional<NodeAndFD> m_nodeAndFd;
     GRefPtr<GstElement> m_videoSrcMIMETypeFilter;
