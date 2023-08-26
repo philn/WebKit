@@ -25,6 +25,7 @@
  */
 
 #include "config.h"
+#include "OpusEncoderConfig.h"
 #include "WebCodecsAudioEncoder.h"
 
 #if ENABLE(WEB_CODECS)
@@ -74,7 +75,11 @@ static bool isValidEncoderConfig(const WebCodecsAudioEncoderConfig& config, cons
 
 static ExceptionOr<AudioEncoder::Config> createAudioEncoderConfig(const WebCodecsAudioEncoderConfig& config)
 {
-    return AudioEncoder::Config { config.sampleRate, config.numberOfChannels, config.bitrate.value_or(0) };
+    std::optional<AudioEncoder::OpusConfig> opusConfig;
+    if (config.opus) {
+        opusConfig = { config.opus->format == OpusBitstreamFormat::Ogg, config.opus->frameDuration, config.opus->complexity, config.opus->packetlossperc, config.opus->useinbandfec, config.opus->usedtx };
+    }
+    return AudioEncoder::Config { config.sampleRate, config.numberOfChannels, config.bitrate.value_or(0), WTFMove(opusConfig) };
 }
 
 ExceptionOr<void> WebCodecsAudioEncoder::configure(ScriptExecutionContext& context, WebCodecsAudioEncoderConfig&& config)

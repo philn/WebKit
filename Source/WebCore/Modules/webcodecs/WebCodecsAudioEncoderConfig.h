@@ -29,6 +29,7 @@
 #if ENABLE(WEB_CODECS)
 
 #include "BitrateMode.h"
+#include "OpusEncoderConfig.h"
 #include <optional>
 #include <wtf/text/WTFString.h>
 
@@ -40,9 +41,10 @@ struct WebCodecsAudioEncoderConfig {
     size_t numberOfChannels;
     std::optional<uint64_t> bitrate;
     BitrateMode bitrateMode { BitrateMode::Variable };
+    std::optional<OpusEncoderConfig> opus;
 
-    WebCodecsAudioEncoderConfig isolatedCopy() && { return { WTFMove(codec).isolatedCopy(), sampleRate, numberOfChannels, bitrate, bitrateMode }; }
-    WebCodecsAudioEncoderConfig isolatedCopy() const & { return { codec.isolatedCopy(), sampleRate, numberOfChannels, bitrate, bitrateMode }; }
+    WebCodecsAudioEncoderConfig isolatedCopy() && { return { WTFMove(codec).isolatedCopy(), sampleRate, numberOfChannels, bitrate, bitrateMode, opus }; }
+    WebCodecsAudioEncoderConfig isolatedCopy() const & { return { codec.isolatedCopy(), sampleRate, numberOfChannels, bitrate, bitrateMode, opus }; }
 };
 
 }

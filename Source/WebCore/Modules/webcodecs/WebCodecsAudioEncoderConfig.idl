@@ -37,4 +37,5 @@ typedef [EnforceRange] unsigned long long WebCodecsAudioEncoderConfigBitrate;
     WebCodecsAudioEncoderConfigSize numberOfChannels;
     WebCodecsAudioEncoderConfigBitrate bitrate;
     BitrateMode bitrateMode = "variable";
+    OpusEncoderConfig opus;
 };

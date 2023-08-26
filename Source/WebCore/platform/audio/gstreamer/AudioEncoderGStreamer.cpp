@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "AudioEncoderGStreamer.h"
+#include <gst/gstutils.h>
 
 #if ENABLE(WEB_CODECS) && USE(GSTREAMER)
 
@@ -70,6 +71,8 @@ private:
     bool m_isClosed { false };
     bool m_isInitialized { false };
     RefPtr<GStreamerElementHarness> m_harness;
+    GRefPtr<GstElement> m_encoder;
+    GRefPtr<GstElement> m_capsFilter;
 };
 
 void GStreamerAudioEncoder::create(const String& codecName, const AudioEncoder::Config& config, CreateCallback&& callback, DescriptionCallback&& descriptionCallback, OutputCallback&& outputCallback, PostTaskCallback&& postTaskCallback)
@@ -175,78 +178,19 @@ GStreamerInternalAudioEncoder::GStreamerInternalAudioEncoder(const String& codec
     : m_codecName(codecName)
     , m_outputCallback(WTFMove(outputCallback))
     , m_postTaskCallback(WTFMove(postTaskCallback))
+    , m_encoder(WTFMove(encoderElement))
 {
-#if 0
-    GRefPtr<GstElement> element = gst_element_factory_make("fixme", nullptr);
-    if (codecName.startsWith("mp4a"_s)) {
-        // m_inputCaps = adoptGRef(gst_caps_new_simple("audio/mpeg", "mpegversion", G_TYPE_INT, 4, "channels", G_TYPE_INT, config.numberOfChannels, nullptr));
-        // auto codecData = wrapSpanData(config.description);
-        // if (codecData)
-        //     gst_caps_set_simple(m_inputCaps.get(), "codec_data", GST_TYPE_BUFFER, codecData.get(), "stream-format", G_TYPE_STRING, "raw", nullptr);
-        // else
-        //     gst_caps_set_simple(m_inputCaps.get(), "stream-format", G_TYPE_STRING, "adts", nullptr);
-    } else if (codecName == "mp3"_s) {
-        // m_inputCaps = adoptGRef(gst_caps_new_simple("audio/mpeg", "mpegversion", G_TYPE_INT, 1, "layer", G_TYPE_INT, 3, "rate", G_TYPE_INT, config.sampleRate, "channels", G_TYPE_INT, config.numberOfChannels, "parsed", G_TYPE_BOOLEAN, TRUE, nullptr));
-    } else if (codecName == "opus"_s) {
-        // int channelMappingFamily = config.numberOfChannels <= 2 ? 0 : 1;
-        // m_inputCaps = adoptGRef(gst_caps_new_simple("audio/x-opus", "channel-mapping-family", G_TYPE_INT, channelMappingFamily, nullptr));
-        // m_header = wrapSpanData(config.description);
-        // if (m_header)
-        //     parser = "opusparse";
-    } else if (codecName == "alaw"_s) {
-        // m_inputCaps = adoptGRef(gst_caps_new_simple("audio/x-alaw", "rate", G_TYPE_INT, config.sampleRate, "channels", G_TYPE_INT, config.numberOfChannels, nullptr));
-    } else if (codecName == "ulaw"_s) {
-        // m_inputCaps = adoptGRef(gst_caps_new_simple("audio/x-mulaw", "rate", G_TYPE_INT, config.sampleRate, "channels", G_TYPE_INT, config.numberOfChannels, nullptr));
-    } else if (codecName == "flac"_s) {
-        // m_header = wrapSpanData(config.description);
-        // if (!m_header) {
-        //     GST_WARNING("Decoder config description for flac codec is mandatory");
-        //     return;
-        // }
-        // parser = "flacparse";
-        // m_inputCaps = adoptGRef(gst_caps_new_empty_simple("audio/x-flac"));
-    } else if (codecName == "vorbis"_s) {
-        // m_header = wrapSpanData(config.description);
-        // if (!m_header) {
-        //     GST_WARNING("Decoder config description for vorbis codec is mandatory");
-        //     return;
-        // }
-        // parser = "oggparse";
-        // m_inputCaps = adoptGRef(gst_caps_new_empty_simple("application/ogg"));
-    } else if (codecName.startsWith("pcm-"_s)) {
-        // auto components = codecName.split('-');
-        // auto pcmFormat = components[1].convertToASCIILowercase();
-        // GstAudioFormat gstPcmFormat = GST_AUDIO_FORMAT_UNKNOWN;
-        // if (pcmFormat == "u8"_s)
-        //     gstPcmFormat = GST_AUDIO_FORMAT_U8;
-        // else if (pcmFormat == "s16"_s)
-        //     gstPcmFormat = GST_AUDIO_FORMAT_S16;
-        // else if (pcmFormat == "s24"_s)
-        //     gstPcmFormat = GST_AUDIO_FORMAT_S24;
-        // else if (pcmFormat == "s32"_s)
-        //     gstPcmFormat = GST_AUDIO_FORMAT_S32;
-        // else if (pcmFormat == "f32"_s)
-        //     gstPcmFormat = GST_AUDIO_FORMAT_F32;
-        // else {
-        //     GST_WARNING("Invalid LPCM codec format: %s", pcmFormat.ascii().data());
-        //     return;
-        // }
-        // m_inputCaps = adoptGRef(gst_caps_new_simple("audio/x-raw", "format", G_TYPE_STRING, gst_audio_format_to_string(gstPcmFormat),
-        //     "rate", G_TYPE_INT, config.sampleRate, "channels", G_TYPE_INT, config.numberOfChannels,
-        //     "layout", G_TYPE_STRING, "interleaved", nullptr));
-        // parser = "rawaudioparse";
-    } else
-        return;
-#endif
-
-    GRefPtr<GstElement> harnessedElement = gst_bin_new(nullptr);
+    static Atomic<uint64_t> counter = 0;
+    auto binName = makeString("audio-encoder-"_s, codecName, '-', counter.exchangeAdd(1));
+    GRefPtr<GstElement> harnessedElement = gst_bin_new(binName.ascii().data());
     auto audioconvert = gst_element_factory_make("audioconvert", nullptr);
     auto audioresample = gst_element_factory_make("audioresample", nullptr);
-    gst_bin_add_many(GST_BIN_CAST(harnessedElement.get()), audioconvert, audioresample, encoderElement.get(), nullptr);
-    gst_element_link_many(audioconvert, audioresample, encoderElement.get(), nullptr);
+    m_capsFilter = gst_element_factory_make("capsfilter", nullptr);
+    gst_bin_add_many(GST_BIN_CAST(harnessedElement.get()), audioconvert, audioresample, m_encoder.get(), m_capsFilter.get(), nullptr);
+    gst_element_link_many(audioconvert, audioresample, m_encoder.get(), m_capsFilter.get(), nullptr);
     auto sinkPad = adoptGRef(gst_element_get_static_pad(audioconvert, "sink"));
     gst_element_add_pad(harnessedElement.get(), gst_ghost_pad_new("sink", sinkPad.get()));
-    auto srcPad = adoptGRef(gst_element_get_static_pad(encoderElement.get(), "src"));
+    auto srcPad = adoptGRef(gst_element_get_static_pad(m_capsFilter.get(), "src"));
     gst_element_add_pad(harnessedElement.get(), gst_ghost_pad_new("src", srcPad.get()));
 
     m_harness = GStreamerElementHarness::create(WTFMove(harnessedElement), [weakThis = WeakPtr { *this }, this](auto&, const GRefPtr<GstBuffer>& outputBuffer) {
@@ -257,9 +201,9 @@ GStreamerInternalAudioEncoder::GStreamerInternalAudioEncoder(const String& codec
 
         bool isKeyFrame = !GST_BUFFER_FLAG_IS_SET(outputBuffer.get(), GST_BUFFER_FLAG_DELTA_UNIT);
         GST_TRACE_OBJECT(m_harness->element(), "Notifying encoded%s frame", isKeyFrame ? " key" : "");
-        GstMappedBuffer encodedImage(outputBuffer.get(), GST_MAP_READ);
+        GstMappedBuffer mappedBuffer(outputBuffer.get(), GST_MAP_READ);
         AudioEncoder::EncodedFrame encodedFrame {
-            Vector<uint8_t> { std::span<const uint8_t> { encodedImage.data(), encodedImage.size() } },
+            mappedBuffer.createVector(),
             isKeyFrame, m_timestamp, m_duration,
         };
 
@@ -277,43 +221,64 @@ String GStreamerInternalAudioEncoder::initialize(const AudioEncoder::Config& con
 {
     GST_DEBUG_OBJECT(m_harness->element(), "Initializing encoder for codec %s", m_codecName.ascii().data());
     GRefPtr<GstCaps> encoderCaps;
-    // if (m_codecName == "vp8"_s)
-    //     encoderCaps = adoptGRef(gst_caps_new_empty_simple("video/x-vp8"));
-    // else if (m_codecName.startsWith("vp09"_s)) {
-    //     encoderCaps = adoptGRef(gst_caps_new_empty_simple("video/x-vp9"));
-    //     if (auto profileId = GStreamerCodecUtilities::parseVP9Profile(m_codecName)) {
-    //         auto profile = makeString(profileId);
-    //         gst_caps_set_simple(encoderCaps.get(), "profile", G_TYPE_STRING, profile.ascii().data(), nullptr);
-    //     }
-    // } else if (m_codecName.startsWith("avc1"_s)) {
-    //     encoderCaps = adoptGRef(gst_caps_new_empty_simple("video/x-h264"));
-    //     auto [profile, level] = GStreamerCodecUtilities::parseH264ProfileAndLevel(m_codecName);
-    //     if (profile)
-    //         gst_caps_set_simple(encoderCaps.get(), "profile", G_TYPE_STRING, profile, nullptr);
-    //     // FIXME: Set level on caps too?
-    //     UNUSED_VARIABLE(level);
-    // } else if (m_codecName.startsWith("av01"_s)) {
-    //     // FIXME: parse codec parameters.
-    //     encoderCaps = adoptGRef(gst_caps_new_empty_simple("video/x-av1"));
-    // } else if (m_codecName.startsWith("hvc1"_s) || m_codecName.startsWith("hev1"_s)) {
-    //     encoderCaps = adoptGRef(gst_caps_new_empty_simple("video/x-h265"));
-    //     if (const char* profile = GStreamerCodecUtilities::parseHEVCProfile(m_codecName))
-    //         gst_caps_set_simple(encoderCaps.get(), "profile", G_TYPE_STRING, profile, nullptr);
-    // } else
-    return makeString("Unsupported outgoing video encoding: "_s, m_codecName);
+    if (m_codecName.startsWith("mp4a"_s)) {
+        encoderCaps = adoptGRef(gst_caps_new_simple("audio/mpeg", "mpegversion", G_TYPE_INT, 4, nullptr));
+    } else if (m_codecName == "mp3"_s) {
+        encoderCaps = adoptGRef(gst_caps_new_simple("audio/mpeg", "mpegversion", G_TYPE_INT, 1, "layer", G_TYPE_INT, 3, nullptr));
+    } else if (m_codecName == "opus"_s) {
+        int channelMappingFamily = config.numberOfChannels <= 2 ? 0 : 1;
+        encoderCaps = adoptGRef(gst_caps_new_simple("audio/x-opus", "channel-mapping-family", G_TYPE_INT, channelMappingFamily, nullptr));
+        if (auto parameters = config.opusConfig) {
+            // if (gstObjectHasProperty(m_encoder.get(), "frame-size"))
+            //     g_object_set(m_encoder.get(), "frame-size", parameters->frameDuration, nullptr);
+            // if (parameters->complexity < std::numeric_limits<size_t>::max() && gstObjectHasProperty(m_encoder.get(), "complexity"))
+            //     g_object_set(m_encoder.get(), "complexity", static_cast<int>(parameters->complexity), nullptr);
+            if (gstObjectHasProperty(m_encoder.get(), "packet-loss-percentage"))
+                g_object_set(m_encoder.get(), "packet-loss-percentage", static_cast<int>(parameters->packetlossperc), nullptr);
+            if (gstObjectHasProperty(m_encoder.get(), "inband-fec"))
+                g_object_set(m_encoder.get(), "inband-fec", (gboolean) parameters->useinbandfec, nullptr);
+            if (gstObjectHasProperty(m_encoder.get(), "dtx"))
+                g_object_set(m_encoder.get(), "dtx", (gboolean) parameters->usedtx, nullptr);
+            gst_util_set_object_arg(G_OBJECT(m_encoder.get()), "bitrate-type", "cbr");
+            gst_util_set_object_arg(G_OBJECT(m_encoder.get()), "audio-type", "voice");
+        }
 
-    // if (config.width)
-    //     gst_caps_set_simple(encoderCaps.get(), "width", G_TYPE_INT, static_cast<int>(config.width), nullptr);
-    // if (config.height)
-    //     gst_caps_set_simple(encoderCaps.get(), "height", G_TYPE_INT, static_cast<int>(config.height), nullptr);
+    } else if (m_codecName == "alaw"_s) {
+        encoderCaps = adoptGRef(gst_caps_new_empty_simple("audio/x-alaw"));
+    } else if (m_codecName == "ulaw"_s) {
+        encoderCaps = adoptGRef(gst_caps_new_empty_simple("audio/x-mulaw"));
+    } else if (m_codecName == "flac"_s) {
+        encoderCaps = adoptGRef(gst_caps_new_empty_simple("audio/x-flac"));
+    } else if (m_codecName == "vorbis"_s) {
+        encoderCaps = adoptGRef(gst_caps_new_empty_simple("audio/x-vorbis"));
+    } else if (m_codecName.startsWith("pcm-"_s)) {
+        auto components = m_codecName.split('-');
+        auto pcmFormat = components[1].convertToASCIILowercase();
+        GstAudioFormat gstPcmFormat = GST_AUDIO_FORMAT_UNKNOWN;
+        if (pcmFormat == "u8"_s)
+            gstPcmFormat = GST_AUDIO_FORMAT_U8;
+        else if (pcmFormat == "s16"_s)
+            gstPcmFormat = GST_AUDIO_FORMAT_S16;
+        else if (pcmFormat == "s24"_s)
+            gstPcmFormat = GST_AUDIO_FORMAT_S24;
+        else if (pcmFormat == "s32"_s)
+            gstPcmFormat = GST_AUDIO_FORMAT_S32;
+        else if (pcmFormat == "f32"_s)
+            gstPcmFormat = GST_AUDIO_FORMAT_F32;
+        else
+            return makeString("Invalid LPCM codec format: "_s, pcmFormat);
 
-    // FIXME: Propagate config.frameRate to caps?
+        encoderCaps = adoptGRef(gst_caps_new_simple("audio/x-raw", "format", G_TYPE_STRING, gst_audio_format_to_string(gstPcmFormat),
+            "layout", G_TYPE_STRING, "interleaved", nullptr));
+    } else
+        return makeString("Unsupported audio codec: "_s, m_codecName);
 
-    // if (!videoEncoderSetFormat(WEBKIT_VIDEO_ENCODER(m_harness->element()), WTFMove(encoderCaps)))
-    //     return "Unable to set encoder format"_s;
+    gst_caps_set_simple(encoderCaps.get(), "rate", G_TYPE_INT, config.sampleRate, "channels", G_TYPE_INT, config.numberOfChannels, nullptr);
+    g_object_set(m_capsFilter.get(), "caps", encoderCaps.get(), nullptr);
 
+    // FIXME:
     if (config.bitRate)
-        g_object_set(m_harness->element(), "bitrate", static_cast<uint32_t>(config.bitRate / 1024), nullptr);
+        g_object_set(m_encoder.get(), "bitrate", static_cast<int>(config.bitRate), nullptr);
     m_isInitialized = true;
     return emptyString();
 }
@@ -328,20 +293,17 @@ bool GStreamerInternalAudioEncoder::encode(AudioEncoder::RawFrame&& rawFrame)
     m_timestamp = rawFrame.timestamp;
     m_duration = rawFrame.duration;
 
-    // if (shouldGenerateKeyFrame) {
-    //     GST_INFO_OBJECT(m_harness->element(), "Requesting key-frame!");
-    //     m_harness->pushEvent(gst_video_event_new_downstream_force_key_unit(GST_CLOCK_TIME_NONE, GST_CLOCK_TIME_NONE, GST_CLOCK_TIME_NONE, FALSE, 1));
-    // }
-
     auto gstAudioFrame = downcast<PlatformRawAudioDataGStreamer>(rawFrame.frame.get());
     auto sample = gstAudioFrame->sample();
     auto buffer = gst_sample_get_buffer(sample);
-    auto writableBuffer = adoptGRef(gst_buffer_make_writable(buffer));
-    GST_BUFFER_PTS(writableBuffer.get()) = m_timestamp;
+    // auto writableBuffer = adoptGRef(gst_buffer_make_writable(buffer));
+    // GST_BUFFER_PTS(writableBuffer.get()) = m_timestamp;
+    GST_BUFFER_PTS(buffer) = m_timestamp;
 
-    auto writableSample = adoptGRef(gst_sample_make_writable(sample));
-    gst_sample_set_buffer(writableSample.get(), writableBuffer.get());
-    return m_harness->pushSample(WTFMove(writableSample));
+    // auto writableSample = adoptGRef(gst_sample_make_writable(sample));
+    // gst_sample_set_buffer(writableSample.get(), writableBuffer.get());
+    // return m_harness->pushSample(WTFMove(writableSample));
+    return m_harness->pushSample(sample);
 }
 
 void GStreamerInternalAudioEncoder::flush(Function<void()>&& callback)

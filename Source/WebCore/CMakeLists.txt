@@ -738,6 +738,7 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/webcodecs/BitrateMode.idl
     Modules/webcodecs/HardwareAcceleration.idl
     Modules/webcodecs/LatencyMode.idl
+    Modules/webcodecs/OpusEncoderConfig.idl
     Modules/webcodecs/PlaneLayout.idl
     Modules/webcodecs/VideoColorPrimaries.idl
     Modules/webcodecs/VideoColorSpace.idl

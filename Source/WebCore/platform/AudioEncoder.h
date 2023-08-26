@@ -27,6 +27,7 @@
 #pragma once
 
 #include "PlatformRawAudioData.h"
+#include <limits>
 #if ENABLE(WEB_CODECS)
 
 #include "AudioEncoderActiveConfiguration.h"
@@ -44,10 +45,20 @@ public:
 
     static bool isCodecSupported(const StringView&);
 
+    struct OpusConfig {
+        bool isOggBitStream { false };
+        uint64_t frameDuration { 20000 };
+        size_t complexity { std::numeric_limits<size_t>::max() };
+        size_t packetlossperc { 0 };
+        bool useinbandfec { false };
+        bool usedtx { false };
+    };
+
     struct Config {
         uint64_t sampleRate { 0 };
         uint64_t numberOfChannels { 0 };
         uint64_t bitRate { 0 };
+        std::optional<OpusConfig> opusConfig;
     };
     using ActiveConfiguration = AudioEncoderActiveConfiguration;
     struct EncodedFrame {

@@ -3868,6 +3868,7 @@ JSOfflineAudioContextOptions.cpp
 JSOffscreenCanvas.cpp
 JSOffscreenCanvasRenderingContext2D.cpp
 JSOptionalEffectTiming.cpp
+JSOpusEncoderConfig.cpp
 JSOscillatorNode.cpp
 JSOscillatorOptions.cpp
 JSOscillatorType.cpp
