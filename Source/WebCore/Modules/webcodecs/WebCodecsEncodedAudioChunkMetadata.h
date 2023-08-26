@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2020 Apple Inc. All rights reserved.
+ * Copyright (C) 2022 Apple Inc. All rights reserved.
+ * Copyright (C) 2023 Igalia S.L
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,53 +24,18 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "PlatformScreen.h"
+#pragma once
 
-#if PLATFORM(COCOA) || PLATFORM(GTK)
+#if ENABLE(WEB_CODECS)
 
-#include "ScreenProperties.h"
-#include <wtf/NeverDestroyed.h>
+#include "WebCodecsAudioDecoderConfig.h"
 
 namespace WebCore {
 
-static ScreenProperties& screenProperties()
-{
-    static NeverDestroyed<ScreenProperties> screenProperties;
-    return screenProperties;
+struct WebCodecsEncodedAudioChunkMetadata {
+    std::optional<WebCodecsAudioDecoderConfig> decoderConfig;
+};
+
 }
 
-const ScreenProperties& getScreenProperties()
-{
-    return screenProperties();
-}
-
-PlatformDisplayID primaryScreenDisplayID()
-{
-    return screenProperties().primaryDisplayID;
-}
-
-void setScreenProperties(const ScreenProperties& properties)
-{
-    screenProperties() = properties;
-}
-
-const ScreenData* screenData(PlatformDisplayID screenDisplayID)
-{
-    if (screenProperties().screenDataMap.isEmpty())
-        return nullptr;
-
-    // Return property of the first screen if the screen is not found in the map.
-    if (auto displayID = screenDisplayID ? screenDisplayID : primaryScreenDisplayID()) {
-        auto properties = screenProperties().screenDataMap.find(displayID);
-        if (properties != screenProperties().screenDataMap.end())
-            return &properties->value;
-    }
-
-    // Last resort: use the first item in the screen list.
-    return &screenProperties().screenDataMap.begin()->value;
-}
-
-} // namespace WebCore
-
-#endif // PLATFORM(COCOA) || PLATFORM(GTK)
+#endif // ENABLE(WEB_CODECS)

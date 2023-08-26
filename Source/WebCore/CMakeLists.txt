@@ -751,8 +751,13 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/webcodecs/WebCodecsAudioDecoder.idl
     Modules/webcodecs/WebCodecsAudioDecoderConfig.idl
     Modules/webcodecs/WebCodecsAudioDecoderSupport.idl
+    Modules/webcodecs/WebCodecsAudioEncoder.idl
+    Modules/webcodecs/WebCodecsAudioEncoderConfig.idl
+    Modules/webcodecs/WebCodecsAudioEncoderSupport.idl
     Modules/webcodecs/WebCodecsCodecState.idl
     Modules/webcodecs/WebCodecsEncodedAudioChunk.idl
+    Modules/webcodecs/WebCodecsEncodedAudioChunkMetadata.idl
+    Modules/webcodecs/WebCodecsEncodedAudioChunkOutputCallback.idl
     Modules/webcodecs/WebCodecsEncodedAudioChunkType.idl
     Modules/webcodecs/WebCodecsEncodedVideoChunk.idl
     Modules/webcodecs/WebCodecsEncodedVideoChunkMetadata.idl
