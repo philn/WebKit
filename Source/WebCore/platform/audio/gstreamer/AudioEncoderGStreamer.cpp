@@ -19,7 +19,6 @@
 
 #include "config.h"
 #include "AudioEncoderGStreamer.h"
-#include <gst/gstutils.h>
 
 #if ENABLE(WEB_CODECS) && USE(GSTREAMER)
 
@@ -29,6 +28,7 @@
 #include "GStreamerRegistryScanner.h"
 #include "PlatformRawAudioDataGStreamer.h"
 #include <wtf/NeverDestroyed.h>
+#include <wtf/PrintStream.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/WorkQueue.h>
 
@@ -199,6 +199,13 @@ GStreamerInternalAudioEncoder::GStreamerInternalAudioEncoder(const String& codec
         if (m_isClosed)
             return;
 
+        if (auto meta = gst_buffer_get_audio_clipping_meta(outputBuffer.get())) {
+            gst_printerrln("clipping-meta: %zu-%zu", meta->start, meta->end);
+        }
+        GST_TRACE_OBJECT(m_harness->element(), "phil %" GST_PTR_FORMAT, outputBuffer.get());
+        // if (GST_BUFFER_IS_DISCONT(outputBuffer.get()))
+        //     return;
+
         bool isKeyFrame = !GST_BUFFER_FLAG_IS_SET(outputBuffer.get(), GST_BUFFER_FLAG_DELTA_UNIT);
         GST_TRACE_OBJECT(m_harness->element(), "Notifying encoded%s frame", isKeyFrame ? " key" : "");
         GstMappedBuffer mappedBuffer(outputBuffer.get(), GST_MAP_READ);
@@ -217,41 +224,62 @@ GStreamerInternalAudioEncoder::GStreamerInternalAudioEncoder(const String& codec
     });
 }
 
+static unsigned getGstOpusEncFrameSizeFlag(const char* nick)
+{
+    static GFlagsClass* flagsClass = static_cast<GFlagsClass*>(g_type_class_ref(g_type_from_name("GstOpusEncFrameSize")));
+    ASSERT(flagsClass);
+
+    GFlagsValue* flag = g_flags_get_value_by_nick(flagsClass, nick);
+    if (!flag)
+        return 0;
+
+    return flag->value;
+}
+
 String GStreamerInternalAudioEncoder::initialize(const AudioEncoder::Config& config)
 {
     GST_DEBUG_OBJECT(m_harness->element(), "Initializing encoder for codec %s", m_codecName.ascii().data());
     GRefPtr<GstCaps> encoderCaps;
     if (m_codecName.startsWith("mp4a"_s)) {
+        // FIXME: handle codec-specific parameters.
         encoderCaps = adoptGRef(gst_caps_new_simple("audio/mpeg", "mpegversion", G_TYPE_INT, 4, nullptr));
-    } else if (m_codecName == "mp3"_s) {
+    } else if (m_codecName == "mp3"_s)
         encoderCaps = adoptGRef(gst_caps_new_simple("audio/mpeg", "mpegversion", G_TYPE_INT, 1, "layer", G_TYPE_INT, 3, nullptr));
-    } else if (m_codecName == "opus"_s) {
+    else if (m_codecName == "opus"_s) {
         int channelMappingFamily = config.numberOfChannels <= 2 ? 0 : 1;
         encoderCaps = adoptGRef(gst_caps_new_simple("audio/x-opus", "channel-mapping-family", G_TYPE_INT, channelMappingFamily, nullptr));
+        if (config.bitRate)
+            g_object_set(m_encoder.get(), "bitrate", static_cast<int>(config.bitRate), nullptr);
         if (auto parameters = config.opusConfig) {
-            // if (gstObjectHasProperty(m_encoder.get(), "frame-size"))
-            //     g_object_set(m_encoder.get(), "frame-size", parameters->frameDuration, nullptr);
-            // if (parameters->complexity < std::numeric_limits<size_t>::max() && gstObjectHasProperty(m_encoder.get(), "complexity"))
-            //     g_object_set(m_encoder.get(), "complexity", static_cast<int>(parameters->complexity), nullptr);
-            if (gstObjectHasProperty(m_encoder.get(), "packet-loss-percentage"))
-                g_object_set(m_encoder.get(), "packet-loss-percentage", static_cast<int>(parameters->packetlossperc), nullptr);
-            if (gstObjectHasProperty(m_encoder.get(), "inband-fec"))
-                g_object_set(m_encoder.get(), "inband-fec", (gboolean) parameters->useinbandfec, nullptr);
-            if (gstObjectHasProperty(m_encoder.get(), "dtx"))
-                g_object_set(m_encoder.get(), "dtx", (gboolean) parameters->usedtx, nullptr);
-            gst_util_set_object_arg(G_OBJECT(m_encoder.get()), "bitrate-type", "cbr");
-            gst_util_set_object_arg(G_OBJECT(m_encoder.get()), "audio-type", "voice");
-        }
+            GUniquePtr<char> name(gst_element_get_name(m_encoder.get()));
+            if (g_str_has_prefix(name.get(), "opusenc")) {
+                g_object_set(m_encoder.get(), "packet-loss-percentage", static_cast<int>(parameters->packetlossperc),
+                    "inband-fec", static_cast<gboolean>(parameters->useinbandfec), "dtx", static_cast<gboolean>(parameters->usedtx), nullptr);
+                GST_DEBUG_OBJECT(m_encoder.get(), "DTX enabled: %s", boolForPrinting(parameters->usedtx));
+                gst_util_set_object_arg(G_OBJECT(m_encoder.get()), "bitrate-type", "cbr");
 
-    } else if (m_codecName == "alaw"_s) {
+                // The frame-size property is expressed in milli-seconds, the value in parameters is
+                // expressed in micro-seconds.
+                auto frameSize = makeString(parameters->frameDuration / 1000);
+                if (auto flag = getGstOpusEncFrameSizeFlag(frameSize.ascii().data()))
+                    g_object_set(m_encoder.get(), "frame-size", flag, nullptr);
+                else
+                    GST_WARNING_OBJECT(m_encoder.get(), "Unhandled frameDuration: %" G_GUINT64_FORMAT, parameters->frameDuration);
+
+                if (parameters->complexity && parameters->complexity <= 10)
+                    g_object_set(m_encoder.get(), "complexity", static_cast<int>(parameters->complexity), nullptr);
+            }
+        }
+    } else if (m_codecName == "alaw"_s)
         encoderCaps = adoptGRef(gst_caps_new_empty_simple("audio/x-alaw"));
-    } else if (m_codecName == "ulaw"_s) {
+    else if (m_codecName == "ulaw"_s)
         encoderCaps = adoptGRef(gst_caps_new_empty_simple("audio/x-mulaw"));
-    } else if (m_codecName == "flac"_s) {
+    else if (m_codecName == "flac"_s) {
+        // FIXME: handle codec-specific parameters.
         encoderCaps = adoptGRef(gst_caps_new_empty_simple("audio/x-flac"));
-    } else if (m_codecName == "vorbis"_s) {
+    } else if (m_codecName == "vorbis"_s)
         encoderCaps = adoptGRef(gst_caps_new_empty_simple("audio/x-vorbis"));
-    } else if (m_codecName.startsWith("pcm-"_s)) {
+    else if (m_codecName.startsWith("pcm-"_s)) {
         auto components = m_codecName.split('-');
         auto pcmFormat = components[1].convertToASCIILowercase();
         GstAudioFormat gstPcmFormat = GST_AUDIO_FORMAT_UNKNOWN;
@@ -276,9 +304,8 @@ String GStreamerInternalAudioEncoder::initialize(const AudioEncoder::Config& con
     gst_caps_set_simple(encoderCaps.get(), "rate", G_TYPE_INT, config.sampleRate, "channels", G_TYPE_INT, config.numberOfChannels, nullptr);
     g_object_set(m_capsFilter.get(), "caps", encoderCaps.get(), nullptr);
 
-    // FIXME:
-    if (config.bitRate)
-        g_object_set(m_encoder.get(), "bitrate", static_cast<int>(config.bitRate), nullptr);
+    g_object_set(m_encoder.get(), "hard-resync", TRUE, nullptr);
+
     m_isInitialized = true;
     return emptyString();
 }
