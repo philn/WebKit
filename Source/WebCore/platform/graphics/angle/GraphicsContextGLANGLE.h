@@ -360,6 +360,11 @@ public:
     std::optional<IntSize> readPixelsWithStatus(IntRect, GCGLenum format, GCGLenum type, GCGLboolean packReverseRowOrder, std::span<uint8_t> data);
 
     void addError(GCGLErrorCode);
+
+#if ENABLE(WEB_CODECS)
+    bool copyTextureFromVideoFrame(VideoFrame&, PlatformGLObject /* texture */, GCGLenum /* target */, GCGLint /* level */, GCGLenum /* internalFormat */, GCGLenum /* format */, GCGLenum /* type */, bool /* premultiplyAlpha */, bool /* flipY */) override;
+#endif
+
 protected:
     GraphicsContextGLANGLE(GraphicsContextGLAttributes);
 

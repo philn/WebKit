@@ -43,9 +43,15 @@
 #include <wtf/Seconds.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
+#include <wtf/Scope.h>
 
 #if ENABLE(VIDEO) && USE(AVFOUNDATION)
 #include "GraphicsContextGLCVCocoa.h"
+#endif
+
+#if ENABLE(WEB_CODECS) && USE(GSTREAMER)
+#include "VideoFrameGStreamer.h"
+#include "GStreamerCommon.h"
 #endif
 
 // This one definition short-circuits the need for gl2ext.h, which
@@ -3393,6 +3399,111 @@ bool GraphicsContextGLANGLE::validateClearBufferv(GCGLenum buffer, size_t values
     addError(GCGLErrorCode::InvalidOperation);
     return false;
 }
+
+#if ENABLE(WEB_CODECS)
+bool GraphicsContextGLANGLE::copyTextureFromVideoFrame(VideoFrame& videoFrame, PlatformGLObject outputTexture, GCGLenum videoTextureTarget, GCGLint level, GCGLenum internalFormat, GCGLenum format, GCGLenum type, bool premultiplyAlpha, bool flipY)
+{
+#if USE(GSTREAMER)
+    auto& gstFrame = downcast<VideoFrameGStreamer>(videoFrame);
+    //return gstFrame.uploadToTexture(texture, target, level, internalFormat, format, type, premultiplyAlpha, flipY);
+
+    if (!makeContextCurrent())
+        return false;
+
+    auto size = gstFrame.presentationSize();
+    int width = static_cast<int>(size.width());
+    int height = static_cast<int>(size.height());
+    GL_Viewport(0, 0, width, height);
+
+    // The outputTexture might contain uninitialized content on early-outs. Clear it in cases
+    // autoClearTextureOnError is not reset.
+    auto autoClearTextureOnError = makeScopeExit([outputTexture, level, internalFormat, format, type] {
+        GL_BindTexture(GL_TEXTURE_2D, outputTexture);
+        GL_TexImage2D(GL_TEXTURE_2D, level, internalFormat, 0, 0, 0, format, type, nullptr);
+        GL_BindTexture(GL_TEXTURE_2D, 0);
+    });
+    // Allocate memory for the output texture.
+    GL_BindTexture(GL_TEXTURE_2D, outputTexture);
+    GL_TexImage2D(GL_TEXTURE_2D, level, internalFormat, width, height, 0, format, type, nullptr);
+
+    GL_FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, outputTexture, level);
+    GLenum status = GL_CheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        LOG(WebGL, "GraphicsContextGLCVCocoa::copyVideoTextureToPlatformTexture(%p) - Unable to create framebuffer for outputTexture.", this);
+        return false;
+    }
+    GL_BindTexture(GL_TEXTURE_2D, 0);
+
+    GstMappedFrame mappedFrame(gstFrame.sample(), GST_MAP_READ);
+    auto info = mappedFrame.info();
+
+    // Bind and set up the textures for the video source.
+    auto yPlaneWidth = GST_VIDEO_INFO_WIDTH(info);
+    auto yPlaneHeight = GST_VIDEO_INFO_PLANE_STRIDE(info, 0);
+    auto uvPlaneWidth = GST_VIDEO_INFO_WIDTH(info);
+    auto uvPlaneHeight = GST_VIDEO_INFO_PLANE_STRIDE(info, 0);
+
+    GLuint uvTexture = 0;
+    GL_GenTextures(1, &uvTexture);
+    auto uvTextureCleanup = makeScopeExit([uvTexture] {
+        GL_DeleteTextures(1, &uvTexture);
+    });
+    GL_ActiveTexture(GL_TEXTURE1);
+    GL_BindTexture(videoTextureTarget, uvTexture);
+    GL_TexParameteri(videoTextureTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    GL_TexParameteri(videoTextureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    GL_TexParameteri(videoTextureTarget, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    GL_TexParameteri(videoTextureTarget, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    auto uvHandle = WebCore::createPbufferAndAttachIOSurface(m_display, m_config, videoTextureTarget, EGL_IOSURFACE_READ_HINT_ANGLE, GL_RG, uvPlaneWidth, uvPlaneHeight, GL_UNSIGNED_BYTE, surface, 1);
+    if (!uvHandle)
+        return false;
+    auto uvHandleCleanup = makeScopeExit([display = m_display, uvHandle] {
+        WebCore::destroyPbufferAndDetachIOSurface(display, uvHandle);
+    });
+
+    GLuint yTexture = 0;
+    GL_GenTextures(1, &yTexture);
+    auto yTextureCleanup = makeScopeExit([yTexture] {
+        GL_DeleteTextures(1, &yTexture);
+    });
+    GL_ActiveTexture(GL_TEXTURE0);
+    GL_BindTexture(videoTextureTarget, yTexture);
+    GL_TexParameteri(videoTextureTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    GL_TexParameteri(videoTextureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    GL_TexParameteri(videoTextureTarget, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    GL_TexParameteri(videoTextureTarget, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    auto yHandle = WebCore::createPbufferAndAttachIOSurface(m_display, m_config, videoTextureTarget, EGL_IOSURFACE_READ_HINT_ANGLE, GL_RED, yPlaneWidth, yPlaneHeight, GL_UNSIGNED_BYTE, surface, 0);
+    if (!yHandle)
+        return false;
+    auto yHandleCleanup = makeScopeExit([display = m_display, yHandle] {
+        destroyPbufferAndDetachIOSurface(display, yHandle);
+    });
+
+    // Configure the drawing parameters.
+    GL_Uniform1i(m_yTextureUniformLocation, 0);
+    GL_Uniform1i(m_uvTextureUniformLocation, 1);
+    GL_Uniform1i(m_yuvFlipYUniformLocation, flipY ? 1 : 0);
+    GL_Uniform1i(m_yuvFlipXUniformLocation, flipX ? 1 : 0);
+    GL_Uniform1i(m_yuvSwapXYUniformLocation, swapXY ? 1 : 0);
+    GL_Uniform2f(m_yTextureSizeUniformLocation, yPlaneWidth, yPlaneHeight);
+    GL_Uniform2f(m_uvTextureSizeUniformLocation, uvPlaneWidth, uvPlaneHeight);
+
+    auto range = pixelRangeFromPixelFormat(pixelFormat);
+    auto transferFunction = transferFunctionFromString(dynamic_cf_cast<CFStringRef>(CVBufferGetAttachment(image, kCVImageBufferYCbCrMatrixKey, nil)));
+    auto colorMatrix = YCbCrToRGBMatrixForRangeAndTransferFunction(range, transferFunction);
+    GL_UniformMatrix4fv(m_colorMatrixUniformLocation, 1, GL_FALSE, colorMatrix);
+
+    // Do the actual drawing.
+    GL_DrawArrays(GL_TRIANGLES, 0, 6);
+
+    m_knownContent.set(outputTexture, content);
+    autoClearTextureOnError.release();
+    return true;
+#endif
+    return false;
+}
+#endif
+
 }
 
 #endif // ENABLE(WEBGL)

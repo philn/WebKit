@@ -1666,6 +1666,8 @@ public:
 #endif
 #if ENABLE(VIDEO)
     virtual bool copyTextureFromMedia(MediaPlayer&, PlatformGLObject texture, GCGLenum target, GCGLint level, GCGLenum internalFormat, GCGLenum format, GCGLenum type, bool premultiplyAlpha, bool flipY) = 0;
+#endif
+#if ENABLE(WEB_CODECS)
     virtual bool copyTextureFromVideoFrame(VideoFrame&, PlatformGLObject /* texture */, GCGLenum /* target */, GCGLint /* level */, GCGLenum /* internalFormat */, GCGLenum /* format */, GCGLenum /* type */, bool /* premultiplyAlpha */, bool /* flipY */) { return false; }
     WEBCORE_EXPORT virtual RefPtr<Image> videoFrameToImage(VideoFrame&);
 #endif
