@@ -1,3 +1,5 @@
 
-PASS Test the Opus DTX flag works.
+NOTRUN Test the Opus DTX flag works. Opus not supported
+NOTRUN Test the Opus bitrateMode flag works. Opus CBR not supported
+NOTRUN Test the AAC bitrateMode flag works. AAC CBR not supported
 
