@@ -2879,13 +2879,13 @@ void MediaPlayerPrivateGStreamer::setPlaybackFlags(bool isMediaStream)
     hasText = 0x0;
 #endif
 
-#if 1 //USE(GSTREAMER_NATIVE_VIDEO)
+#if USE(GSTREAMER_NATIVE_VIDEO)
     hasSoftwareColorBalance = 0x0;
 #else
     hasNativeVideo = 0x0;
 #endif
 
-#if !USE(GSTREAMER_NATIVE_AUDIO)
+#if 1 //!USE(GSTREAMER_NATIVE_AUDIO)
     hasNativeAudio = 0x0;
 #endif
 
