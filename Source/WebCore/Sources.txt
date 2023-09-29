@@ -3494,6 +3494,7 @@ JSFileSystemFileHandle.cpp
 JSFileSystemHandle.cpp
 JSFileSystemSyncAccessHandle.cpp
 JSFillMode.cpp
+JSFillLightMode.cpp
 JSFlacEncoderConfig.cpp
 JSFocusEvent.cpp
 JSFocusOptions.cpp
@@ -3769,6 +3770,7 @@ JSImageBitmap.cpp
 JSImageBitmapOptions.cpp
 JSImageBitmapRenderingContext.cpp
 JSImageBitmapRenderingContextSettings.cpp
+JSImageCapture.cpp
 JSImageData.cpp
 JSImageDataSettings.cpp
 JSImageSmoothingQuality.cpp
@@ -3828,20 +3830,21 @@ JSMediaKeys.cpp
 JSMediaKeysRequirement.cpp
 JSMediaList.cpp
 JSMediaMetadata.cpp
-JSMediaSessionCoordinator.cpp
-JSMediaSessionCoordinatorState.cpp
 JSMediaMetadataInit.cpp
 JSMediaPositionState.cpp
 JSMediaQueryList.cpp
 JSMediaQueryListEvent.cpp
 JSMediaRecorder.cpp
 JSMediaRecorderErrorEvent.cpp
+JSMediaSessionCoordinator.cpp
+JSMediaSessionCoordinatorState.cpp
 JSMediaSessionActionDetails.cpp
 JSMediaSessionActionHandler.cpp
 JSMediaSessionAction.cpp
 JSMediaSessionPlaybackState.cpp
 JSMediaSessionReadyState.cpp
 JSMediaSession.cpp
+JSMediaSettingsRange.cpp
 JSMediaSource.cpp
 JSMediaStream.cpp
 JSMediaStreamAudioDestinationNode.cpp
@@ -3962,6 +3965,7 @@ JSPermissionName.cpp
 JSPermissionState.cpp
 JSPermissionStatus.cpp
 JSPermissions.cpp
+JSPhotoCapabilities.cpp
 JSPictureInPictureEvent.cpp
 JSPictureInPictureWindow.cpp
 JSPlaneLayout.cpp
@@ -3995,6 +3999,7 @@ JSPushSubscriptionChangeEventInit.cpp
 JSPushSubscriptionJSON.cpp
 JSPushSubscriptionOptions.cpp
 JSPushSubscriptionOptionsInit.cpp
+JSRedEyeReduction.cpp
 JSRTCAnswerOptions.cpp
 JSRTCCertificate.cpp
 JSRTCConfiguration.cpp
