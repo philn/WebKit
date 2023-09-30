@@ -227,6 +227,7 @@ Modules/mediasource/SourceBufferList.cpp
 Modules/mediasource/VideoPlaybackQuality.cpp
 Modules/mediastream/CanvasCaptureMediaStreamTrack.cpp
 Modules/mediastream/MediaDeviceInfo.cpp
+Modules/mediastream/ImageCapture.cpp
 Modules/mediastream/InputDeviceInfo.cpp
 Modules/mediastream/MediaDevices.cpp
 Modules/mediastream/MediaStream.cpp
