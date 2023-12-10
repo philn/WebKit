@@ -381,7 +381,7 @@ protected:
     bool m_isSeeking { false };
     bool m_isSeekPending { false };
     SeekTarget m_seekTarget;
-    GRefPtr<GstElement> m_source { nullptr };
+    GRefPtr<GstElement> m_source;
     bool m_areVolumeAndMuteInitialized { false };
 
 #if USE(TEXTURE_MAPPER)

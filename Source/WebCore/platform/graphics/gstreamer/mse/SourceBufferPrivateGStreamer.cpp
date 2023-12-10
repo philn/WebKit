@@ -73,7 +73,7 @@ SourceBufferPrivateGStreamer::SourceBufferPrivateGStreamer(MediaSourcePrivateGSt
     : SourceBufferPrivate(mediaSource)
     , m_type(contentType)
     , m_playerPrivate(playerPrivate)
-    , m_appendPipeline(makeUniqueRef<AppendPipeline>(*this, playerPrivate))
+    , m_appendPipeline(makeUnique<AppendPipeline>(*this, playerPrivate))
 #if !RELEASE_LOG_DISABLED
     , m_logger(mediaSource.logger())
     , m_logIdentifier(mediaSource.nextSourceBufferLogIdentifier())
@@ -126,6 +126,7 @@ void SourceBufferPrivateGStreamer::removedFromMediaSource()
     m_hasBeenRemovedFromMediaSource = true;
 
     m_appendPipeline->stopParser();
+    m_appendPipeline = nullptr;
 
     SourceBufferPrivate::removedFromMediaSource();
 }
