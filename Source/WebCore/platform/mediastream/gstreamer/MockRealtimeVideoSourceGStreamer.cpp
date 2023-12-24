@@ -86,7 +86,7 @@ MockRealtimeVideoSourceGStreamer::~MockRealtimeVideoSourceGStreamer()
 void MockRealtimeVideoSourceGStreamer::startProducingData()
 {
     if (deviceType() == CaptureDevice::DeviceType::Camera)
-        m_capturer->setSize(size().width(), size().height());
+        m_capturer->setSize(size());
 
     m_capturer->setFrameRate(frameRate());
     m_capturer->start();

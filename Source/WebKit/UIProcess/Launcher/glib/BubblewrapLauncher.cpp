@@ -143,13 +143,13 @@ static String effectiveApplicationId()
     // and won't flood xdg-desktop-portal with new ids.
     if (auto executablePath = FileSystem::currentExecutablePath(); !executablePath.isNull()) {
         GUniquePtr<char> digest(g_compute_checksum_for_data(G_CHECKSUM_SHA256, reinterpret_cast<const uint8_t*>(executablePath.data()), executablePath.length()));
-        return makeString("org.webkit.app-", digest.get());
+        return makeString("org.webkit.app-"_s, digest.get());
     }
 
     // If it is not possible to obtain the executable path, generate
     // a random identifier as a fallback.
     auto uuid = WTF::UUID::createVersion4Weak();
-    return makeString("org.webkit.app-", uuid.toString());
+    return makeString("org.webkit.app-"_s, uuid.toString());
 }
 
 static int createFlatpakInfo()
@@ -453,6 +453,7 @@ static void bindOpenGL(Vector<CString>& args)
     }));
 }
 
+#if PLATFORM(WPE)
 static void bindV4l(Vector<CString>& args)
 {
     args.appendVector(Vector<CString>({
@@ -464,6 +465,7 @@ static void bindV4l(Vector<CString>& args)
         "--dev-bind-try", "/dev/media0", "/dev/media0",
     }));
 }
+#endif
 
 static bool enableDebugPermissions()
 {
@@ -890,8 +892,6 @@ GRefPtr<GSubprocess> bubblewrapSpawn(GSubprocessLauncher* launcher, const Proces
         bindFonts(sandboxArgs);
         bindGStreamerData(sandboxArgs);
         bindOpenGL(sandboxArgs);
-        // FIXME: This is also fixed by Pipewire once in use.
-        bindV4l(sandboxArgs);
 #if ENABLE(ACCESSIBILITY)
         if (dbusProxy)
             bindA11y(sandboxArgs, *dbusProxy);
@@ -899,6 +899,19 @@ GRefPtr<GSubprocess> bubblewrapSpawn(GSubprocessLauncher* launcher, const Proces
 #if PLATFORM(GTK)
         bindGtkData(sandboxArgs);
 #endif
+        // NOTE: We don't bind v4l2 devices in the sandbox for WebKitGTK builds. We expect the
+        // WebKitGTK Application/UIProcess to be packaged as a Flatpak so that Camera access can be
+        // managed via the DesktopPortal. Our fake WebProcess .flatpak-info file is not sufficient
+        // for this, at least on GNOME hosts, where GNOME-Shell expects the Window/UIProcess to also
+        // have a .flatpak-info file mapped in /proc/<pid>/root/.flatpak-info in order to show the
+        // camera access permission popup.
+        //
+        // For WPEWebKit applications, we expect to find no DesktopPortal at runtime, so we bind the
+        // v4l2 devices in the sandbox.
+#if PLATFORM(WPE)
+        bindV4l(sandboxArgs);
+#endif
+
         if (dbusProxy && !dbusProxy->launch())
             dbusProxy = nullptr;
     } else {

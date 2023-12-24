@@ -20,7 +20,6 @@
 #pragma once
 
 #include <gio/gio.h>
-#include <pipewire/pipewire.h>
 #include <wtf/CompletionHandler.h>
 #include <wtf/Forward.h>
 #include <wtf/RefCounted.h>
@@ -28,81 +27,69 @@
 #include <wtf/glib/WTFGType.h>
 #include <wtf/text/WTFString.h>
 
+#include "PipeWireSession.h"
+
 namespace WebCore {
 
 class DesktopPortal : public RefCounted<DesktopPortal> {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static RefPtr<DesktopPortal> create(const String& interfaceName);
     DesktopPortal(const String&, GRefPtr<GDBusProxy>&&);
-
-    class Session {
-    public:
-        Session(String&& path, const GRefPtr<GDBusProxy>&);
-
-        const String& path() const { return m_path; }
-
-        GRefPtr<GVariant> accessCamera();
-
-    protected:
-        String m_path;
-        const GRefPtr<GDBusProxy>& m_proxy;
-    };
-
-    class ScreencastSession : public Session {
-    public:
-        ScreencastSession(String&& path, const GRefPtr<GDBusProxy>& proxy)
-            : Session(WTFMove(path), proxy)
-        {
-        }
-        GRefPtr<GVariant> selectSources(GVariantBuilder&);
-        GRefPtr<GVariant> start();
-        std::optional<int> openPipewireRemote();
-    };
-
-    std::optional<ScreencastSession> createScreencastSession();
-    void closeSession(const String& path);
-
-    GRefPtr<GVariant> accessCamera();
-    std::optional<std::pair<uint32_t, int>> openCameraPipewireRemote();
 
     GRefPtr<GVariant> getProperty(const char* name);
 
     using ResponseCallback = CompletionHandler<void(GVariant*)>;
     void waitResponseSignal(const char* objectPath, ResponseCallback&& = [](GVariant*) {});
 
-protected:
     void notifyResponse(GVariant* parameters) { m_currentResponseCallback(parameters); }
 
-private:
+protected:
     String m_interfaceName;
     GRefPtr<GDBusProxy> m_proxy;
     ResponseCallback m_currentResponseCallback;
+};
 
-    struct PipeWireCore {
-        ~PipeWireCore()
+class DesktopPortalCamera : public DesktopPortal {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    static RefPtr<DesktopPortalCamera> create();
+
+    bool isCameraPresent();
+    bool accessCamera();
+    Vector<PipeWireNodeData> openCameraPipewireRemote();
+
+private:
+    DesktopPortalCamera(const String&, GRefPtr<GDBusProxy>&&);
+    HashMap<String, std::optional<bool>> m_cameraAccessResults;
+};
+
+class DesktopPortalScreenCast : public DesktopPortal {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    static RefPtr<DesktopPortalScreenCast> create();
+
+    class ScreencastSession {
+    public:
+        ScreencastSession(String&& path, const GRefPtr<GDBusProxy>& proxy)
+            : m_path(WTFMove(path))
+            , m_proxy(proxy)
         {
-            WTFLogAlways("Closing pipewire things");
-            pw_context_destroy(context);
-            pw_thread_loop_destroy(loop);
         }
-        int fd;
-        struct pw_thread_loop* loop;
-        struct pw_context* context;
-        struct pw_core* core;
-        struct spa_hook coreListener;
-        int lastSeq;
-        int pendingSeq;
-        int lastError;
-    };
-    WEBKIT_DEFINE_ASYNC_DATA_STRUCT(PipeWireCore)
+        const String& path() const { return m_path; }
+        GRefPtr<GVariant> selectSources(GVariantBuilder&);
+        GRefPtr<GVariant> start();
+        std::optional<PipeWireNodeData> openPipewireRemote();
 
-    struct PipeWireCore* m_pipewireCore { nullptr };
-    struct pw_registry* m_registry { nullptr };
-    struct spa_hook m_registryListener;
-    int m_seq { 0 };
-    bool m_loopDone { false };
-    uint32_t m_nodeId;
+    private:
+        String m_path;
+        const GRefPtr<GDBusProxy>& m_proxy;
+    };
+
+    std::optional<ScreencastSession> createScreencastSession();
+    void closeSession(const String& path);
+
+private:
+    DesktopPortalScreenCast(const String&, GRefPtr<GDBusProxy>&&);
 };
 
 } // namespace WebCore

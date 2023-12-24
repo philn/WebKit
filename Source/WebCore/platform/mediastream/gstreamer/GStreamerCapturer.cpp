@@ -50,19 +50,20 @@ static void initializeCapturerDebugCategory()
 
 GStreamerCapturer::GStreamerCapturer(GStreamerCaptureDevice&& device, GRefPtr<GstCaps>&& caps)
     : m_caps(WTFMove(caps))
-    , m_sourceFactory(nullptr)
     , m_deviceType(device.type())
 {
     initializeCapturerDebugCategory();
     m_device.emplace(WTFMove(device));
 }
 
-GStreamerCapturer::GStreamerCapturer(const char* sourceFactory, GRefPtr<GstCaps>&& caps, CaptureDevice::DeviceType deviceType)
-    : m_caps(WTFMove(caps))
-    , m_sourceFactory(sourceFactory)
-    , m_deviceType(deviceType)
+GStreamerCapturer::GStreamerCapturer(const PipewireCaptureDevice& device)
+    : m_deviceType(device.type())
 {
     initializeCapturerDebugCategory();
+    m_pipewireDevice.emplace(device);
+
+    // TODO: Generate caps from device.capabilities?
+    m_caps = adoptGRef(gst_caps_new_empty_simple("video/x-raw"));
 }
 
 GStreamerCapturer::~GStreamerCapturer()
@@ -103,30 +104,29 @@ void GStreamerCapturer::forEachObserver(const Function<void(Observer&)>& apply)
 
 GstElement* GStreamerCapturer::createSource()
 {
-    if (m_sourceFactory) {
-        m_src = makeElement(m_sourceFactory);
+    if (m_pipewireDevice) {
+        m_src = makeElement("pipewiresrc");
         ASSERT(m_src);
+        auto path = AtomString::number(m_pipewireDevice->objectId());
+        // FIXME: The path property is deprecated in favor of target-object but the portal doesn't expose this object.
+        g_object_set(m_src.get(), "path", path.string().ascii().data(), "fd", m_pipewireDevice->fd(), nullptr);
 
-        if (GST_IS_APP_SRC(m_src.get()))
-            g_object_set(m_src.get(), "is-live", TRUE, "format", GST_FORMAT_TIME, "do-timestamp", TRUE, nullptr);
-
-        if (m_deviceType == CaptureDevice::DeviceType::Screen) {
-            auto srcPad = adoptGRef(gst_element_get_static_pad(m_src.get(), "src"));
-            gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, [](GstPad*, GstPadProbeInfo* info, void* userData) -> GstPadProbeReturn {
-                auto* event = gst_pad_probe_info_get_event(info);
-                if (GST_EVENT_TYPE(event) != GST_EVENT_CAPS)
-                    return GST_PAD_PROBE_OK;
-
-                callOnMainThread([event, capturer = reinterpret_cast<GStreamerCapturer*>(userData)] {
-                    GstCaps* caps;
-                    gst_event_parse_caps(event, &caps);
-                    capturer->forEachObserver([caps](Observer& observer) {
-                        observer.sourceCapsChanged(caps);
-                    });
-                });
+        auto srcPad = adoptGRef(gst_element_get_static_pad(m_src.get(), "src"));
+        gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, [](GstPad*, GstPadProbeInfo* info, void* userData) -> GstPadProbeReturn {
+            auto* event = gst_pad_probe_info_get_event(info);
+            if (GST_EVENT_TYPE(event) != GST_EVENT_CAPS)
                 return GST_PAD_PROBE_OK;
-            }, this, nullptr);
-        }
+
+            callOnMainThread([event, capturer = reinterpret_cast<GStreamerCapturer*>(userData)] {
+                GstCaps* caps;
+                gst_event_parse_caps(event, &caps);
+                capturer->forEachObserver([caps](Observer& observer) {
+                    observer.sourceCapsChanged(caps);
+                });
+            });
+            return GST_PAD_PROBE_OK;
+        }, this, nullptr);
+
     } else {
         ASSERT(m_device);
         auto sourceName = makeString(name(), hex(reinterpret_cast<uintptr_t>(this)));
@@ -150,17 +150,13 @@ GstElement* GStreamerCapturer::createSource()
     return m_src.get();
 }
 
-GstCaps* GStreamerCapturer::caps()
+GRefPtr<GstCaps> GStreamerCapturer::caps()
 {
-    if (m_sourceFactory) {
-        GRefPtr<GstElement> element = makeElement(m_sourceFactory);
-        auto pad = adoptGRef(gst_element_get_static_pad(element.get(), "src"));
-
-        return gst_pad_query_caps(pad.get(), nullptr);
-    }
+    if (m_pipewireDevice)
+        return m_pipewireDevice->caps();
 
     ASSERT(m_device);
-    return gst_device_get_caps(m_device->device());
+    return adoptGRef(gst_device_get_caps(m_device->device()));
 }
 
 void GStreamerCapturer::setupPipeline()

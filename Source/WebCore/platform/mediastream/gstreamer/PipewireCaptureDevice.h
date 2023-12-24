@@ -22,24 +22,26 @@
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 
 #include "CaptureDevice.h"
+#include "PipeWireSession.h"
 
 namespace WebCore {
 
 class PipewireCaptureDevice : public CaptureDevice {
+    WTF_MAKE_FAST_ALLOCATED;
+
 public:
-    PipewireCaptureDevice(uint32_t node, int fd, const String& persistentId, DeviceType type, const String& label, const String& groupId = emptyString())
+    PipewireCaptureDevice(PipeWireNodeData& nodeData, const String& persistentId, DeviceType type, const String& label, const String& groupId = emptyString())
         : CaptureDevice(persistentId, type, label, groupId)
-        , m_node(node)
-        , m_fd(fd)
+        , m_nodeData(nodeData)
     {
     }
 
-    uint32_t node() const { return m_node; }
-    int fd() const { return m_fd; }
+    uint32_t objectId() const { return m_nodeData.objectId; }
+    int fd() const { return m_nodeData.fd; }
+    const GRefPtr<GstCaps>& caps() const { return m_nodeData.caps; }
 
 private:
-    uint32_t m_node;
-    int m_fd;
+    PipeWireNodeData m_nodeData;
 };
 
 }

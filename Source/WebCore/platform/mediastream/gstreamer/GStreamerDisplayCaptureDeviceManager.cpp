@@ -20,6 +20,8 @@
  */
 
 #include "config.h"
+#include "PipeWireSession.h"
+#include "RealtimeMediaSourceCapabilities.h"
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "GStreamerCaptureDeviceManager.h"
@@ -62,13 +64,13 @@ CaptureSourceOrError GStreamerDisplayCaptureDeviceManager::createDisplayCaptureS
 {
     const auto it = m_sessions.find(device.persistentId());
     if (it != m_sessions.end()) {
-        auto& [node, fd] = it->value->nodeAndFd;
-        PipewireCaptureDevice pipewireCaptureDevice { node, fd, device.persistentId(), device.type(), device.label(), device.groupId() };
+        auto& node = it->value;
+        PipewireCaptureDevice pipewireCaptureDevice { *node, device.persistentId(), device.type(), device.label(), device.groupId() };
         return GStreamerVideoCaptureSource::createPipewireSource(WTFMove(pipewireCaptureDevice), WTFMove(hashSalts), constraints);
     }
 
     if (!m_portal)
-        m_portal = DesktopPortal::create("org.freedesktop.portal.ScreenCast"_s);
+        m_portal = DesktopPortalScreenCast::create();
     if (!m_portal)
         return CaptureSourceOrError({ { }, MediaAccessDenialReason::PermissionDenied });
 
@@ -137,15 +139,13 @@ CaptureSourceOrError GStreamerDisplayCaptureDeviceManager::createDisplayCaptureS
         return CaptureSourceOrError({ { } , MediaAccessDenialReason::PermissionDenied });
     }
 
-    auto fd = session->openPipewireRemote();
-    if (!fd)
+    auto nodeData = session->openPipewireRemote();
+    if (!nodeData)
         return CaptureSourceOrError({ { }, MediaAccessDenialReason::PermissionDenied });
 
-    NodeAndFD nodeAndFd = { *nodeId, *fd };
-    auto sessionData = makeUnique<PipewireSession>(nodeAndFd, session->path());
-    m_sessions.add(device.persistentId(), WTFMove(sessionData));
-
-    PipewireCaptureDevice pipewireCaptureDevice { *nodeId, *fd, device.persistentId(), device.type(), device.label(), device.groupId() };
+    nodeData->objectId = *nodeId;
+    PipewireCaptureDevice pipewireCaptureDevice { *nodeData, device.persistentId(), device.type(), device.label(), device.groupId() };
+    m_sessions.add(device.persistentId(), makeUnique<PipeWireNodeData>(WTFMove(*nodeData)));
     return GStreamerVideoCaptureSource::createPipewireSource(WTFMove(pipewireCaptureDevice), WTFMove(hashSalts), constraints);
 }
 

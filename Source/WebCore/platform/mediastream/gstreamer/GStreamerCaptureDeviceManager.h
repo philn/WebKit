@@ -32,34 +32,11 @@
 #include "PipewireCaptureDevice.h"
 #include "RealtimeMediaSourceCenter.h"
 #include "RealtimeMediaSourceFactory.h"
-
-#include <wtf/Noncopyable.h>
+#include "PipeWireSession.h"
 
 namespace WebCore {
 
-using NodeAndFD = GStreamerVideoCapturer::NodeAndFD;
-
-
 void teardownGStreamerCaptureDeviceManagers();
-
-struct PipewireSession {
-    WTF_MAKE_STRUCT_FAST_ALLOCATED;
-    WTF_MAKE_NONCOPYABLE(PipewireSession);
-    PipewireSession(const NodeAndFD& nodeAndFd, const String& path)
-        : nodeAndFd(nodeAndFd)
-        , path(WTFMove(path))
-    {
-    }
-
-    ~PipewireSession()
-    {
-        WTFLogAlways(">>>>>>>>>>>>>>>>>> closing");
-        close(nodeAndFd.second);
-    }
-
-    NodeAndFD nodeAndFd;
-    const String& path;
-};
 
 class GStreamerCaptureDeviceManager : public CaptureDeviceManager, public RealtimeMediaSourceCenter::Observer {
     WTF_MAKE_NONCOPYABLE(GStreamerCaptureDeviceManager)
@@ -112,8 +89,8 @@ public:
     CaptureSourceOrError createVideoCaptureSource(const CaptureDevice&, MediaDeviceHashSalts&&, const MediaConstraints*);
 
 private:
-    HashMap<String, std::unique_ptr<PipewireSession>> m_sessions;
-    RefPtr<DesktopPortal> m_portal;
+    HashMap<String, std::unique_ptr<PipewireCaptureDevice>> m_pipewireDevices;
+    RefPtr<DesktopPortalCamera> m_portal;
 };
 
 class GStreamerDisplayCaptureDeviceManager final : public DisplayCaptureManager {
@@ -140,8 +117,8 @@ private:
 
     Vector<CaptureDevice> m_devices;
 
-    HashMap<String, std::unique_ptr<PipewireSession>> m_sessions;
-    RefPtr<DesktopPortal> m_portal;
+    HashMap<String, std::unique_ptr<PipeWireNodeData>> m_sessions;
+    RefPtr<DesktopPortalScreenCast> m_portal;
 };
 
 } // namespace WebCore

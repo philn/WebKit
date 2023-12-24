@@ -28,8 +28,8 @@
 #include "GStreamerCommon.h"
 #include "GStreamerVideoCaptureSource.h"
 #include "MockRealtimeMediaSourceCenter.h"
+#include "PipewireCaptureDevice.h"
 #include <wtf/Scope.h>
-#include <wtf/UUID.h>
 
 namespace WebCore {
 
@@ -60,22 +60,25 @@ void GStreamerVideoCaptureDeviceManager::computeCaptureDevices(CompletionHandler
         return;
 
     if (!m_portal)
-        m_portal = DesktopPortal::create("org.freedesktop.portal.Camera"_s);
-    if (!m_portal)
+        m_portal = DesktopPortalCamera::create();
+
+    if (!m_portal || !m_portal->isCameraPresent())
         return;
 
-    auto isCameraPresent = m_portal->getProperty("IsCameraPresent");
-    if (!isCameraPresent)
+    if (!m_portal->accessCamera())
         return;
 
-    if (!g_variant_get_boolean(isCameraPresent.get()))
-        return;
+    for (auto& nodeData : m_portal->openCameraPipewireRemote()) {
+        CaptureDevice device(nodeData.persistentId, CaptureDevice::DeviceType::Camera, nodeData.label);
+        auto deviceWasAdded = m_pipewireDevices.ensure(device.persistentId(), [&] {
+            return makeUnique<PipewireCaptureDevice>(nodeData, device.persistentId(), device.type(), device.label(), device.groupId());
+        });
+        if (!deviceWasAdded)
+            continue;
 
-    // m_devices.clear();
-
-    CaptureDevice cameraDevice(createVersion4UUIDString(), CaptureDevice::DeviceType::Camera, makeString("Camera"));
-    cameraDevice.setEnabled(true);
-    m_devices.append(WTFMove(cameraDevice));
+        device.setEnabled(true);
+        m_devices.append(WTFMove(device));
+    }
 }
 
 CaptureSourceOrError GStreamerVideoCaptureDeviceManager::createVideoCaptureSource(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)
@@ -83,29 +86,12 @@ CaptureSourceOrError GStreamerVideoCaptureDeviceManager::createVideoCaptureSourc
     if (!m_portal)
         return GStreamerVideoCaptureSource::create(String { device.persistentId() }, WTFMove(hashSalts), constraints);
 
-    const auto it = m_sessions.find(device.persistentId());
-    if (it != m_sessions.end()) {
-        auto& [node, fd] = it->value->nodeAndFd;
-        PipewireCaptureDevice pipewireCaptureDevice { node, fd, device.persistentId(), device.type(), device.label(), device.groupId() };
-        return GStreamerVideoCaptureSource::createPipewireSource(WTFMove(pipewireCaptureDevice), WTFMove(hashSalts), constraints);
-    }
+    const auto it = m_pipewireDevices.find(device.persistentId());
+    if (it == m_pipewireDevices.end())
+        return CaptureSourceOrError({ { }, MediaAccessDenialReason::PermissionDenied });
 
-    auto result = m_portal->accessCamera();
-    if (!result)
-        return { };
-
-    auto fds = m_portal->openCameraPipewireRemote();
-    if (!fds)
-        return { };
-
-    WTFLogAlways("FD: %d", fds->second);
-
-    NodeAndFD nodeAndFd = { fds->first, fds->second };
-    auto sessionData = makeUnique<PipewireSession>(nodeAndFd, emptyString());
-    m_sessions.add(device.persistentId(), WTFMove(sessionData));
-
-    PipewireCaptureDevice pipewireCaptureDevice { nodeAndFd.first, nodeAndFd.second, device.persistentId(), device.type(), device.label(), device.groupId() };
-    return GStreamerVideoCaptureSource::createPipewireSource(WTFMove(pipewireCaptureDevice), WTFMove(hashSalts), constraints);
+    auto& pipewireCaptureDevice = it->value;
+    return GStreamerVideoCaptureSource::createPipewireSource(*pipewireCaptureDevice, WTFMove(hashSalts), constraints);
 }
 
 } // namespace WebCore

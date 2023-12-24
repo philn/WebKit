@@ -74,9 +74,9 @@ CaptureSourceOrError GStreamerVideoCaptureSource::create(String&& deviceID, Medi
     return CaptureSourceOrError(WTFMove(source));
 }
 
-CaptureSourceOrError GStreamerVideoCaptureSource::createPipewireSource(PipewireCaptureDevice&& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)
+CaptureSourceOrError GStreamerVideoCaptureSource::createPipewireSource(const PipewireCaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)
 {
-    auto source = adoptRef(*new GStreamerVideoCaptureSource(WTFMove(device), WTFMove(hashSalts)));
+    auto source = adoptRef(*new GStreamerVideoCaptureSource(device, WTFMove(hashSalts)));
     if (constraints) {
         if (auto result = source->applyConstraints(*constraints))
             return CaptureSourceOrError({ WTFMove(result->badConstraint), MediaAccessDenialReason::InvalidConstraint });
@@ -96,13 +96,12 @@ DisplayCaptureFactory& GStreamerVideoCaptureSource::displayFactory()
     return factory.get();
 }
 
-GStreamerVideoCaptureSource::GStreamerVideoCaptureSource(PipewireCaptureDevice&& device, MediaDeviceHashSalts&& hashSalts)
-    : RealtimeVideoCaptureSource(device, WTFMove(hashSalts), { })
-    , m_capturer(adoptRef(*new GStreamerVideoCapturer("pipewiresrc", device.type())))
+GStreamerVideoCaptureSource::GStreamerVideoCaptureSource(const PipewireCaptureDevice& device, MediaDeviceHashSalts&& hashSalts)
+    : RealtimeVideoCaptureSource(device, WTFMove(hashSalts), {})
+    , m_capturer(adoptRef(*new GStreamerVideoCapturer(device)))
 {
     initializeVideoCaptureSourceDebugCategory();
     m_deviceType = m_capturer->deviceType();
-    m_capturer->setPipewireNodeAndFD({device.node(), device.fd()});
     m_capturer->addObserver(*this);
 
     auto& singleton = GStreamerVideoCaptureDeviceManager::singleton();
@@ -140,18 +139,21 @@ GStreamerVideoCaptureSource::~GStreamerVideoCaptureSource()
 void GStreamerVideoCaptureSource::settingsDidChange(OptionSet<RealtimeMediaSourceSettings::Flag> settings)
 {
     bool reconfigure = false;
+    GST_DEBUG("Settings changed");
     if (settings.containsAny({ RealtimeMediaSourceSettings::Flag::Width, RealtimeMediaSourceSettings::Flag::Height })) {
         if (m_deviceType == CaptureDevice::DeviceType::Window || m_deviceType == CaptureDevice::DeviceType::Screen)
             ensureIntrinsicSizeMaintainsAspectRatio();
 
-        if (m_capturer->setSize(size().width(), size().height()))
+        GST_DEBUG("Size changed to %dx%d", size().width(), size().height());
+        if (m_capturer->setSize(size()))
             reconfigure = true;
     }
 
-    if (settings.contains(RealtimeMediaSourceSettings::Flag::FrameRate))
+    if (settings.contains(RealtimeMediaSourceSettings::Flag::FrameRate)) {
+        GST_DEBUG("FrameRate changed to %f FPS", frameRate());
         if (m_capturer->setFrameRate(frameRate()))
             reconfigure = true;
-
+    }
     if (reconfigure)
         m_capturer->reconfigure();
 }
@@ -180,7 +182,7 @@ void GStreamerVideoCaptureSource::startProducingData()
     m_capturer->setupPipeline();
 
     if (m_deviceType == CaptureDevice::DeviceType::Camera)
-        m_capturer->setSize(size().width(), size().height());
+        m_capturer->setSize(size());
 
     m_capturer->setFrameRate(frameRate());
     m_capturer->reconfigure();
@@ -242,7 +244,7 @@ const RealtimeMediaSourceSettings& GStreamerVideoCaptureSource::settings()
 void GStreamerVideoCaptureSource::generatePresets()
 {
     Vector<VideoPreset> presets;
-    GRefPtr<GstCaps> caps = adoptGRef(m_capturer->caps());
+    auto caps = m_capturer->caps();
     for (unsigned i = 0; i < gst_caps_get_size(caps.get()); i++) {
         GstStructure* str = gst_caps_get_structure(caps.get(), i);
 

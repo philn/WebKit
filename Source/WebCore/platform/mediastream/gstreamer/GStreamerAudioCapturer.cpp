@@ -56,12 +56,6 @@ GStreamerAudioCapturer::GStreamerAudioCapturer(GStreamerCaptureDevice&& device)
     initializeAudioCapturerDebugCategory();
 }
 
-GStreamerAudioCapturer::GStreamerAudioCapturer()
-    : GStreamerCapturer("appsrc", adoptGRef(gst_caps_new_simple("audio/x-raw", "rate", G_TYPE_INT, s_audioCaptureSampleRate, nullptr)), CaptureDevice::DeviceType::Microphone)
-{
-    initializeAudioCapturerDebugCategory();
-}
-
 void GStreamerAudioCapturer::setSinkAudioCallback(SinkAudioDataCallback&& callback)
 {
     if (m_sinkAudioDataCallback.first)

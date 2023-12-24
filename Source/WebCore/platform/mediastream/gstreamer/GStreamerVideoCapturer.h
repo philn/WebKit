@@ -35,29 +35,22 @@ class GStreamerVideoCapturer final : public GStreamerCapturer {
     friend class MockRealtimeVideoSourceGStreamer;
 public:
     GStreamerVideoCapturer(GStreamerCaptureDevice&&);
-    GStreamerVideoCapturer(const char* sourceFactory, CaptureDevice::DeviceType);
+    GStreamerVideoCapturer(const PipewireCaptureDevice&);
     ~GStreamerVideoCapturer() = default;
 
-    GstElement* createSource() final;
     GstElement* createConverter() final;
     const char* name() final { return "Video"; }
-
-    using NodeAndFD = std::pair<uint32_t, int>;
 
     using SinkVideoFrameCallback = Function<void(Ref<VideoFrameGStreamer>&&)>;
     void setSinkVideoFrameCallback(SinkVideoFrameCallback&&);
 
 private:
-    bool setSize(int width, int height);
+    bool setSize(const IntSize&);
     bool setFrameRate(double);
     void reconfigure();
 
-    GstVideoInfo getBestFormat();
-
-    void setPipewireNodeAndFD(const NodeAndFD& nodeAndFd) { m_nodeAndFd = nodeAndFd; }
     bool isCapturingDisplay() const;
 
-    std::optional<NodeAndFD> m_nodeAndFd;
     GRefPtr<GstElement> m_videoSrcMIMETypeFilter;
     std::pair<unsigned long, SinkVideoFrameCallback> m_sinkVideoFrameCallback;
 };

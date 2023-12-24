@@ -58,12 +58,6 @@ GStreamerAudioCaptureDeviceManager& GStreamerAudioCaptureDeviceManager::singleto
     return manager;
 }
 
-GStreamerVideoCaptureDeviceManager& GStreamerVideoCaptureDeviceManager::singleton()
-{
-    static NeverDestroyed<GStreamerVideoCaptureDeviceManager> manager;
-    return manager;
-}
-
 void teardownGStreamerCaptureDeviceManagers()
 {
     auto& audioManager = GStreamerAudioCaptureDeviceManager::singleton();

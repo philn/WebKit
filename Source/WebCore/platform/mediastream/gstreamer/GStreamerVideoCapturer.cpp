@@ -21,7 +21,6 @@
  */
 
 #include "config.h"
-#include "CaptureDevice.h"
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "GStreamerVideoCapturer.h"
@@ -50,8 +49,8 @@ GStreamerVideoCapturer::GStreamerVideoCapturer(GStreamerCaptureDevice&& device)
     initializeVideoCapturerDebugCategory();
 }
 
-GStreamerVideoCapturer::GStreamerVideoCapturer(const char* sourceFactory, CaptureDevice::DeviceType deviceType)
-    : GStreamerCapturer(sourceFactory, adoptGRef(gst_caps_new_empty_simple("video/x-raw")), deviceType)
+GStreamerVideoCapturer::GStreamerVideoCapturer(const PipewireCaptureDevice& device)
+    : GStreamerCapturer(device)
 {
     initializeVideoCapturerDebugCategory();
 }
@@ -72,27 +71,16 @@ void GStreamerVideoCapturer::setSinkVideoFrameCallback(SinkVideoFrameCallback&& 
 
 bool GStreamerVideoCapturer::isCapturingDisplay() const
 {
+    // return true;
     auto deviceType = this->deviceType();
     return deviceType == CaptureDevice::DeviceType::Screen || deviceType == CaptureDevice::DeviceType::Window;
-}
-
-GstElement* GStreamerVideoCapturer::createSource()
-{
-    auto* src = GStreamerCapturer::createSource();
-    if (m_nodeAndFd) {
-        auto& [node, fd] = *m_nodeAndFd;
-        auto path = AtomString::number(node);
-        // FIXME: The path property is deprecated in favor of target-object but the portal doesn't expose this object.
-        g_object_set(m_src.get(), "path", path.string().ascii().data(), "fd", fd, nullptr);
-    }
-    return src;
 }
 
 GstElement* GStreamerVideoCapturer::createConverter()
 {
     if (isCapturingDisplay()) {
         // gst_caps_set_features(m_caps.get(), 0, gst_caps_features_new("memory:DMABuf", nullptr));
-        return makeGStreamerElement("identity", nullptr);
+        return makeGStreamerElement("videoconvert", nullptr);
     }
 
     auto* bin = gst_bin_new(nullptr);
@@ -131,22 +119,17 @@ GstElement* GStreamerVideoCapturer::createConverter()
     return bin;
 }
 
-GstVideoInfo GStreamerVideoCapturer::getBestFormat()
-{
-    auto caps = adoptGRef(gst_caps_fixate(gst_device_get_caps(m_device->device())));
-    GstVideoInfo info;
-    gst_video_info_from_caps(&info, caps.get());
-
-    return info;
-}
-
-bool GStreamerVideoCapturer::setSize(int width, int height)
+bool GStreamerVideoCapturer::setSize(const IntSize& size)
 {
     if (isCapturingDisplay()) {
         // Pipewiresrc doesn't seem to support caps re-negotiation and framerate configuration properly.
         GST_FIXME_OBJECT(m_pipeline.get(), "Resizing disabled on display capture source");
         return true;
     }
+
+    int width = size.width();
+    int height = size.height();
+    GST_INFO_OBJECT(m_pipeline.get(), "Setting size to %dx%d", width, height);
 
     if (!width || !height)
         return false;
@@ -292,6 +275,11 @@ void GStreamerVideoCapturer::reconfigure()
     if (!m_videoSrcMIMETypeFilter)
         return;
 
+    auto deviceCaps = caps();
+    gst_printerrln("-> %" GST_PTR_FORMAT, deviceCaps.get());
+    if (!deviceCaps)
+        return;
+
     struct MimeTypeSelector {
         const char* mimeType = "video/x-raw";
         const char* format = nullptr;
@@ -324,7 +312,6 @@ void GStreamerVideoCapturer::reconfigure()
     GST_DEBUG_OBJECT(m_pipeline.get(), "Searching best video capture device mime type for resolution %dx%d@%.3f",
         selector.stopCondition.width, selector.stopCondition.height, selector.stopCondition.frameRate);
 
-    auto deviceCaps = adoptGRef(gst_device_get_caps(m_device->device()));
     gst_caps_foreach(deviceCaps.get(),
         reinterpret_cast<GstCapsForeachFunc>(+[](GstCapsFeatures*, GstStructure* structure, MimeTypeSelector* selector) -> gboolean {
             auto width = getMaxIntValueFromStructure(structure, "width");
