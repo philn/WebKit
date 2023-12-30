@@ -35,7 +35,7 @@ class GStreamerVideoCapturer final : public GStreamerCapturer {
     friend class MockRealtimeVideoSourceGStreamer;
 public:
     GStreamerVideoCapturer(GStreamerCaptureDevice&&);
-    GStreamerVideoCapturer(const PipewireCaptureDevice&);
+    GStreamerVideoCapturer(const PipeWireCaptureDevice&);
     ~GStreamerVideoCapturer() = default;
 
     GstElement* createConverter() final;

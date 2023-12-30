@@ -26,11 +26,11 @@
 
 namespace WebCore {
 
-class PipewireCaptureDevice : public CaptureDevice {
+class PipeWireCaptureDevice : public CaptureDevice {
     WTF_MAKE_FAST_ALLOCATED;
 
 public:
-    PipewireCaptureDevice(PipeWireNodeData& nodeData, const String& persistentId, DeviceType type, const String& label, const String& groupId = emptyString())
+    PipeWireCaptureDevice(PipeWireNodeData& nodeData, const String& persistentId, DeviceType type, const String& label, const String& groupId = emptyString())
         : CaptureDevice(persistentId, type, label, groupId)
         , m_nodeData(nodeData)
     {

@@ -49,7 +49,7 @@ GStreamerVideoCapturer::GStreamerVideoCapturer(GStreamerCaptureDevice&& device)
     initializeVideoCapturerDebugCategory();
 }
 
-GStreamerVideoCapturer::GStreamerVideoCapturer(const PipewireCaptureDevice& device)
+GStreamerVideoCapturer::GStreamerVideoCapturer(const PipeWireCaptureDevice& device)
     : GStreamerCapturer(device)
 {
     initializeVideoCapturerDebugCategory();

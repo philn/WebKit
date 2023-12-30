@@ -29,7 +29,7 @@
 #include "GStreamerCaptureDevice.h"
 #include "GStreamerCapturer.h"
 #include "GStreamerVideoCapturer.h"
-#include "PipewireCaptureDevice.h"
+#include "PipeWireCaptureDevice.h"
 #include "RealtimeMediaSourceCenter.h"
 #include "RealtimeMediaSourceFactory.h"
 #include "PipeWireSession.h"
@@ -89,7 +89,7 @@ public:
     CaptureSourceOrError createVideoCaptureSource(const CaptureDevice&, MediaDeviceHashSalts&&, const MediaConstraints*);
 
 private:
-    HashMap<String, std::unique_ptr<PipewireCaptureDevice>> m_pipewireDevices;
+    HashMap<String, std::unique_ptr<PipeWireCaptureDevice>> m_pipewireDevices;
     RefPtr<DesktopPortalCamera> m_portal;
 };
 

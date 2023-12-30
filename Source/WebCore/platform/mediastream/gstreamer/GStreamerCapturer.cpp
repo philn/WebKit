@@ -21,6 +21,7 @@
  */
 
 #include "config.h"
+#include "CaptureDevice.h"
 
 #if ENABLE(VIDEO) && ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 
@@ -55,14 +56,27 @@ GStreamerCapturer::GStreamerCapturer(GStreamerCaptureDevice&& device, GRefPtr<Gs
     m_device.emplace(WTFMove(device));
 }
 
-GStreamerCapturer::GStreamerCapturer(const PipewireCaptureDevice& device)
+GStreamerCapturer::GStreamerCapturer(const PipeWireCaptureDevice& device)
     : m_deviceType(device.type())
 {
     initializeCapturerDebugCategory();
     m_pipewireDevice.emplace(device);
 
-    // TODO: Generate caps from device.capabilities?
-    m_caps = adoptGRef(gst_caps_new_empty_simple("video/x-raw"));
+    const char* mediaType = nullptr;
+    switch(device.type()) {
+    case CaptureDevice::DeviceType::Camera:
+    case CaptureDevice::DeviceType::Screen:
+    case CaptureDevice::DeviceType::Window:
+        mediaType = "video/x-raw";
+        break;
+    case CaptureDevice::DeviceType::Microphone:
+        mediaType = "audio/x-raw";
+        break;
+    default:
+        break;
+    }
+    if (mediaType)
+        m_caps = adoptGRef(gst_caps_new_empty_simple(mediaType));
 }
 
 GStreamerCapturer::~GStreamerCapturer()

@@ -21,7 +21,7 @@
  */
 
 #include "config.h"
-#include "PipewireCaptureDevice.h"
+#include "PipeWireCaptureDevice.h"
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "GStreamerVideoCaptureSource.h"
@@ -74,7 +74,7 @@ CaptureSourceOrError GStreamerVideoCaptureSource::create(String&& deviceID, Medi
     return CaptureSourceOrError(WTFMove(source));
 }
 
-CaptureSourceOrError GStreamerVideoCaptureSource::createPipewireSource(const PipewireCaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)
+CaptureSourceOrError GStreamerVideoCaptureSource::createPipewireSource(const PipeWireCaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)
 {
     auto source = adoptRef(*new GStreamerVideoCaptureSource(device, WTFMove(hashSalts)));
     if (constraints) {
@@ -96,7 +96,7 @@ DisplayCaptureFactory& GStreamerVideoCaptureSource::displayFactory()
     return factory.get();
 }
 
-GStreamerVideoCaptureSource::GStreamerVideoCaptureSource(const PipewireCaptureDevice& device, MediaDeviceHashSalts&& hashSalts)
+GStreamerVideoCaptureSource::GStreamerVideoCaptureSource(const PipeWireCaptureDevice& device, MediaDeviceHashSalts&& hashSalts)
     : RealtimeVideoCaptureSource(device, WTFMove(hashSalts), {})
     , m_capturer(adoptRef(*new GStreamerVideoCapturer(device)))
 {

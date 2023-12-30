@@ -29,7 +29,7 @@
 #include "DesktopPortal.h"
 #include "GStreamerCommon.h"
 #include "GStreamerVideoCaptureSource.h"
-#include "PipewireCaptureDevice.h"
+#include "PipeWireCaptureDevice.h"
 #include <wtf/UUID.h>
 
 namespace WebCore {
@@ -65,7 +65,7 @@ CaptureSourceOrError GStreamerDisplayCaptureDeviceManager::createDisplayCaptureS
     const auto it = m_sessions.find(device.persistentId());
     if (it != m_sessions.end()) {
         auto& node = it->value;
-        PipewireCaptureDevice pipewireCaptureDevice { *node, device.persistentId(), device.type(), device.label(), device.groupId() };
+        PipeWireCaptureDevice pipewireCaptureDevice { *node, device.persistentId(), device.type(), device.label(), device.groupId() };
         return GStreamerVideoCaptureSource::createPipewireSource(WTFMove(pipewireCaptureDevice), WTFMove(hashSalts), constraints);
     }
 
@@ -144,7 +144,7 @@ CaptureSourceOrError GStreamerDisplayCaptureDeviceManager::createDisplayCaptureS
         return CaptureSourceOrError({ { }, MediaAccessDenialReason::PermissionDenied });
 
     nodeData->objectId = *nodeId;
-    PipewireCaptureDevice pipewireCaptureDevice { *nodeData, device.persistentId(), device.type(), device.label(), device.groupId() };
+    PipeWireCaptureDevice pipewireCaptureDevice { *nodeData, device.persistentId(), device.type(), device.label(), device.groupId() };
     m_sessions.add(device.persistentId(), makeUnique<PipeWireNodeData>(WTFMove(*nodeData)));
     return GStreamerVideoCaptureSource::createPipewireSource(WTFMove(pipewireCaptureDevice), WTFMove(hashSalts), constraints);
 }

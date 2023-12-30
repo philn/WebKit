@@ -28,7 +28,7 @@
 #include "GStreamerCommon.h"
 #include "GStreamerVideoCaptureSource.h"
 #include "MockRealtimeMediaSourceCenter.h"
-#include "PipewireCaptureDevice.h"
+#include "PipeWireCaptureDevice.h"
 #include <wtf/Scope.h>
 
 namespace WebCore {
@@ -71,7 +71,7 @@ void GStreamerVideoCaptureDeviceManager::computeCaptureDevices(CompletionHandler
     for (auto& nodeData : m_portal->openCameraPipewireRemote()) {
         CaptureDevice device(nodeData.persistentId, CaptureDevice::DeviceType::Camera, nodeData.label);
         auto deviceWasAdded = m_pipewireDevices.ensure(device.persistentId(), [&] {
-            return makeUnique<PipewireCaptureDevice>(nodeData, device.persistentId(), device.type(), device.label(), device.groupId());
+            return makeUnique<PipeWireCaptureDevice>(nodeData, device.persistentId(), device.type(), device.label(), device.groupId());
         });
         if (!deviceWasAdded)
             continue;
