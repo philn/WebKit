@@ -39,7 +39,7 @@ static void initializeVideoCapturerDebugCategory()
 
     static std::once_flag debugRegisteredFlag;
     std::call_once(debugRegisteredFlag, [] {
-        GST_DEBUG_CATEGORY_INIT(webkit_video_capturer_debug, "webkitvideocapturer", 0, "WebKit Video Capturer");
+        GST_DEBUG_CATEGORY_INIT(webkit_video_capturer_debug, "webkitcapturervideo", 0, "WebKit Video Capturer");
     });
 }
 
@@ -71,17 +71,14 @@ void GStreamerVideoCapturer::setSinkVideoFrameCallback(SinkVideoFrameCallback&& 
 
 bool GStreamerVideoCapturer::isCapturingDisplay() const
 {
-    // return true;
     auto deviceType = this->deviceType();
     return deviceType == CaptureDevice::DeviceType::Screen || deviceType == CaptureDevice::DeviceType::Window;
 }
 
 GstElement* GStreamerVideoCapturer::createConverter()
 {
-    if (isCapturingDisplay()) {
-        // gst_caps_set_features(m_caps.get(), 0, gst_caps_features_new("memory:DMABuf", nullptr));
+    if (isCapturingDisplay())
         return makeGStreamerElement("videoconvert", nullptr);
-    }
 
     auto* bin = gst_bin_new(nullptr);
     auto* videoscale = makeGStreamerElement("videoscale", "videoscale");

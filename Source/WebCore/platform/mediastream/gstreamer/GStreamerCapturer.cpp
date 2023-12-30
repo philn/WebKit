@@ -28,7 +28,6 @@
 #include "VideoFrameMetadataGStreamer.h"
 
 #include <gst/app/gstappsink.h>
-#include <gst/app/gstappsrc.h>
 #include <mutex>
 #include <wtf/HexNumber.h>
 #include <wtf/MonotonicTime.h>
@@ -110,7 +109,17 @@ GstElement* GStreamerCapturer::createSource()
         auto path = AtomString::number(m_pipewireDevice->objectId());
         // FIXME: The path property is deprecated in favor of target-object but the portal doesn't expose this object.
         g_object_set(m_src.get(), "path", path.string().ascii().data(), "fd", m_pipewireDevice->fd(), nullptr);
+    } else {
+        ASSERT(m_device);
+        auto sourceName = makeString(name(), hex(reinterpret_cast<uintptr_t>(this)));
+        m_src = gst_device_create_element(m_device->device(), sourceName.ascii().data());
+        ASSERT(m_src);
+        g_object_set(m_src.get(), "do-timestamp", TRUE, nullptr);
+    }
 
+    auto* factory = gst_element_get_factory(m_src.get());
+    GST_DEBUG_OBJECT(m_pipeline.get(), "Source element created: %" GST_PTR_FORMAT, factory);
+    if (g_str_equal(GST_OBJECT_NAME(factory), "pipewiresrc")) {
         auto srcPad = adoptGRef(gst_element_get_static_pad(m_src.get(), "src"));
         gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, [](GstPad*, GstPadProbeInfo* info, void* userData) -> GstPadProbeReturn {
             auto* event = gst_pad_probe_info_get_event(info);
@@ -126,13 +135,6 @@ GstElement* GStreamerCapturer::createSource()
             });
             return GST_PAD_PROBE_OK;
         }, this, nullptr);
-
-    } else {
-        ASSERT(m_device);
-        auto sourceName = makeString(name(), hex(reinterpret_cast<uintptr_t>(this)));
-        m_src = gst_device_create_element(m_device->device(), sourceName.ascii().data());
-        ASSERT(m_src);
-        g_object_set(m_src.get(), "do-timestamp", TRUE, nullptr);
     }
 
     if (m_deviceType == CaptureDevice::DeviceType::Camera) {

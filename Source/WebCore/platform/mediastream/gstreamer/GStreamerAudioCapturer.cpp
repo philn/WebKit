@@ -46,7 +46,7 @@ static void initializeAudioCapturerDebugCategory()
 {
     static std::once_flag debugRegisteredFlag;
     std::call_once(debugRegisteredFlag, [] {
-        GST_DEBUG_CATEGORY_INIT(webkit_audio_capturer_debug, "webkitaudiocapturer", 0, "WebKit Audio Capturer");
+        GST_DEBUG_CATEGORY_INIT(webkit_audio_capturer_debug, "webkitcaptureraudio", 0, "WebKit Audio Capturer");
     });
 }
 
