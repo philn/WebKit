@@ -56,6 +56,12 @@ GStreamerAudioCapturer::GStreamerAudioCapturer(GStreamerCaptureDevice&& device)
     initializeAudioCapturerDebugCategory();
 }
 
+GStreamerAudioCapturer::GStreamerAudioCapturer(const PipeWireCaptureDevice& device)
+    : GStreamerCapturer(device)
+{
+    initializeAudioCapturerDebugCategory();
+}
+
 void GStreamerAudioCapturer::setSinkAudioCallback(SinkAudioDataCallback&& callback)
 {
     if (m_sinkAudioDataCallback.first)

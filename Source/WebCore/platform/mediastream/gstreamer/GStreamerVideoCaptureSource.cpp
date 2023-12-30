@@ -21,15 +21,14 @@
  */
 
 #include "config.h"
-#include "PipeWireCaptureDevice.h"
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "GStreamerVideoCaptureSource.h"
 
 #include "DisplayCaptureManager.h"
 #include "GStreamerCaptureDeviceManager.h"
-
-#include <gst/app/gstappsink.h>
+#include "PipeWireCaptureDevice.h"
+#include "PipeWireCaptureDeviceManager.h"
 
 namespace WebCore {
 
@@ -45,6 +44,40 @@ static void initializeVideoCaptureSourceDebugCategory()
         GST_DEBUG_CATEGORY_INIT(webkit_video_capture_source_debug, "webkitvideocapturesource", 0,
             "WebKit Video Capture Source.");
     });
+}
+
+class GStreamerVideoCaptureSourceFactory final : public VideoCaptureFactory {
+public:
+    CaptureSourceOrError createVideoCaptureSource(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints, PageIdentifier) final
+    {
+        auto& manager = GStreamerVideoCaptureDeviceManager::singleton();
+        return manager.createVideoCaptureSource(device, WTFMove(hashSalts), constraints);
+    }
+
+private:
+    CaptureDeviceManager& videoCaptureDeviceManager() final { return GStreamerVideoCaptureDeviceManager::singleton(); }
+};
+
+GStreamerVideoCaptureDeviceManager& GStreamerVideoCaptureDeviceManager::singleton()
+{
+    static NeverDestroyed<GStreamerVideoCaptureDeviceManager> manager;
+    return manager;
+}
+
+GStreamerVideoCaptureDeviceManager::GStreamerVideoCaptureDeviceManager()
+    : GStreamerCaptureDeviceManager()
+{
+    m_pipewireCaptureDeviceManager = PipeWireCaptureDeviceManager::create(deviceType());
+}
+
+void GStreamerVideoCaptureDeviceManager::computeCaptureDevices(CompletionHandler<void()>&& callback)
+{
+    m_devices = m_pipewireCaptureDeviceManager->computeCaptureDevices(WTFMove(callback));
+}
+
+CaptureSourceOrError GStreamerVideoCaptureDeviceManager::createVideoCaptureSource(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)
+{
+    return m_pipewireCaptureDeviceManager->createCaptureSource(device, WTFMove(hashSalts), constraints);
 }
 
 class GStreamerDisplayCaptureSourceFactory final : public DisplayCaptureFactory {

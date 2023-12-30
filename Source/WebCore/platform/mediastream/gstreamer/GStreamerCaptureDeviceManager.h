@@ -33,6 +33,7 @@
 #include "RealtimeMediaSourceCenter.h"
 #include "RealtimeMediaSourceFactory.h"
 #include "PipeWireSession.h"
+#include "PipeWireCaptureDeviceManager.h"
 
 namespace WebCore {
 
@@ -89,8 +90,8 @@ public:
     CaptureSourceOrError createVideoCaptureSource(const CaptureDevice&, MediaDeviceHashSalts&&, const MediaConstraints*);
 
 private:
-    HashMap<String, std::unique_ptr<PipeWireCaptureDevice>> m_pipewireDevices;
-    RefPtr<DesktopPortalCamera> m_portal;
+    GStreamerVideoCaptureDeviceManager();
+    RefPtr<PipeWireCaptureDeviceManager> m_pipewireCaptureDeviceManager;
 };
 
 class GStreamerDisplayCaptureDeviceManager final : public DisplayCaptureManager {

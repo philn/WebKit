@@ -25,11 +25,16 @@
 #include <fcntl.h>
 #include <glib.h>
 #include <pipewire/context.h>
+#include <pipewire/keys.h>
 #include <spa/monitor/device.h>
+#include <spa/param/audio/format-utils.h>
 #include <spa/param/format-utils.h>
 #include <spa/param/video/raw.h>
 #include <spa/pod/parser.h>
+#include <spa/utils/defs.h>
+#include <spa/utils/dict.h>
 #include <spa/utils/result.h>
+#include <spa/utils/string.h>
 
 namespace WebCore {
 
@@ -169,6 +174,44 @@ void PipeWireSession::finalSync()
     m_pendingSeq = pw_core_sync(m_core, PW_ID_CORE, 0);
     IGNORE_WARNINGS_END;
     m_lastSeq = m_pendingSeq;
+}
+
+static void handleIntProperty(const struct spa_pod_prop* prop, const char* key, GRefPtr<GstCaps>& res)
+{
+    uint32_t totalItems, choice;
+    struct spa_pod* val = spa_pod_get_values(&prop->value, &totalItems, &choice);
+    if (val->type != SPA_TYPE_Int)
+        return;
+
+    auto ints = static_cast<uint32_t*>(SPA_POD_BODY(val));
+
+    switch (choice) {
+    case SPA_CHOICE_None:
+        gst_caps_set_simple(res.get(), key, G_TYPE_INT, ints[0], nullptr);
+        break;
+    case SPA_CHOICE_Range:
+    case SPA_CHOICE_Step: {
+        if (totalItems < 3)
+            return;
+        gst_caps_set_simple(res.get(), key, GST_TYPE_INT_RANGE, ints[1], ints[2], nullptr);
+        break;
+    }
+    case SPA_CHOICE_Enum: {
+        GValue list = G_VALUE_INIT, v = G_VALUE_INIT;
+
+        g_value_init(&list, GST_TYPE_LIST);
+        for (uint32_t i = 1; i < totalItems; i++) {
+            g_value_init(&v, G_TYPE_INT);
+            g_value_set_int(&v, ints[i]);
+            gst_value_list_append_and_take_value(&list, &v);
+        }
+        gst_caps_set_value(res.get(), key, &list);
+        g_value_unset(&list);
+        break;
+    }
+    default:
+        break;
+    }
 }
 
 static void handleRectangleProperty(const struct spa_pod_prop* prop, GRefPtr<GstCaps>& res)
@@ -331,6 +374,49 @@ static const uint32_t videoFormatMap[] = {
     SPA_VIDEO_FORMAT_Y444_12LE,
 };
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+#define _FORMAT_LE(fmt) SPA_AUDIO_FORMAT_##fmt##_OE
+#define _FORMAT_BE(fmt) SPA_AUDIO_FORMAT_##fmt
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+#define _FORMAT_LE(fmt) SPA_AUDIO_FORMAT_##fmt
+#define _FORMAT_BE(fmt) SPA_AUDIO_FORMAT_##fmt##_OE
+#endif
+
+static const uint32_t audioFormatMap[] = {
+    SPA_AUDIO_FORMAT_UNKNOWN,
+    SPA_AUDIO_FORMAT_ENCODED,
+    SPA_AUDIO_FORMAT_S8,
+    SPA_AUDIO_FORMAT_U8,
+    _FORMAT_LE(S16),
+    _FORMAT_BE(S16),
+    _FORMAT_LE(U16),
+    _FORMAT_BE(U16),
+    _FORMAT_LE(S24_32),
+    _FORMAT_BE(S24_32),
+    _FORMAT_LE(U24_32),
+    _FORMAT_BE(U24_32),
+    _FORMAT_LE(S32),
+    _FORMAT_BE(S32),
+    _FORMAT_LE(U32),
+    _FORMAT_BE(U32),
+    _FORMAT_LE(S24),
+    _FORMAT_BE(S24),
+    _FORMAT_LE(U24),
+    _FORMAT_BE(U24),
+    _FORMAT_LE(S20),
+    _FORMAT_BE(S20),
+    _FORMAT_LE(U20),
+    _FORMAT_BE(U20),
+    _FORMAT_LE(S18),
+    _FORMAT_BE(S18),
+    _FORMAT_LE(U18),
+    _FORMAT_BE(U18),
+    _FORMAT_LE(F32),
+    _FORMAT_BE(F32),
+    _FORMAT_LE(F64),
+    _FORMAT_BE(F64),
+};
+
 static std::optional<int> findIndex(const uint32_t* items, int totalItems, uint32_t id)
 {
     for (int i = 0; i < totalItems; i++) {
@@ -346,6 +432,14 @@ static const char* videoIdToString(uint32_t id)
     if (!index)
         return nullptr;
     return gst_video_format_to_string(static_cast<GstVideoFormat>(*index));
+}
+
+static const char* audioIdToString(uint32_t id)
+{
+    auto index = findIndex(audioFormatMap, SPA_N_ELEMENTS(audioFormatMap), id);
+    if (!index)
+        return nullptr;
+    return gst_audio_format_to_string(static_cast<GstAudioFormat>(*index));
 }
 
 using IdToString = Function<const char*(uint32_t)>;
@@ -399,33 +493,49 @@ static GRefPtr<GstCaps> spaPodToCaps(const spa_pod* spaPod)
     if (spa_format_parse(spaPod, &mediaType, &mediaSubType) < 0)
         return caps;
 
-    RELEASE_ASSERT(mediaType == SPA_MEDIA_TYPE_video);
-    if (mediaType != SPA_MEDIA_TYPE_video)
-        return caps;
+    if (mediaType == SPA_MEDIA_TYPE_video) {
+        if (mediaSubType == SPA_MEDIA_SUBTYPE_raw) {
+            caps = adoptGRef(gst_caps_new_empty_simple("video/x-raw"));
+            prop = spa_pod_object_find_prop(obj, prop, SPA_FORMAT_VIDEO_format);
+            if (prop)
+                handleIdProp(prop, "format", videoIdToString, caps);
+        } else if (mediaSubType == SPA_MEDIA_SUBTYPE_mjpg)
+            caps = adoptGRef(gst_caps_new_empty_simple("image/jpeg"));
+        else if (mediaSubType == SPA_MEDIA_SUBTYPE_h264)
+            caps = adoptGRef(gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "byte-stream", "alignment", G_TYPE_STRING, "au", nullptr));
+        else
+            return caps;
 
-    if (mediaSubType == SPA_MEDIA_SUBTYPE_raw) {
-        caps = adoptGRef(gst_caps_new_empty_simple("video/x-raw"));
-        prop = spa_pod_object_find_prop(obj, prop, SPA_FORMAT_VIDEO_format);
+        prop = spa_pod_object_find_prop(obj, prop, SPA_FORMAT_VIDEO_size);
         if (prop)
-            handleIdProp(prop, "format", videoIdToString, caps);
-    } else if (mediaSubType == SPA_MEDIA_SUBTYPE_mjpg)
-        caps = adoptGRef(gst_caps_new_empty_simple("image/jpeg"));
-    else if (mediaSubType == SPA_MEDIA_SUBTYPE_h264)
-        caps = adoptGRef(gst_caps_new_simple("video/x-h264", "stream-format", G_TYPE_STRING, "byte-stream", "alignment", G_TYPE_STRING, "au", nullptr));
-    else
+            handleRectangleProperty(prop, caps);
+
+        prop = spa_pod_object_find_prop(obj, prop, SPA_FORMAT_VIDEO_framerate);
+        if (prop)
+            handleFractionProperty(prop, "framerate", caps);
+
+        prop = spa_pod_object_find_prop(obj, prop, SPA_FORMAT_VIDEO_maxFramerate);
+        if (prop)
+            handleFractionProperty(prop, "max-framerate", caps);
         return caps;
+    }
 
-    prop = spa_pod_object_find_prop(obj, prop, SPA_FORMAT_VIDEO_size);
-    if (prop)
-        handleRectangleProperty(prop, caps);
+    if (mediaType == SPA_MEDIA_TYPE_audio) {
+        if (mediaSubType == SPA_MEDIA_SUBTYPE_raw) {
+            caps = gst_caps_new_simple("audio/x-raw", "layout", G_TYPE_STRING, "interleaved", nullptr);
+            prop = spa_pod_object_find_prop(obj, prop, SPA_FORMAT_AUDIO_format);
+            if (prop)
+                handleIdProp(prop, "format", audioIdToString, caps);
 
-    prop = spa_pod_object_find_prop(obj, prop, SPA_FORMAT_VIDEO_framerate);
-    if (prop)
-        handleFractionProperty(prop, "framerate", caps);
+            prop = spa_pod_object_find_prop(obj, prop, SPA_FORMAT_AUDIO_rate);
+            if (prop)
+                handleIntProperty(prop, "rate", caps);
 
-    prop = spa_pod_object_find_prop(obj, prop, SPA_FORMAT_VIDEO_maxFramerate);
-    if (prop)
-        handleFractionProperty(prop, "max-framerate", caps);
+            prop = spa_pod_object_find_prop(obj, prop, SPA_FORMAT_AUDIO_channels);
+            if (prop)
+                handleIntProperty(prop, "channels", caps);
+        }
+    }
 
     return caps;
 }

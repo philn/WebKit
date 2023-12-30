@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2018 Metrological Group B.V.
- * Author: Thibault Saunier <tsaunier@igalia.com>
- * Author: Alejandro G. Castro <alex@igalia.com>
+ * Copyright (C) 2024 Igalia S.L
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -20,56 +18,49 @@
  */
 
 #include "config.h"
+#include "PipeWireCaptureDeviceManager.h"
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
-#include "GStreamerCaptureDeviceManager.h"
 
-#include "DesktopPortal.h"
-#include "GStreamerCommon.h"
 #include "GStreamerVideoCaptureSource.h"
 #include "MockRealtimeMediaSourceCenter.h"
-#include "PipeWireCaptureDevice.h"
 #include <wtf/Scope.h>
 
 namespace WebCore {
 
-class GStreamerVideoCaptureSourceFactory final : public VideoCaptureFactory {
-public:
-    CaptureSourceOrError createVideoCaptureSource(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints, PageIdentifier) final
-    {
-        auto& manager = GStreamerVideoCaptureDeviceManager::singleton();
-        return manager.createVideoCaptureSource(device, WTFMove(hashSalts), constraints);
-    }
-
-private:
-    CaptureDeviceManager& videoCaptureDeviceManager() final { return GStreamerVideoCaptureDeviceManager::singleton(); }
-};
-
-GStreamerVideoCaptureDeviceManager& GStreamerVideoCaptureDeviceManager::singleton()
+RefPtr<PipeWireCaptureDeviceManager> PipeWireCaptureDeviceManager::create(CaptureDevice::DeviceType deviceType)
 {
-    static NeverDestroyed<GStreamerVideoCaptureDeviceManager> manager;
-    return manager;
+    return adoptRef(*new PipeWireCaptureDeviceManager(deviceType));
 }
 
-void GStreamerVideoCaptureDeviceManager::computeCaptureDevices(CompletionHandler<void()>&& callback)
+PipeWireCaptureDeviceManager::PipeWireCaptureDeviceManager(CaptureDevice::DeviceType deviceType)
+    : m_deviceType(deviceType)
+{
+}
+
+Vector<CaptureDevice> PipeWireCaptureDeviceManager::computeCaptureDevices(CompletionHandler<void()>&& callback)
 {
     auto scopeExit = makeScopeExit([&] {
         callback();
     });
+    Vector<CaptureDevice> devices;
     if (MockRealtimeMediaSourceCenter::mockRealtimeMediaSourceCenterEnabled())
-        return;
+        return devices;
 
     if (!m_portal)
         m_portal = DesktopPortalCamera::create();
 
     if (!m_portal || !m_portal->isCameraPresent())
-        return;
+        return devices;
+
+    // We don't support audio capture yet.
+    RELEASE_ASSERT(m_deviceType == CaptureDevice::DeviceType::Camera);
 
     if (!m_portal->accessCamera())
-        return;
+        return devices;
 
     for (auto& nodeData : m_portal->openCameraPipewireRemote()) {
-        CaptureDevice device(nodeData.persistentId, CaptureDevice::DeviceType::Camera, nodeData.label);
+        CaptureDevice device(nodeData.persistentId, m_deviceType, nodeData.label);
         auto deviceWasAdded = m_pipewireDevices.ensure(device.persistentId(), [&] {
             return makeUnique<PipeWireCaptureDevice>(nodeData, device.persistentId(), device.type(), device.label(), device.groupId());
         });
@@ -77,11 +68,12 @@ void GStreamerVideoCaptureDeviceManager::computeCaptureDevices(CompletionHandler
             continue;
 
         device.setEnabled(true);
-        m_devices.append(WTFMove(device));
+        devices.append(WTFMove(device));
     }
+    return devices;
 }
 
-CaptureSourceOrError GStreamerVideoCaptureDeviceManager::createVideoCaptureSource(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)
+CaptureSourceOrError PipeWireCaptureDeviceManager::createCaptureSource(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)
 {
     if (!m_portal)
         return GStreamerVideoCaptureSource::create(String { device.persistentId() }, WTFMove(hashSalts), constraints);
