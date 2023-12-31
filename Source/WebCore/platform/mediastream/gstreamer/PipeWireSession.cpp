@@ -553,7 +553,7 @@ PipeWireNode::PipeWireNode(uint32_t nodeId, struct pw_registry* registry, RefPtr
 
             if (info->change_mask & PW_NODE_CHANGE_MASK_PROPS) {
                 self->m_data.persistentId = makeString(spa_dict_lookup(info->props, SPA_KEY_DEVICE_VENDOR_ID), '-', spa_dict_lookup(info->props, SPA_KEY_DEVICE_PRODUCT_ID), '-', spa_dict_lookup(info->props, PW_KEY_DEVICE_ID));
-                self->m_data.label = makeString(spa_dict_lookup(info->props, PW_KEY_NODE_NICK));
+                self->m_data.label = makeString(spa_dict_lookup(info->props, PW_KEY_NODE_DESCRIPTION));
                 for (uint32_t i = 0; i < info->n_params; i++) {
                     uint32_t id = info->params[i].id;
                     if (id == SPA_PARAM_EnumFormat && info->params[i].flags & SPA_PARAM_INFO_READ) {

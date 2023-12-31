@@ -94,7 +94,7 @@ GStreamerAudioCaptureSource::GStreamerAudioCaptureSource(GStreamerCaptureDevice&
 
     static std::once_flag debugRegisteredFlag;
     std::call_once(debugRegisteredFlag, [] {
-        GST_DEBUG_CATEGORY_INIT(webkit_audio_capture_source_debug, "webkitaudiocapturesource", 0, "WebKit Audio Capture Source.");
+        GST_DEBUG_CATEGORY_INIT(webkit_audio_capture_source_debug, "webkitcapturesourceaudio", 0, "WebKit Audio Capture Source.");
     });
 
     auto& singleton = GStreamerAudioCaptureDeviceManager::singleton();

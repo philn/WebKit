@@ -39,8 +39,6 @@ public:
     static RefPtr<PipeWireCaptureDeviceManager> create(CaptureDevice::DeviceType);
     PipeWireCaptureDeviceManager(CaptureDevice::DeviceType);
 
-    Vector<CaptureDevice> computeCaptureDevices(CompletionHandler<void()>&&);
-
     CaptureSourceOrError createCaptureSource(const CaptureDevice&, MediaDeviceHashSalts&&, const MediaConstraints*);
 
 private:

@@ -41,7 +41,7 @@ static void initializeVideoCaptureSourceDebugCategory()
 
     static std::once_flag debugRegisteredFlag;
     std::call_once(debugRegisteredFlag, [] {
-        GST_DEBUG_CATEGORY_INIT(webkit_video_capture_source_debug, "webkitvideocapturesource", 0,
+        GST_DEBUG_CATEGORY_INIT(webkit_video_capture_source_debug, "webkitcapturesourcevideo", 0,
             "WebKit Video Capture Source.");
     });
 }
@@ -68,11 +68,6 @@ GStreamerVideoCaptureDeviceManager::GStreamerVideoCaptureDeviceManager()
     : GStreamerCaptureDeviceManager()
 {
     m_pipewireCaptureDeviceManager = PipeWireCaptureDeviceManager::create(deviceType());
-}
-
-void GStreamerVideoCaptureDeviceManager::computeCaptureDevices(CompletionHandler<void()>&& callback)
-{
-    m_devices = m_pipewireCaptureDeviceManager->computeCaptureDevices(WTFMove(callback));
 }
 
 CaptureSourceOrError GStreamerVideoCaptureDeviceManager::createVideoCaptureSource(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)

@@ -85,7 +85,6 @@ class GStreamerVideoCaptureDeviceManager final : public GStreamerCaptureDeviceMa
     friend class NeverDestroyed<GStreamerVideoCaptureDeviceManager>;
 public:
     static GStreamerVideoCaptureDeviceManager& singleton();
-    void computeCaptureDevices(CompletionHandler<void()>&&) final;
     CaptureDevice::DeviceType deviceType() final { return CaptureDevice::DeviceType::Camera; }
     CaptureSourceOrError createVideoCaptureSource(const CaptureDevice&, MediaDeviceHashSalts&&, const MediaConstraints*);
 

@@ -273,7 +273,6 @@ void GStreamerVideoCapturer::reconfigure()
         return;
 
     auto deviceCaps = caps();
-    gst_printerrln("-> %" GST_PTR_FORMAT, deviceCaps.get());
     if (!deviceCaps)
         return;
 
