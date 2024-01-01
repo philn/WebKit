@@ -286,11 +286,10 @@ protected:
     virtual void sourceSetup(GstElement*);
     virtual void updatePlaybackRate();
 
-#if USE(GSTREAMER_HOLEPUNCH)
+    bool isHolePunchRenderingEnabled() const;
     GstElement* createHolePunchVideoSink();
     void pushNextHolePunchBuffer();
-    bool shouldIgnoreIntrinsicSize() final { return true; }
-#endif
+    bool shouldIgnoreIntrinsicSize() final;
 
 #if USE(TEXTURE_MAPPER_DMABUF)
     GstElement* createVideoSinkDMABuf();
@@ -524,9 +523,8 @@ private:
     void configureAudioDecoder(GstElement*);
     void configureVideoDecoder(GstElement*);
     void configureElement(GstElement*);
-#if PLATFORM(BROADCOM) || USE(WESTEROS_SINK) || PLATFORM(AMLOGIC) || PLATFORM(REALTEK)
+
     void configureElementPlatformQuirks(GstElement*);
-#endif
 
     void setPlaybinURL(const URL& urlString);
 
