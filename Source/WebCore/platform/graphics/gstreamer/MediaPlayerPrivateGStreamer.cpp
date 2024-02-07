@@ -178,10 +178,8 @@ MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
             if (webKitDMABufVideoSinkIsEnabled() && webKitDMABufVideoSinkProbePlatform())
                 return adoptRef(*new TextureMapperPlatformLayerProxyDMABuf);
 #endif
-#if USE(GSTREAMER_HOLEPUNCH)
-            return adoptRef(*new TextureMapperPlatformLayerProxyGL(true));
-#endif
-            return adoptRef(*new TextureMapperPlatformLayerProxyGL);
+            bool disableBufferInvalidation = isHolePunchRenderingEnabled();
+            return adoptRef(*new TextureMapperPlatformLayerProxyGL(disableBufferInvalidation));
         }());
 #endif
 
@@ -1689,7 +1687,7 @@ FloatSize MediaPlayerPrivateGStreamer::naturalSize() const
     if (!m_videoSize.isEmpty() && !isHolePunchRenderingEnabled())
         return m_videoSize;
 
-    // When using the holepuch we may not be able to get the video frames size, so we can't use
+    // When using the holepunch we may not be able to get the video frames size, so we can't use
     // it. But we need to report some non empty naturalSize for the player's GraphicsLayer
     // to be properly created.
     return s_holePunchDefaultFrameSize;
