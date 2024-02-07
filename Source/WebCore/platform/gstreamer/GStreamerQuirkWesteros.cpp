@@ -80,27 +80,6 @@ std::optional<bool> GStreamerQuirkWesteros::isHardwareAccelerated(GstElementFact
     return std::nullopt;
 }
 
-GstElement* GStreamerQuirkWesteros::createHolePunchVideoSink(bool isLegacyPlaybin, const MediaPlayer* player)
-{
-    AtomString val;
-    bool isPIPRequested = player && player->doesHaveAttribute("pip"_s, &val) && equalLettersIgnoringASCIICase(val, "true"_s);
-    if (isLegacyPlaybin && !isPIPRequested)
-        return nullptr;
-    // Westeros using holepunch.
-    GstElement* videoSink = makeGStreamerElement("westerossink", "WesterosVideoSink");
-    g_object_set(videoSink, "zorder", 0.0f, nullptr);
-    if (isPIPRequested)
-        g_object_set(videoSink, "res-usage", 0u, nullptr);
-    return videoSink;
-}
-
-bool GStreamerQuirkWesteros::setHolePunchVideoRectangle(GstElement* videoSink, const IntRect& rect)
-{
-    GUniquePtr<gchar> rectString(g_strdup_printf("%d,%d,%d,%d", rect.x(), rect.y(), rect.width(), rect.height()));
-    g_object_set(videoSink, "rectangle", rectString.get(), nullptr);
-    return true;
-}
-
 #undef GST_CAT_DEFAULT
 
 } // namespace WebCore

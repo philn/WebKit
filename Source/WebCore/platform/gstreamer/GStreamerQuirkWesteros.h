@@ -33,9 +33,6 @@ public:
 
     bool configureElement(GstElement*, const OptionSet<ElementRuntimeCharacteristics>&) final;
     std::optional<bool> isHardwareAccelerated(GstElementFactory*) final;
-    bool supportsVideoHolePunchRendering() const final { return true; }
-    GstElement* createHolePunchVideoSink(bool, const MediaPlayer*) final;
-    bool setHolePunchVideoRectangle(GstElement*, const IntRect&) final;
 
 private:
     GRefPtr<GstCaps> m_sinkCaps;

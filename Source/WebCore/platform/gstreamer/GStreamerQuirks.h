@@ -36,24 +36,38 @@ enum class ElementRuntimeCharacteristics : uint8_t {
     IsLiveStream = 1 << 3,
 };
 
-class GStreamerQuirk {
+class GStreamerQuirkBase {
+    WTF_MAKE_FAST_ALLOCATED;
+
+public:
+    GStreamerQuirkBase() = default;
+    virtual ~GStreamerQuirkBase() = default;
+
+    virtual const char* identifier() = 0;
+};
+
+class GStreamerQuirk : public GStreamerQuirkBase {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     GStreamerQuirk() = default;
     virtual ~GStreamerQuirk() = default;
 
-    virtual const char* identifier() = 0;
-
     virtual bool isPlatformSupported() const { return true; }
     virtual GstElement* createWebAudioSink() { return nullptr; }
-    virtual GstElement* createHolePunchVideoSink(bool, const MediaPlayer*) { return nullptr; }
-    virtual bool setHolePunchVideoRectangle(GstElement*, const IntRect&) { return false; }
     virtual bool configureElement(GstElement*, const OptionSet<ElementRuntimeCharacteristics>&) { return false; }
     virtual std::optional<bool> isHardwareAccelerated(GstElementFactory*) { return std::nullopt; }
-    virtual bool supportsVideoHolePunchRendering() const { return false; }
     virtual std::optional<GstElementFactoryListType> audioVideoDecoderFactoryListType() const { return std::nullopt; }
     virtual Vector<String> disallowedWebAudioDecoders() const { return { }; }
+};
 
+class GStreamerHolePunchQuirk : public GStreamerQuirkBase {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    GStreamerHolePunchQuirk() = default;
+    virtual ~GStreamerHolePunchQuirk() = default;
+
+    virtual GstElement* createHolePunchVideoSink(bool, const MediaPlayer*) { return nullptr; }
+    virtual bool setHolePunchVideoRectangle(GstElement*, const IntRect&) { return false; }
 };
 
 class GStreamerQuirksManager {
@@ -66,18 +80,20 @@ public:
     bool isEnabled() const;
 
     GstElement* createWebAudioSink();
-    GstElement* createHolePunchVideoSink(bool isLegacyPlaybin, const MediaPlayer*);
-    void setHolePunchVideoRectangle(GstElement*, const IntRect&);
     void configureElement(GstElement*, OptionSet<ElementRuntimeCharacteristics>&&);
     std::optional<bool> isHardwareAccelerated(GstElementFactory*) const;
-    bool supportsVideoHolePunchRendering() const;
     GstElementFactoryListType audioVideoDecoderFactoryListType() const;
     Vector<String> disallowedWebAudioDecoders() const;
+
+    bool supportsVideoHolePunchRendering() const;
+    GstElement* createHolePunchVideoSink(bool isLegacyPlaybin, const MediaPlayer*);
+    void setHolePunchVideoRectangle(GstElement*, const IntRect&);
 
 private:
     GStreamerQuirksManager();
 
     Vector<std::unique_ptr<GStreamerQuirk>> m_quirks;
+    std::unique_ptr<GStreamerHolePunchQuirk> m_holePunchQuirk;
 };
 
 } // namespace WebCore

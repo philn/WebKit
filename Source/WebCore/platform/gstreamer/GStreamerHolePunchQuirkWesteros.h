@@ -26,17 +26,12 @@
 
 namespace WebCore {
 
-class GStreamerQuirkBcmNexus final : public GStreamerQuirk {
+class GStreamerHolePunchQuirkWesteros final : public GStreamerHolePunchQuirk {
 public:
-    GStreamerQuirkBcmNexus();
-    const char* identifier() final { return "BcmNexus"; }
+    const char* identifier() final { return "WesterosHolePunch"; }
 
-    std::optional<bool> isHardwareAccelerated(GstElementFactory*) final;
-    std::optional<GstElementFactoryListType> audioVideoDecoderFactoryListType() const final { return GST_ELEMENT_FACTORY_TYPE_PARSER; }
-    Vector<String> disallowedWebAudioDecoders() const final { return m_disallowedWebAudioDecoders; }
-
-private:
-    Vector<String> m_disallowedWebAudioDecoders;
+    GstElement* createHolePunchVideoSink(bool, const MediaPlayer*) final;
+    bool setHolePunchVideoRectangle(GstElement*, const IntRect&) final;
 };
 
 } // namespace WebCore

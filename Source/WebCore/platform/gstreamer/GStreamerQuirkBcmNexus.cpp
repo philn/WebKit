@@ -28,12 +28,8 @@
 
 namespace WebCore {
 
-GST_DEBUG_CATEGORY_STATIC(webkit_bcmnexus_quirks_debug);
-#define GST_CAT_DEFAULT webkit_bcmnexus_quirks_debug
-
 GStreamerQuirkBcmNexus::GStreamerQuirkBcmNexus()
 {
-    GST_DEBUG_CATEGORY_INIT(webkit_bcmnexus_quirks_debug, "webkitquirksbcmnexus", 0, "WebKit BcmNexus Quirks");
     m_disallowedWebAudioDecoders = { "brcmaudfilter"_s };
 }
 
@@ -44,15 +40,6 @@ std::optional<bool> GStreamerQuirkBcmNexus::isHardwareAccelerated(GstElementFact
 
     return std::nullopt;
 }
-
-bool GStreamerQuirkBcmNexus::setHolePunchVideoRectangle(GstElement* videoSink, const IntRect& rect)
-{
-    GUniquePtr<gchar> rectString(g_strdup_printf("%d,%d,%d,%d", rect.x(), rect.y(), rect.width(), rect.height()));
-    g_object_set(videoSink, "rectangle", rectString.get(), nullptr);
-    return true;
-}
-
-#undef GST_CAT_DEFAULT
 
 } // namespace WebCore
 

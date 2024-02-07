@@ -24,6 +24,8 @@
 #if USE(GSTREAMER)
 
 #include "GStreamerCommon.h"
+#include "GStreamerHolePunchQuirkBcmNexus.h"
+#include "GStreamerHolePunchQuirkWesteros.h"
 #include "GStreamerQuirkAmLogic.h"
 #include "GStreamerQuirkBcmNexus.h"
 #include "GStreamerQuirkBroadcom.h"
@@ -56,38 +58,56 @@ GStreamerQuirksManager::GStreamerQuirksManager()
 
     const char* quirksList = g_getenv("WEBKIT_GST_QUIRKS");
     GST_DEBUG("Attempting to parse requested quirks: %s", GST_STR_NULL(quirksList));
-    if (!quirksList)
+    if (quirksList) {
+         StringView quirks { quirksList, static_cast<unsigned>(strlen(quirksList)) };
+         if (WTF::equalLettersIgnoringASCIICase(quirks, "help"_s)) {
+             WTFLogAlways("Supported quirks for WEBKIT_GST_QUIRKS are: amlogic, broadcom, bcmnexus, realtek, westeros");
+             return;
+         }
+
+         for (const auto& identifier : quirks.split(',')) {
+             std::unique_ptr<GStreamerQuirk> quirk;
+             if (WTF::equalLettersIgnoringASCIICase(identifier, "amlogic"_s))
+                 quirk = std::make_unique<GStreamerQuirkAmLogic>();
+             else if (WTF::equalLettersIgnoringASCIICase(identifier, "broadcom"_s))
+                 quirk = std::make_unique<GStreamerQuirkBroadcom>();
+             else if (WTF::equalLettersIgnoringASCIICase(identifier, "bcmnexus"_s))
+                 quirk = std::make_unique<GStreamerQuirkBcmNexus>();
+             else if (WTF::equalLettersIgnoringASCIICase(identifier, "realtek"_s))
+                 quirk = std::make_unique<GStreamerQuirkRealtek>();
+             else if (WTF::equalLettersIgnoringASCIICase(identifier, "westeros"_s))
+                 quirk = std::make_unique<GStreamerQuirkWesteros>();
+             else {
+                 GST_WARNING("Unknown quirk requested: %s. Skipping", identifier.toStringWithoutCopying().ascii().data());
+                 continue;
+             }
+
+             if (!quirk->isPlatformSupported()) {
+                 GST_WARNING("Quirk %s was requested but is not supported on this platform. Skipping", quirk->identifier());
+                 continue;
+             }
+             m_quirks.append(WTFMove(quirk));
+         }
+    }
+
+    const char* holePunchQuirk = g_getenv("WEBKIT_GST_HOLE_PUNCH_QUIRK");
+    GST_DEBUG("Attempting to parse requested hole-punch quirk: %s", GST_STR_NULL(holePunchQuirk));
+    if (!holePunchQuirk)
         return;
 
-    StringView quirks { quirksList, static_cast<unsigned>(strlen(quirksList)) };
-    if (WTF::equalLettersIgnoringASCIICase(quirks, "help"_s)) {
-        WTFLogAlways("Supported quirks for WEBKIT_GST_QUIRKS are: amlogic, broadcom, bcmnexus, realtek, westeros");
+    StringView identifier { holePunchQuirk, static_cast<unsigned>(strlen(holePunchQuirk)) };
+    if (WTF::equalLettersIgnoringASCIICase(identifier, "help"_s)) {
+        WTFLogAlways("Supported quirks for WEBKIT_GST_HOLE_PUNCH_QUIRK are: westeros, bcmnexus");
         return;
     }
 
-    for (const auto& identifier : quirks.split(',')) {
-        std::unique_ptr<GStreamerQuirk> quirk;
-        if (WTF::equalLettersIgnoringASCIICase(identifier, "amlogic"_s))
-            quirk = std::make_unique<GStreamerQuirkAmLogic>();
-        else if (WTF::equalLettersIgnoringASCIICase(identifier, "broadcom"_s))
-            quirk = std::make_unique<GStreamerQuirkBroadcom>();
-        else if (WTF::equalLettersIgnoringASCIICase(identifier, "bcmnexus"_s))
-            quirk = std::make_unique<GStreamerQuirkBcmNexus>();
-        else if (WTF::equalLettersIgnoringASCIICase(identifier, "realtek"_s))
-            quirk = std::make_unique<GStreamerQuirkRealtek>();
-        else if (WTF::equalLettersIgnoringASCIICase(identifier, "westeros"_s))
-            quirk = std::make_unique<GStreamerQuirkWesteros>();
-        else {
-            GST_WARNING("Unknown quirk requested: %s. Skipping", identifier.toStringWithoutCopying().ascii().data());
-            continue;
-        }
-
-        if (!quirk->isPlatformSupported()) {
-            GST_WARNING("Quirk %s was requested but is not supported on this platform. Skipping", quirk->identifier());
-            continue;
-        }
-        m_quirks.append(WTFMove(quirk));
-    }
+    // TODO: Maybe check this is coherent (somehow) with the quirk(s) selected above.
+    if (WTF::equalLettersIgnoringASCIICase(identifier, "bcmnexus"_s))
+        m_holePunchQuirk = std::make_unique<GStreamerHolePunchQuirkBcmNexus>();
+    else if (WTF::equalLettersIgnoringASCIICase(identifier, "westeros"_s))
+        m_holePunchQuirk = std::make_unique<GStreamerHolePunchQuirkWesteros>();
+    else
+        GST_WARNING("HolePunch quirk %s un-supported.", identifier.toStringWithoutCopying().ascii().data());
 }
 
 bool GStreamerQuirksManager::isEnabled() const
@@ -112,27 +132,26 @@ GstElement* GStreamerQuirksManager::createWebAudioSink()
 
 GstElement* GStreamerQuirksManager::createHolePunchVideoSink(bool isLegacyPlaybin, const MediaPlayer* player)
 {
-    RELEASE_ASSERT_WITH_MESSAGE(isEnabled(), "createHolePunchVideoSink() should be called only if at least one quirk was requested");
-    for (const auto& quirk : m_quirks) {
-        auto* sink = quirk->createHolePunchVideoSink(isLegacyPlaybin, player);
-        if (!sink)
-            continue;
-
-        GST_DEBUG("Using HolePunchSink from quirk %s : %" GST_PTR_FORMAT, quirk->identifier(), sink);
-        return sink;
+    RELEASE_ASSERT_WITH_MESSAGE(isEnabled() && m_holePunchQuirk, "createHolePunchVideoSink() should be called only if one hole-punch quirk was requested");
+    if (!isEnabled() || !m_holePunchQuirk) {
+        GST_DEBUG("None of the quirks requested a HolePunchSink");
+        return nullptr;
     }
-
-    GST_DEBUG("None of the quirks requested a HolePunchSink");
-    return nullptr;
+    auto sink = m_holePunchQuirk->createHolePunchVideoSink(isLegacyPlaybin, player);
+    GST_DEBUG("Using HolePunchSink from quirk %s : %" GST_PTR_FORMAT, m_holePunchQuirk->identifier(), sink);
+    return sink;
 }
 
 void GStreamerQuirksManager::setHolePunchVideoRectangle(GstElement* videoSink, const IntRect& rect)
 {
-    RELEASE_ASSERT_WITH_MESSAGE(supportsVideoHolePunchRendering(), "setHolePunchVideoRectangle() should be called only if at least one quirk supports HolePunch rendering");
-    for (const auto& quirk : m_quirks) {
-        if (quirk->setHolePunchVideoRectangle(videoSink, rect))
-            return;
+    RELEASE_ASSERT_WITH_MESSAGE(isEnabled() && m_holePunchQuirk, "setHolePunchVideoRectangle() should be called only if one hole-punch quirk was requested");
+    if (!isEnabled() || !m_holePunchQuirk) {
+        GST_DEBUG("None of the quirks requested a HolePunchSink");
+        return;
     }
+
+    if (!m_holePunchQuirk->setHolePunchVideoRectangle(videoSink, rect))
+        GST_WARNING("Hole punch video rectangle configuration failed.");
 }
 
 void GStreamerQuirksManager::configureElement(GstElement* element, OptionSet<ElementRuntimeCharacteristics>&& characteristics)
@@ -160,15 +179,7 @@ std::optional<bool> GStreamerQuirksManager::isHardwareAccelerated(GstElementFact
 
 bool GStreamerQuirksManager::supportsVideoHolePunchRendering() const
 {
-    for (const auto& quirk : m_quirks) {
-        if (quirk->supportsVideoHolePunchRendering()) {
-            GST_DEBUG("Quirk %s supports video punch hole rendering", quirk->identifier());
-            return true;
-        }
-    }
-
-    GST_DEBUG("None of the quirks supports video punch hole rendering");
-    return false;
+    return m_holePunchQuirk.get();
 }
 
 GstElementFactoryListType GStreamerQuirksManager::audioVideoDecoderFactoryListType() const

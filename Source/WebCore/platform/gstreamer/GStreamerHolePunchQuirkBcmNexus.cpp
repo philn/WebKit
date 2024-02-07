@@ -18,26 +18,24 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#pragma once
+#include "config.h"
+#include "GStreamerHolePunchQuirkBcmNexus.h"
+
+#include "GStreamerCommon.h"
 
 #if USE(GSTREAMER)
 
-#include "GStreamerQuirks.h"
-
 namespace WebCore {
 
-class GStreamerQuirkBcmNexus final : public GStreamerQuirk {
-public:
-    GStreamerQuirkBcmNexus();
-    const char* identifier() final { return "BcmNexus"; }
+bool GStreamerHolePunchQuirkBcmNexus::setHolePunchVideoRectangle(GstElement* videoSink, const IntRect& rect)
+{
+    if (UNLIKELY(!gstObjectHasProperty(videoSink, "rectangle")))
+        return false;
 
-    std::optional<bool> isHardwareAccelerated(GstElementFactory*) final;
-    std::optional<GstElementFactoryListType> audioVideoDecoderFactoryListType() const final { return GST_ELEMENT_FACTORY_TYPE_PARSER; }
-    Vector<String> disallowedWebAudioDecoders() const final { return m_disallowedWebAudioDecoders; }
-
-private:
-    Vector<String> m_disallowedWebAudioDecoders;
-};
+    auto rectString = makeString(rect.x(), ',', rect.y(), ',', rect.width(), ',', rect.height());
+    g_object_set(videoSink, "rectangle", rectString.ascii().data(), nullptr);
+    return true;
+}
 
 } // namespace WebCore
 
