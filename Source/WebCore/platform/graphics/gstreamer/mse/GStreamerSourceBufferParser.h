@@ -41,14 +41,11 @@ public:
 private:
     void initializeParserHarness();
     bool processOutputEvents();
-
     void notifyInitializationSegment(GstStreamCollection&);
-
     void handleSample(GRefPtr<GstSample>&&);
 
     SourceBufferPrivateGStreamer& m_sourceBufferPrivate;
-    RefPtr<MediaPlayerPrivateGStreamerMSE> m_playerPrivate;
-
+    ThreadSafeWeakPtr<MediaPlayerPrivateGStreamerMSE> m_playerPrivate;
     RefPtr<GStreamerElementHarness> m_harness;
     GRefPtr<GstBus> m_bus;
     Ref<WorkQueue> m_workQueue;

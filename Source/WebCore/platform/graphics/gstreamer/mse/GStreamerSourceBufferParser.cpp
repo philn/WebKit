@@ -100,7 +100,8 @@ void GStreamerSourceBufferParser::initializeParserHarness()
     gst_element_set_bus(parsebin.get(), m_bus.get());
     gst_bus_enable_sync_message_emission(m_bus.get());
     g_signal_connect(m_bus.get(), "sync-message::need-context", G_CALLBACK(+[](GstBus*, GstMessage* message, GStreamerSourceBufferParser* parser) {
-        parser->m_workQueue->dispatch([player = parser->m_playerPrivate, message = GRefPtr(message)] {
+        parser->m_workQueue->dispatch([weakPlayer = parser->m_playerPrivate, message = GRefPtr(message)] {
+            RefPtr player = weakPlayer.get();
             if (!player)
                 return;
             player->handleNeedContextMessage(message.get());
@@ -147,7 +148,8 @@ Ref<MediaPromise> GStreamerSourceBufferParser::pushNewBuffer(GRefPtr<GstBuffer>&
 
 static void fixupStreamCollection(GstStreamCollection* collection)
 {
-    // Workaround for a parsebin bug, mislabelling encrypted streams as unknown ones.
+    // Workaround for a parsebin bug, mislabelling encrypted streams as unknown ones. Fixed by:
+    // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/6138
     unsigned collectionSize = gst_stream_collection_get_size(collection);
     for (unsigned i = 0; i < collectionSize; i++) {
         auto stream = gst_stream_collection_get_stream(collection, i);
@@ -185,8 +187,11 @@ bool GStreamerSourceBufferParser::processOutputEvents()
                 notifyInitializationSegment(*collection);
             }
 #if ENABLE(ENCRYPTED_MEDIA)
-            if (GST_EVENT_TYPE(event.get()) == GST_EVENT_PROTECTION)
-                m_playerPrivate->handleProtectionEvent(event.get());
+            if (GST_EVENT_TYPE(event.get()) == GST_EVENT_PROTECTION) {
+                RefPtr player = m_playerPrivate.get();
+                if (player)
+                    player->handleProtectionEvent(event.get());
+            }
 #endif
         }
     }
@@ -224,8 +229,9 @@ void GStreamerSourceBufferParser::notifyInitializationSegment(GstStreamCollectio
         auto description = GStreamerMediaDescription::create(caps);
         switch (gst_stream_get_stream_type(stream)) {
         case GST_STREAM_TYPE_VIDEO: {
-            if (m_playerPrivate && doCapsHaveType(caps.get(), GST_VIDEO_CAPS_TYPE_PREFIX))
-                m_playerPrivate->setInitialVideoSize(getVideoResolutionFromCaps(caps.get()).value_or(FloatSize()));
+            RefPtr player = m_playerPrivate.get();
+            if (player && doCapsHaveType(caps.get(), GST_VIDEO_CAPS_TYPE_PREFIX))
+                player->setInitialVideoSize(getVideoResolutionFromCaps(caps.get()).value_or(FloatSize()));
 
             auto track = VideoTrackPrivateGStreamer::create(m_playerPrivate.get(), i, stream);
             track->setInitialCaps(WTFMove(caps));
