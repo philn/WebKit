@@ -52,7 +52,7 @@
 #include "VideoTrackPrivateGStreamer.h"
 #include "WebKitMediaSourceGStreamer.h"
 #include <wtf/NativePromise.h>
-#include <wtf/Scope.h>
+#include <wtf/PrintStream.h>
 #include <wtf/text/StringToIntegerConversion.h>
 
 GST_DEBUG_CATEGORY_EXTERN(webkit_mse_debug);
@@ -80,14 +80,16 @@ SourceBufferPrivateGStreamer::SourceBufferPrivateGStreamer(MediaSourcePrivateGSt
     , m_logIdentifier(mediaSource.nextSourceBufferLogIdentifier())
 #endif
 {
-    if (const char* useAppendPipeline = g_getenv("WEBKIT_GST_MSE_USE_LEGACY_APPEND_PIPELINE")) {
-        if (!g_strcmp0(useAppendPipeline, "1")) {
-            m_appendPipeline = makeUnique<AppendPipeline>(*this, m_playerPrivate);
-            return;
-        }
-    }
+    bool useAppendPipeline = !webkitGstCheckVersion(1, 24, 0);
+    if (const char* useAppendPipelineFromEnvironment = g_getenv("WEBKIT_GST_MSE_USE_LEGACY_APPEND_PIPELINE"))
+        useAppendPipeline = !g_strcmp0(useAppendPipelineFromEnvironment, "1");
 
-    m_parser = makeUnique<GStreamerSourceBufferParser>(*this, &m_playerPrivate);
+    GST_DEBUG("Using legacy append pipeline: %s", boolForPrinting(useAppendPipeline));
+    if (useAppendPipeline) {
+        m_appendPipeline = makeUnique<AppendPipeline>(*this, m_playerPrivate);
+        return;
+    }
+    m_parser = GStreamerSourceBufferParser::create(*this, &m_playerPrivate);
 }
 
 SourceBufferPrivateGStreamer::~SourceBufferPrivateGStreamer()
@@ -112,27 +114,30 @@ Ref<MediaPromise> SourceBufferPrivateGStreamer::appendInternal(Ref<SharedBuffer>
             static_cast<SharedBuffer*>(data)->deref();
         }));
 
+    ASSERT(!m_appendPromise);
+    m_appendPromise.emplace();
     if (m_appendPipeline) {
-        ASSERT(!m_appendPromise);
-        m_appendPromise.emplace();
         m_appendPipeline->pushNewBuffer(WTFMove(buffer));
         return *m_appendPromise;
     }
 
-    return m_parser->pushNewBuffer(WTFMove(buffer));
+    if (m_parser)
+        m_parser->pushNewBuffer(WTFMove(buffer));
+    return *m_appendPromise;
 }
 
 void SourceBufferPrivateGStreamer::resetParserStateInternal()
 {
     ASSERT(isMainThread());
-    if (!m_appendPipeline)
-        return;
 
     GST_DEBUG_OBJECT(m_playerPrivate.pipeline(), "resetting parser state");
     if (m_appendPipeline) {
         m_appendPipeline->resetParserState();
         return;
     }
+
+    if (!m_parser)
+        return;
 
     m_parser->resetParserState();
 }
@@ -145,16 +150,15 @@ void SourceBufferPrivateGStreamer::removedFromMediaSource()
         track->remove();
     m_hasBeenRemovedFromMediaSource = true;
 
-    auto scopeExit = makeScopeExit([this] {
-        SourceBufferPrivate::removedFromMediaSource();
-    });
-
     // Release the resources used by the AppendPipeline. This effectively makes the
     // SourceBufferPrivate useless. Ideally the entire instance should be destroyed. For now we
     // explicitely release the AppendPipeline because that's the biggest resource user. In case the
     // process remains alive, GC might kick in later on and release the SourceBufferPrivate.
+    if (m_appendPipeline)
+        m_appendPipeline->stopParser();
     m_appendPipeline = nullptr;
     m_parser = nullptr;
+    SourceBufferPrivate::removedFromMediaSource();
 }
 
 void SourceBufferPrivateGStreamer::flush(TrackID trackId)

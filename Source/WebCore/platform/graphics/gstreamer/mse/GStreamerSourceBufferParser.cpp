@@ -101,10 +101,8 @@ void GStreamerSourceBufferParser::initializeParserHarness()
     gst_bus_enable_sync_message_emission(m_bus.get());
     g_signal_connect(m_bus.get(), "sync-message::need-context", G_CALLBACK(+[](GstBus*, GstMessage* message, GStreamerSourceBufferParser* parser) {
         parser->m_workQueue->dispatch([weakPlayer = parser->m_playerPrivate, message = GRefPtr(message)] {
-            RefPtr player = weakPlayer.get();
-            if (!player)
-                return;
-            player->handleNeedContextMessage(message.get());
+            if (RefPtr player = weakPlayer.get())
+                player->handleNeedContextMessage(message.get());
         });
     }), this);
 
@@ -113,10 +111,8 @@ void GStreamerSourceBufferParser::initializeParserHarness()
     });
 }
 
-Ref<MediaPromise> GStreamerSourceBufferParser::pushNewBuffer(GRefPtr<GstBuffer>&& buffer)
+void GStreamerSourceBufferParser::pushNewBuffer(GRefPtr<GstBuffer>&& buffer)
 {
-    MediaPromise::Producer promise;
-
     if (!m_harness->inputCaps()) {
         const auto& containerType = m_sourceBufferPrivate.type().containerType();
         GRefPtr<GstCaps> caps;
@@ -128,43 +124,27 @@ Ref<MediaPromise> GStreamerSourceBufferParser::pushNewBuffer(GRefPtr<GstBuffer>&
             caps = adoptGRef(gst_type_find_helper_for_buffer(GST_OBJECT_CAST(m_harness->element()), buffer.get(), nullptr));
             if (!caps) {
                 GST_WARNING_OBJECT(m_harness->element(), "Unable to determine buffer media type");
-                promise.reject(PlatformMediaError::ParsingError);
-                return promise;
+                m_sourceBufferPrivate.appendParsingFailed();
+                return;
             }
         }
         m_harness->start(WTFMove(caps));
     }
 
     m_harness->pushBuffer(WTFMove(buffer));
-    if (!processOutputEvents()) {
-        promise.reject(PlatformMediaError::ParsingError);
-        return promise;
-    }
+    m_workQueue->dispatch([weakThis = ThreadSafeWeakPtr { *this }, this] {
+        RefPtr self = weakThis.get();
+        if (!self)
+            return;
 
-    m_harness->processOutputSamples();
-    promise.resolve();
-    return promise;
-}
-
-static void fixupStreamCollection(GstStreamCollection* collection)
-{
-    // Workaround for a parsebin bug, mislabelling encrypted streams as unknown ones. Fixed by:
-    // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/6138
-    unsigned collectionSize = gst_stream_collection_get_size(collection);
-    for (unsigned i = 0; i < collectionSize; i++) {
-        auto stream = gst_stream_collection_get_stream(collection, i);
-        if (gst_stream_get_stream_type(stream) != GST_STREAM_TYPE_UNKNOWN)
-            continue;
-
-        auto caps = adoptGRef(gst_stream_get_caps(stream));
-        auto structure = gst_caps_get_structure(caps.get(), 0);
-        if (const char* originalMediaType = gst_structure_get_string(structure, "original-media-type")) {
-            if (g_str_has_prefix(originalMediaType, "audio"))
-                gst_stream_set_stream_type(stream, GST_STREAM_TYPE_AUDIO);
-            else if (g_str_has_prefix(originalMediaType, "video"))
-                gst_stream_set_stream_type(stream, GST_STREAM_TYPE_VIDEO);
+        if (!processOutputEvents()) {
+            m_sourceBufferPrivate.appendParsingFailed();
+            return;
         }
-    }
+
+        m_harness->processOutputSamples();
+        m_sourceBufferPrivate.didReceiveAllPendingSamples();
+    });
 }
 
 bool GStreamerSourceBufferParser::processOutputEvents()
@@ -182,14 +162,11 @@ bool GStreamerSourceBufferParser::processOutputEvents()
             if (!m_initializationSegment && GST_EVENT_TYPE(event.get()) == GST_EVENT_STREAM_COLLECTION) {
                 GstStreamCollection* collection = nullptr;
                 gst_event_parse_stream_collection(event.get(), &collection);
-                if (!webkitGstCheckVersion(1, 23, 0))
-                    fixupStreamCollection(collection);
                 notifyInitializationSegment(*collection);
             }
 #if ENABLE(ENCRYPTED_MEDIA)
             if (GST_EVENT_TYPE(event.get()) == GST_EVENT_PROTECTION) {
-                RefPtr player = m_playerPrivate.get();
-                if (player)
+                if (RefPtr player = m_playerPrivate.get())
                     player->handleProtectionEvent(event.get());
             }
 #endif

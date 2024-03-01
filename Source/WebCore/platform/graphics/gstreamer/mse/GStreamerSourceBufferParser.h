@@ -24,21 +24,27 @@
 #include "GStreamerElementHarness.h"
 #include "MediaPlayerPrivateGStreamerMSE.h"
 #include "SourceBufferPrivateGStreamer.h"
+#include <wtf/ThreadSafeWeakPtr.h>
 #include <wtf/WorkQueue.h>
 
 namespace WebCore {
 
-class GStreamerSourceBufferParser {
+class GStreamerSourceBufferParser
+    : public ThreadSafeRefCountedAndCanMakeThreadSafeWeakPtr<GStreamerSourceBufferParser> {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    GStreamerSourceBufferParser(SourceBufferPrivateGStreamer&, const RefPtr<MediaPlayerPrivateGStreamerMSE>&);
+    static Ref<GStreamerSourceBufferParser> create(SourceBufferPrivateGStreamer& sourceBufferPrivate, const RefPtr<MediaPlayerPrivateGStreamerMSE>& mediaPlayerPrivate)
+    {
+        return adoptRef(*new GStreamerSourceBufferParser(sourceBufferPrivate, mediaPlayerPrivate));
+    }
     virtual ~GStreamerSourceBufferParser() = default;
 
-    Ref<MediaPromise> pushNewBuffer(GRefPtr<GstBuffer>&&);
+    void pushNewBuffer(GRefPtr<GstBuffer>&&);
     void resetParserState();
     void stopParser();
 
 private:
+    GStreamerSourceBufferParser(SourceBufferPrivateGStreamer&, const RefPtr<MediaPlayerPrivateGStreamerMSE>&);
     void initializeParserHarness();
     bool processOutputEvents();
     void notifyInitializationSegment(GstStreamCollection&);

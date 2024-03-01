@@ -106,7 +106,7 @@ private:
     ContentType m_type;
     MediaPlayerPrivateGStreamerMSE& m_playerPrivate;
     std::unique_ptr<AppendPipeline> m_appendPipeline;
-    std::unique_ptr<GStreamerSourceBufferParser> m_parser;
+    RefPtr<GStreamerSourceBufferParser> m_parser;
     StdUnorderedMap<TrackID, RefPtr<MediaSourceTrackGStreamer>> m_tracks;
     std::optional<MediaPromise::Producer> m_appendPromise;
 
