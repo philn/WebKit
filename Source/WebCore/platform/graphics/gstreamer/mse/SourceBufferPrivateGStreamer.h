@@ -102,12 +102,14 @@ private:
 
     void notifyClientWhenReadyForMoreSamples(TrackID) override;
 
+    RefPtr<MediaSourceTrackGStreamer> findTrackWithID(TrackID);
+
     bool m_hasBeenRemovedFromMediaSource { false };
     ContentType m_type;
     MediaPlayerPrivateGStreamerMSE& m_playerPrivate;
     std::unique_ptr<AppendPipeline> m_appendPipeline;
     RefPtr<GStreamerSourceBufferParser> m_parser;
-    StdUnorderedMap<TrackID, RefPtr<MediaSourceTrackGStreamer>> m_tracks;
+    Vector<RefPtr<MediaSourceTrackGStreamer>> m_tracks;
     std::optional<MediaPromise::Producer> m_appendPromise;
 
 #if !RELEASE_LOG_DISABLED
