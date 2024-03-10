@@ -57,6 +57,12 @@ char TrackPrivateBaseGStreamer::prefixForType(TrackType trackType)
 
 static AtomString trimStreamId(StringView streamId)
 {
+    // foo/0001:bar -> 0001
+    auto foo = streamId.find('/');
+    auto bar = streamId.substring(foo + 1).toString();
+    auto bar2 = bar.split(':');
+    return AtomString::fromLatin1(bar2[0].ascii().data());
+
     size_t index = streamId.find([](auto c) {
         return c != '0';
     });
@@ -111,6 +117,12 @@ TrackPrivateBaseGStreamer::TrackPrivateBaseGStreamer(TrackType type, TrackPrivat
     , m_owner(owner)
 {
     ASSERT(m_stream);
+
+    auto trackID = WTF::parseInteger<TrackID>(m_stringId);
+    if (trackID) {
+        m_trackID = *trackID;
+        ASSERT(m_trackID);
+    }
 
     g_signal_connect_swapped(m_stream.get(), "notify::tags", G_CALLBACK(+[](TrackPrivateBaseGStreamer* track) {
         track->tagsChanged();
