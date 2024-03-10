@@ -34,17 +34,26 @@
 
 #if ENABLE(MEDIA_SOURCE) && USE(GSTREAMER)
 
+#include "AudioTrackPrivateGStreamer.h"
+#include "InbandTextTrackPrivateGStreamer.h"
+#include "TrackPrivateBase.h"
+#include "TrackPrivateBaseGStreamer.h"
+#include "VideoTrackPrivateGStreamer.h"
+
 GST_DEBUG_CATEGORY_EXTERN(webkit_mse_debug);
 #define GST_CAT_DEFAULT webkit_mse_debug
 
 namespace WebCore {
 
-MediaSourceTrackGStreamer::MediaSourceTrackGStreamer(TrackPrivateBaseGStreamer::TrackType type, TrackID trackId, const AtomString& trackStringId, GRefPtr<GstCaps>&& initialCaps)
-    : m_type(type)
-    , m_id(trackId)
-    , m_stringId(trackStringId)
+Ref<MediaSourceTrackGStreamer> MediaSourceTrackGStreamer::create(RefPtr<TrackPrivateBase>&& track, GRefPtr<GstCaps>&& initialCaps)
+{
+    return adoptRef(*new MediaSourceTrackGStreamer(WTFMove(track), WTFMove(initialCaps)));
+}
+
+MediaSourceTrackGStreamer::MediaSourceTrackGStreamer(RefPtr<TrackPrivateBase>&& track, GRefPtr<GstCaps>&& initialCaps)
+    : m_track(WTFMove(track))
     , m_initialCaps(WTFMove(initialCaps))
-    , m_queueDataMutex(trackStringId)
+    , m_queueDataMutex(stringId())
 { }
 
 MediaSourceTrackGStreamer::~MediaSourceTrackGStreamer()
@@ -52,9 +61,46 @@ MediaSourceTrackGStreamer::~MediaSourceTrackGStreamer()
     ASSERT(m_isRemoved);
 }
 
-Ref<MediaSourceTrackGStreamer> MediaSourceTrackGStreamer::create(TrackPrivateBaseGStreamer::TrackType type, TrackID trackId, const AtomString& trackStringId, GRefPtr<GstCaps>&& initialCaps)
+TrackPrivateBaseGStreamer::TrackType MediaSourceTrackGStreamer::type() const
 {
-    return adoptRef(*new MediaSourceTrackGStreamer(type, trackId, trackStringId, WTFMove(initialCaps)));
+    switch (m_track->type()) {
+    case WebCore::TrackPrivateBase::Type::Audio:
+        return TrackPrivateBaseGStreamer::TrackType::Audio;
+    case WebCore::TrackPrivateBase::Type::Video:
+        return TrackPrivateBaseGStreamer::TrackType::Video;
+    case WebCore::TrackPrivateBase::Type::Text:
+        return TrackPrivateBaseGStreamer::TrackType::Text;
+    }
+    ASSERT_NOT_REACHED();
+    return TrackPrivateBaseGStreamer::TrackType::Unknown;
+}
+
+const AtomString& MediaSourceTrackGStreamer::stringId() const
+{
+    switch (m_track->type()) {
+    case WebCore::TrackPrivateBase::Type::Audio:
+        return static_cast<AudioTrackPrivateGStreamer*>(m_track.get())->stringId();
+    case WebCore::TrackPrivateBase::Type::Video:
+        return static_cast<VideoTrackPrivateGStreamer*>(m_track.get())->stringId();
+    case WebCore::TrackPrivateBase::Type::Text:
+        return static_cast<InbandTextTrackPrivateGStreamer*>(m_track.get())->stringId();
+    }
+    ASSERT_NOT_REACHED();
+    return emptyAtom();
+}
+
+GRefPtr<GstStream> MediaSourceTrackGStreamer::stream() const
+{
+    switch (m_track->type()) {
+    case WebCore::TrackPrivateBase::Type::Audio:
+        return static_cast<AudioTrackPrivateGStreamer*>(m_track.get())->stream();
+    case WebCore::TrackPrivateBase::Type::Video:
+        return static_cast<VideoTrackPrivateGStreamer*>(m_track.get())->stream();
+    case WebCore::TrackPrivateBase::Type::Text:
+        return static_cast<InbandTextTrackPrivateGStreamer*>(m_track.get())->stream();
+    }
+    ASSERT_NOT_REACHED();
+    return nullptr;
 }
 
 bool MediaSourceTrackGStreamer::isReadyForMoreSamples()

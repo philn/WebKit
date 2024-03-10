@@ -1117,7 +1117,7 @@ void MediaPlayerPrivateGStreamer::notifyPlayerOfTrack()
     ASSERT(m_isLegacyPlaybin);
 
     using TrackType = TrackPrivateBaseGStreamer::TrackType;
-    std::variant<HashMap<AtomString, Ref<AudioTrackPrivateGStreamer>>*, HashMap<AtomString, Ref<VideoTrackPrivateGStreamer>>*, HashMap<AtomString, Ref<InbandTextTrackPrivateGStreamer>>*> variantTracks = static_cast<HashMap<AtomString, Ref<TrackPrivateType>>*>(0);
+    std::variant<HashMap<AtomString, RefPtr<AudioTrackPrivateGStreamer>>*, HashMap<AtomString, RefPtr<VideoTrackPrivateGStreamer>>*, HashMap<AtomString, RefPtr<InbandTextTrackPrivateGStreamer>>*> variantTracks = static_cast<HashMap<AtomString, RefPtr<TrackPrivateType>>*>(0);
     auto type(static_cast<TrackType>(variantTracks.index()));
     const char* typeName;
     bool* hasType;
@@ -1140,7 +1140,7 @@ void MediaPlayerPrivateGStreamer::notifyPlayerOfTrack()
     default:
         ASSERT_NOT_REACHED();
     }
-    auto& tracks = *std::get<HashMap<AtomString, Ref<TrackPrivateType>>*>(variantTracks);
+    auto& tracks = *std::get<HashMap<AtomString, RefPtr<TrackPrivateType>>*>(variantTracks);
 
     // Ignore notifications after a EOS. We don't want the tracks to disappear when the video is finished.
     if (m_isEndReached && (type == TrackType::Audio || type == TrackType::Video))
@@ -1538,10 +1538,9 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
 void MediaPlayerPrivateGStreamer::updateEnabledVideoTrack()
 {
     VideoTrackPrivateGStreamer* wantedTrack = nullptr;
-    for (auto& pair : m_videoTracks) {
-        auto& track = pair.value.get();
-        if (track.selected()) {
-            wantedTrack = &track;
+    for (auto& track : m_videoTracks.values()) {
+        if (track->selected()) {
+            wantedTrack = track.get();
             break;
         }
     }
@@ -1562,10 +1561,9 @@ void MediaPlayerPrivateGStreamer::updateEnabledVideoTrack()
 void MediaPlayerPrivateGStreamer::updateEnabledAudioTrack()
 {
     AudioTrackPrivateGStreamer* wantedTrack = nullptr;
-    for (auto& pair : m_audioTracks) {
-        auto& track = pair.value.get();
-        if (track.enabled()) {
-            wantedTrack = &track;
+    for (auto& track : m_audioTracks.values()) {
+        if (track->enabled()) {
+            wantedTrack = track.get();
             break;
         }
     }
@@ -1616,6 +1614,38 @@ void MediaPlayerPrivateGStreamer::playbin3SendSelectStreamsIfAppropriate()
     g_list_free_full(streams, reinterpret_cast<GDestroyNotify>(g_free));
 }
 
+void MediaPlayerPrivateGStreamer::createTrack(TrackPrivateBaseGStreamer::TrackType type, unsigned index, GstStream* stream)
+{
+    RefPtr player = m_player.get();
+    if (!player)
+        return;
+
+    auto streamId = AtomString::fromLatin1(gst_stream_get_stream_id(stream));
+    switch (type) {
+    case TrackPrivateBaseGStreamer::TrackType::Audio: {
+        auto track = AudioTrackPrivateGStreamer::create(*this, index, stream);
+        player->addAudioTrack(*track);
+        m_audioTracks.add(streamId, WTFMove(track));
+        return;
+    }
+    case TrackPrivateBaseGStreamer::TrackType::Video: {
+        auto track = VideoTrackPrivateGStreamer::create(*this, index, stream);
+        player->addVideoTrack(*track);
+        m_videoTracks.add(streamId, WTFMove(track));
+        return;
+    }
+    case TrackPrivateBaseGStreamer::TrackType::Text: {
+        auto track = InbandTextTrackPrivateGStreamer::create(*this, index, stream);
+        player->addTextTrack(*track);
+        m_textTracks.add(streamId, WTFMove(track));
+        return;
+    }
+    case TrackPrivateBaseGStreamer::TrackType::Unknown:
+        break;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
 void MediaPlayerPrivateGStreamer::updateTracks([[maybe_unused]] const GRefPtr<GstObject>& collectionOwner)
 {
     ASSERT(!m_isLegacyPlaybin);
@@ -1628,7 +1658,7 @@ void MediaPlayerPrivateGStreamer::updateTracks([[maybe_unused]] const GRefPtr<Gs
     // fast/mediastream/MediaStream-video-element-remove-track.html expects audio tracks gone, not deactivated.
     if (player) {
         for (auto& track : m_audioTracks.values())
-            player->removeAudioTrack(track);
+            player->removeAudioTrack(*track);
     }
     m_audioTracks.clear();
 
@@ -1671,16 +1701,11 @@ void MediaPlayerPrivateGStreamer::updateTracks([[maybe_unused]] const GRefPtr<Gs
     if (!m_streamCollection)
         return;
 
-    using TextTrackPrivateGStreamer = InbandTextTrackPrivateGStreamer;
 #define CREATE_OR_SELECT_TRACK(type, Type) G_STMT_START { \
         bool isTrackCached = m_##type##Tracks.contains(streamId);       \
-        if (!isTrackCached) { \
-            auto track = Type##TrackPrivateGStreamer::create(*this, type##TrackIndex, stream); \
-            if (player)                                                 \
-                player->add##Type##Track(track);                        \
-            m_##type##Tracks.add(streamId, WTFMove(track));             \
-        }                                                               \
-        auto track = m_##type##Tracks.get(streamId);                    \
+        if (!isTrackCached)                                             \
+            createTrack(TrackPrivateBaseGStreamer::Type, type##TrackIndex, stream); \
+        const auto& track = m_##type##Tracks.get(streamId);             \
         if (isTrackCached)                                              \
             track->updateConfigurationFromCaps(WTFMove(caps));          \
         auto trackId = track->stringId();                               \

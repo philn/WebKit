@@ -67,13 +67,15 @@ enum {
 struct Stream;
 
 struct WebKitMediaSrcPrivate {
-    HashMap<AtomString, RefPtr<Stream>> streams;
-    Stream* streamByName(const AtomString& name)
+    Vector<RefPtr<Stream>> streams;
+    Stream* streamByTrackID(TrackID trackId)
     {
         ASSERT(isMainThread());
-        Stream* stream = streams.get(name);
-        ASSERT(stream);
-        return stream;
+        auto index = streams.findIf([trackId](auto& stream) -> bool {
+            return stream->track->id() == trackId;
+        });
+        ASSERT(index != WTF::notFound);
+        return streams[index].get();
     }
 
     // Used for stream-start events, shared by all streams.
@@ -98,7 +100,6 @@ static void webKitMediaSrcConstructed(GObject*);
 static GstStateChangeReturn webKitMediaSrcChangeState(GstElement*, GstStateChange);
 static gboolean webKitMediaSrcActivateMode(GstPad*, GstObject*, GstPadMode, gboolean activate);
 static void webKitMediaSrcLoop(void*);
-static void webKitMediaSrcTearDownStream(WebKitMediaSrc* source, const AtomString& name);
 static void webKitMediaSrcGetProperty(GObject*, unsigned propId, GValue*, GParamSpec*);
 static void webKitMediaSrcStreamFlush(Stream*, bool isSeekingFlush);
 static gboolean webKitMediaSrcSendEvent(GstElement*, GstEvent*);
@@ -326,7 +327,7 @@ void webKitMediaSrcEmitStreams(WebKitMediaSrc* source, const Vector<RefPtr<Media
 #ifndef GST_DISABLE_GST_DEBUG
         GST_DEBUG_OBJECT(source, "Adding stream with trackId '%s' of type %s with caps %" GST_PTR_FORMAT, track->stringId().string().utf8().data(), streamTypeToString(track->type()), track->initialCaps().get());
 #endif // GST_DISABLE_GST_DEBUG
-        if (source->priv->streams.contains(track->stringId())) {
+        if (source->priv->streams.findIf([&track](auto& stream) -> bool { return stream->track->stringId() == track->stringId(); }) != notFound) {
             GST_ERROR_OBJECT(source, "stream with trackId '%s' already exists", track->stringId().string().utf8().data());
             ASSERT_NOT_REACHED();
             continue;
@@ -336,17 +337,19 @@ void webKitMediaSrcEmitStreams(WebKitMediaSrc* source, const Vector<RefPtr<Media
         gst_pad_set_activatemode_function(GST_PAD(pad.get()), webKitMediaSrcActivateMode);
 
         ASSERT(track->initialCaps());
-        auto stream = adoptRef(new Stream(source, GRefPtr<GstPad>(GST_PAD(pad.get())), *track,
-            adoptGRef(gst_stream_new(track->stringId().string().utf8().data(), track->initialCaps().get(), gstStreamType(track->type()), GST_STREAM_FLAG_SELECT))));
+        auto trackStream = track->stream();
+        if (!trackStream)
+            trackStream = adoptGRef(gst_stream_new(track->stringId().string().utf8().data(), track->initialCaps().get(), gstStreamType(track->type()), GST_STREAM_FLAG_SELECT));
+        auto stream = adoptRef(new Stream(source, GRefPtr<GstPad>(GST_PAD(pad.get())), *track, WTFMove(trackStream)));
         pad->priv->stream = ThreadSafeWeakPtr { *stream.get() };
 
         gst_stream_collection_add_stream(source->priv->collection.get(), GRefPtr<GstStream>(stream->streamInfo.get()).leakRef());
-        source->priv->streams.set(track->stringId(), WTFMove(stream));
+        source->priv->streams.append(WTFMove(stream));
     }
 
     gst_element_post_message(GST_ELEMENT(source), gst_message_new_stream_collection(GST_OBJECT(source), source->priv->collection.get()));
 
-    for (const RefPtr<Stream>& stream: source->priv->streams.values()) {
+    for (const RefPtr<Stream>& stream: source->priv->streams) {
         // Block data flow until pad is exposed.
         gulong blockId = gst_pad_add_probe(
             GST_PAD(stream->pad.get()), GST_PAD_PROBE_TYPE_BLOCK_DOWNSTREAM,
@@ -382,11 +385,10 @@ void webKitMediaSrcSetPlayer(WebKitMediaSrc* source, ThreadSafeWeakPtr<MediaPlay
     source->priv->player = WTFMove(player);
 }
 
-static void webKitMediaSrcTearDownStream(WebKitMediaSrc* source, const AtomString& name)
+static void webKitMediaSrcTearDownStream(WebKitMediaSrc* source, Stream* stream)
 {
     ASSERT(isMainThread());
-    Stream* stream = source->priv->streamByName(name);
-    GST_DEBUG_OBJECT(source, "Tearing down stream '%s'", name.string().utf8().data());
+    GST_DEBUG_OBJECT(source, "Tearing down stream %" PRIu64, stream->track->id());
 
     // Flush the source element **and** downstream. We want to stop the streaming thread and for that we need all elements downstream to be idle.
     webKitMediaSrcStreamFlush(stream, false);
@@ -398,7 +400,6 @@ static void webKitMediaSrcTearDownStream(WebKitMediaSrc* source, const AtomStrin
         gst_element_remove_pad(GST_ELEMENT(source), GST_PAD(pad));
         pad->priv->stream = nullptr;
     }
-    source->priv->streams.remove(name);
 }
 
 static gboolean webKitMediaSrcActivateMode(GstPad* pad, [[maybe_unused]] GstObject* source, GstPadMode mode, gboolean active)
@@ -749,11 +750,11 @@ static void webKitMediaSrcStreamFlush(Stream* stream, bool isSeekingFlush)
         stream->track->stringId().string().utf8().data(), boolForPrinting(isSeekingFlush));
 }
 
-void webKitMediaSrcFlush(WebKitMediaSrc* source, const AtomString& streamName)
+void webKitMediaSrcFlush(WebKitMediaSrc* source, TrackID trackId)
 {
     ASSERT(isMainThread());
-    GST_DEBUG_OBJECT(source, "Received non-seek flush request for stream '%s'.", streamName.string().utf8().data());
-    Stream* stream = source->priv->streamByName(streamName);
+    GST_DEBUG_OBJECT(source, "Received non-seek flush request for stream %" PRIu64, trackId);
+    Stream* stream = source->priv->streamByTrackID(trackId);
 
     webKitMediaSrcStreamFlush(stream, false);
 }
@@ -765,7 +766,7 @@ static void webKitMediaSrcSeek(WebKitMediaSrc* source, uint64_t startTime, doubl
     source->priv->rate = rate;
     GST_DEBUG_OBJECT(source, "Seek requested to time %" GST_TIME_FORMAT " with rate %f.", GST_TIME_ARGS(startTime), rate);
 
-    for (const RefPtr<Stream>& stream : source->priv->streams.values())
+    for (const RefPtr<Stream>& stream : source->priv->streams)
         webKitMediaSrcStreamFlush(stream.get(), true);
 }
 
@@ -773,7 +774,7 @@ static int countStreamsOfType(WebKitMediaSrc* source, WebCore::TrackPrivateBaseG
 {
     // Barring pipeline dumps someone may add during debugging, WebKit will only read these properties (n-video etc.) from the main thread.
     return std::count_if(source->priv->streams.begin(), source->priv->streams.end(), [type](auto item) {
-        return item.value->track->type() == type;
+        return item->track->type() == type;
     });
 }
 
@@ -802,8 +803,10 @@ static GstStateChangeReturn webKitMediaSrcChangeState(GstElement* element, GstSt
     switch (transition) {
     case GST_STATE_CHANGE_PAUSED_TO_READY:
         GST_DEBUG_OBJECT(source, "Downgrading to READY state, tearing down all streams...");
-        while (!source->priv->streams.isEmpty())
-            webKitMediaSrcTearDownStream(source, source->priv->streams.begin()->key);
+        while (!source->priv->streams.isEmpty()) {
+            webKitMediaSrcTearDownStream(source, source->priv->streams.first().get());
+            source->priv->streams.remove(0);
+        }
         break;
     case GST_STATE_CHANGE_READY_TO_PAUSED:
         if (source->priv->isStarted()) {

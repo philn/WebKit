@@ -508,6 +508,45 @@ void MediaPlayerPrivateGStreamerMSE::setEosWithNoBuffers(bool eosWithNoBuffers)
     }
 }
 
+void MediaPlayerPrivateGStreamerMSE::createTrack(TrackPrivateBaseGStreamer::TrackType type, unsigned index, GstStream* stream)
+{
+    RefPtr player = m_player.get();
+    if (!player)
+        return;
+
+    auto streamId = AtomString::fromLatin1(gst_stream_get_stream_id(stream));
+    for (auto& mseTrack : m_tracks) {
+        if (mseTrack->stream().get() != stream)
+            continue;
+
+        auto trackPrivate = mseTrack->trackPrivate();
+        switch (type) {
+        case TrackPrivateBaseGStreamer::TrackType::Audio: {
+            RefPtr track = static_cast<AudioTrackPrivateGStreamer*>(trackPrivate.get());
+            player->addAudioTrack(*track);
+            m_audioTracks.add(streamId, WTFMove(track));
+            return;
+        }
+        case TrackPrivateBaseGStreamer::TrackType::Video: {
+            RefPtr track = static_cast<VideoTrackPrivateGStreamer*>(trackPrivate.get());
+            player->addVideoTrack(*track);
+            m_videoTracks.add(streamId, WTFMove(track));
+            return;
+        }
+        case TrackPrivateBaseGStreamer::TrackType::Text: {
+            RefPtr track = static_cast<InbandTextTrackPrivateGStreamer*>(trackPrivate.get());
+            player->addTextTrack(*track);
+            m_textTracks.add(streamId, WTFMove(track));
+            return;
+        }
+        case TrackPrivateBaseGStreamer::TrackType::Unknown:
+            break;
+        }
+    }
+
+    MediaPlayerPrivateGStreamer::createTrack(type, index, stream);
+}
+
 void MediaPlayerPrivateGStreamerMSE::getSupportedTypes(HashSet<String>& types)
 {
     GStreamerRegistryScannerMSE::getSupportedDecodingTypes(types);

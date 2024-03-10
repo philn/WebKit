@@ -97,6 +97,8 @@ public:
     void setShouldDisableSleep(bool) final;
 #endif
 
+    void createTrack(TrackPrivateBaseGStreamer::TrackType, unsigned, GstStream*) final;
+
 private:
     explicit MediaPlayerPrivateGStreamerMSE(MediaPlayer*);
 
