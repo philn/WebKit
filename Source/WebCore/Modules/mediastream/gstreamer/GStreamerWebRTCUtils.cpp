@@ -604,9 +604,9 @@ GRefPtr<GstCaps> capsFromSDPMedia(const GstSDPMedia* media)
             }
 
             // Remove ssrc- attributes that end up being accumulated in fmtp SDP media parameters.
-            gst_structure_filter_and_map_in_place(structure, reinterpret_cast<GstStructureFilterMapFunc>(+[](GQuark quark, GValue*, gpointer) -> gboolean {
-                return !g_str_has_prefix(g_quark_to_string(quark), "ssrc-");
-            }), nullptr);
+            // gst_structure_filter_and_map_in_place(structure, reinterpret_cast<GstStructureFilterMapFunc>(+[](GQuark quark, GValue*, gpointer) -> gboolean {
+            //     return !g_str_has_prefix(g_quark_to_string(quark), "ssrc-");
+            // }), nullptr);
         }
 
         gst_caps_append(caps.get(), formatCaps);
