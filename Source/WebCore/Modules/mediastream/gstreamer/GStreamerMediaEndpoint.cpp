@@ -1715,6 +1715,25 @@ void GStreamerMediaEndpoint::gatherDecoderImplementationName(Function<void(Strin
     callback({ });
 }
 
+bool GStreamerMediaEndpoint::isNegotiationNeeded(uint32_t eventId) const
+{
+    return false;
+    if (eventId != m_negotiationNeededEventId) {
+        GST_DEBUG_OBJECT(m_pipeline.get(), "Event ID has been invalidated");
+        return false;
+    }
+
+    auto signalingState = fetchSignalingState(m_webrtcBin.get());
+    if (signalingState != GST_WEBRTC_SIGNALING_STATE_STABLE)
+        return false;
+
+    return true;
+    // bool result = eventId == m_negotiationNeededEventId;
+
+    // GST_DEBUG_OBJECT(m_pipeline.get(), "Negotiation needed: %s (eventId: %u)", WTF::boolForPrinting(result), eventId);
+    // return result;
+}
+
 std::optional<bool> GStreamerMediaEndpoint::canTrickleIceCandidates() const
 {
     if (!m_webrtcBin)

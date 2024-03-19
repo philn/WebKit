@@ -81,7 +81,7 @@ public:
     void resume();
 
     void gatherDecoderImplementationName(Function<void(String&&)>&&);
-    bool isNegotiationNeeded(uint32_t eventId) const { return eventId == m_negotiationNeededEventId; }
+    bool isNegotiationNeeded(uint32_t eventId) const;
 
     std::optional<bool> canTrickleIceCandidates() const;
 
