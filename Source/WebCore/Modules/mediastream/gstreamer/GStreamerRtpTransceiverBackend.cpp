@@ -141,6 +141,11 @@ static inline WARN_UNUSED_RETURN ExceptionOr<GstCaps*> toRtpCodecCapability(cons
 
 ExceptionOr<void> GStreamerRtpTransceiverBackend::setCodecPreferences(const Vector<RTCRtpCodecCapability>& codecs)
 {
+    if (codecs.size() == m_codecCapabilities.size())
+        return { };
+
+    m_codecCapabilities = codecs;
+
     auto gstCodecs = adoptGRef(gst_caps_new_empty());
     int dynamicPayloadType = 96;
     for (auto& codec : codecs) {
@@ -149,6 +154,7 @@ ExceptionOr<void> GStreamerRtpTransceiverBackend::setCodecPreferences(const Vect
             return result.releaseException();
         gst_caps_append(gstCodecs.get(), result.releaseReturnValue());
     }
+    GST_DEBUG("phil Setting codec preferences on %" GST_PTR_FORMAT " to %" GST_PTR_FORMAT, m_rtcTransceiver.get(), gstCodecs.get());
     g_object_set(m_rtcTransceiver.get(), "codec-preferences", gstCodecs.get(), nullptr);
     return { };
 }

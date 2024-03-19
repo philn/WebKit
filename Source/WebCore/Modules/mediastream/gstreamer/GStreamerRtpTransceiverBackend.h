@@ -53,6 +53,7 @@ private:
 
     GRefPtr<GstWebRTCRTPTransceiver> m_rtcTransceiver;
     bool m_isStopped { false };
+    Vector<RTCRtpCodecCapability> m_codecCapabilities;
 };
 
 } // namespace WebCore
