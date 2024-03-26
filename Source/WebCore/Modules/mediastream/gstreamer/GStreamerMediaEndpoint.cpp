@@ -1717,7 +1717,7 @@ void GStreamerMediaEndpoint::gatherDecoderImplementationName(Function<void(Strin
 
 bool GStreamerMediaEndpoint::isNegotiationNeeded(uint32_t eventId) const
 {
-    return false;
+    // return false;
     if (eventId != m_negotiationNeededEventId) {
         GST_DEBUG_OBJECT(m_pipeline.get(), "Event ID has been invalidated");
         return false;
@@ -1727,7 +1727,11 @@ bool GStreamerMediaEndpoint::isNegotiationNeeded(uint32_t eventId) const
     if (signalingState != GST_WEBRTC_SIGNALING_STATE_STABLE)
         return false;
 
-    return true;
+    if (!m_foo) {
+        m_foo = true;
+        return true;
+    }
+    return false;
     // bool result = eventId == m_negotiationNeededEventId;
 
     // GST_DEBUG_OBJECT(m_pipeline.get(), "Negotiation needed: %s (eventId: %u)", WTF::boolForPrinting(result), eventId);

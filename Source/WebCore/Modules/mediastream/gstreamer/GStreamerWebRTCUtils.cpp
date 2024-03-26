@@ -589,6 +589,7 @@ GRefPtr<GstCaps> capsFromSDPMedia(const GstSDPMedia* media)
         // Relay SDP attributes to the caps, this is specially useful so that elements in
         // webrtcbin will be able to enable RTP header extensions.
         gst_sdp_media_attributes_to_caps(media, formatCaps);
+        GST_DEBUG("philcaps: %" GST_PTR_FORMAT, formatCaps);
         for (unsigned j = 0; j < gst_caps_get_size(formatCaps); j++) {
             auto* structure = gst_caps_get_structure(formatCaps, j);
             gst_structure_set_name(structure, "application/x-rtp");
@@ -604,9 +605,10 @@ GRefPtr<GstCaps> capsFromSDPMedia(const GstSDPMedia* media)
             }
 
             // Remove ssrc- attributes that end up being accumulated in fmtp SDP media parameters.
-            // gst_structure_filter_and_map_in_place(structure, reinterpret_cast<GstStructureFilterMapFunc>(+[](GQuark quark, GValue*, gpointer) -> gboolean {
-            //     return !g_str_has_prefix(g_quark_to_string(quark), "ssrc-");
-            // }), nullptr);
+            gst_structure_filter_and_map_in_place(structure, reinterpret_cast<GstStructureFilterMapFunc>(+[](GQuark quark, GValue*, gpointer) -> gboolean {
+                const char* quarkString = g_quark_to_string(quark);
+                return !g_str_has_prefix(quarkString, "ssrc-") && !g_str_has_prefix(quarkString, "extmap");
+            }), nullptr);
         }
 
         gst_caps_append(caps.get(), formatCaps);

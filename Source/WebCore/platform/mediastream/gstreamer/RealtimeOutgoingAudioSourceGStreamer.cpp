@@ -90,10 +90,14 @@ bool RealtimeOutgoingAudioSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
             gst_structure_remove_field(structure.get(), "useinbandfec");
         }
 
-        if (const char* isStereo = gst_structure_get_string(structure.get(), "stereo")) {
-            if (!g_strcmp0(isStereo, "1"))
-                m_inputCaps = adoptGRef(gst_caps_new_simple("audio/x-raw", "channels", G_TYPE_INT, 2, nullptr));
-            gst_structure_remove_field(structure.get(), "stereo");
+        // if (const char* isStereo = gst_structure_get_string(structure.get(), "stereo")) {
+        //     if (!g_strcmp0(isStereo, "1"))
+        //         m_inputCaps = adoptGRef(gst_caps_new_simple("audio/x-raw", "channels", G_TYPE_INT, 2, nullptr));
+        //     gst_structure_remove_field(structure.get(), "stereo");
+        // }
+        if (const char* encodingParameters = gst_structure_get_string(structure.get(), "encoding-params")) {
+            if (auto channels = parseIntegerAllowingTrailingJunk<int>(StringView::fromLatin1(encodingParameters)))
+                m_inputCaps = adoptGRef(gst_caps_new_simple("audio/x-raw", "channels", G_TYPE_INT, *channels, nullptr));
         }
     } else if (encoding == "g722"_s)
         m_encoder = makeGStreamerElement("avenc_g722", nullptr);
@@ -112,7 +116,7 @@ bool RealtimeOutgoingAudioSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
     }
 
     // Align MTU with libwebrtc implementation, also helping to reduce packet fragmentation.
-    g_object_set(m_payloader.get(), "auto-header-extension", TRUE, "mtu", 1200, nullptr);
+    g_object_set(m_payloader.get(), "auto-header-extension", FALSE, "mtu", 1200, nullptr);
 
     if (const char* minPTime = gst_structure_get_string(structure.get(), "minptime")) {
         auto time = String::fromLatin1(minPTime);

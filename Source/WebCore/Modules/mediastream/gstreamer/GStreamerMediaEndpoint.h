@@ -204,6 +204,7 @@ private:
     RefPtr<UniqueSSRCGenerator> m_ssrcGenerator;
 
     HashMap<GRefPtr<GstWebRTCRTPTransceiver>, RefPtr<GStreamerIncomingTrackProcessor>> m_trackProcessors;
+    mutable bool m_foo { false };
 };
 
 } // namespace WebCore
