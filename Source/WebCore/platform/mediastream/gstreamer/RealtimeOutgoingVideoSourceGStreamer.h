@@ -33,7 +33,7 @@ public:
     void setApplyRotation(bool shouldApplyRotation) { m_shouldApplyRotation = shouldApplyRotation; }
 
     bool setPayloadType(const GRefPtr<GstCaps>&) final;
-    void teardown() final;
+    void finishTeardown() final;
     void flush() final;
 
     void setParameters(GUniquePtr<GstStructure>&&) final;

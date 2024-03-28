@@ -203,9 +203,9 @@ void RealtimeOutgoingAudioSourceGStreamer::setParameters(GUniquePtr<GstStructure
     m_parameters = WTFMove(parameters);
 }
 
-void RealtimeOutgoingAudioSourceGStreamer::teardown()
+void RealtimeOutgoingAudioSourceGStreamer::finishTeardown()
 {
-    RealtimeOutgoingMediaSourceGStreamer::teardown();
+    RealtimeOutgoingMediaSourceGStreamer::finishTeardown();
     m_audioconvert.clear();
     m_audioresample.clear();
     m_inputCaps.clear();

@@ -53,7 +53,8 @@ public:
     GRefPtr<GstElement> bin() const { return m_bin; }
 
     virtual bool setPayloadType(const GRefPtr<GstCaps>&) { return false; }
-    virtual void teardown();
+    void teardown();
+    virtual void finishTeardown();
 
     GUniquePtr<GstStructure> parameters();
     virtual void fillEncodingParameters(const GUniquePtr<GstStructure>&) { }

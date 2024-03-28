@@ -262,15 +262,43 @@ void RealtimeOutgoingMediaSourceGStreamer::teardown()
     if (m_transceiver)
         g_signal_handlers_disconnect_by_data(m_transceiver.get(), this);
 
-    if (m_fallbackSource) {
-        gst_element_set_locked_state(m_fallbackSource.get(), TRUE);
-        gst_element_set_state(m_fallbackSource.get(), GST_STATE_READY);
-        gst_element_unlink(m_fallbackSource.get(), m_inputSelector.get());
-        gst_element_set_state(m_fallbackSource.get(), GST_STATE_NULL);
-        gst_element_release_request_pad(m_inputSelector.get(), m_fallbackPad.get());
-        gst_element_set_locked_state(m_fallbackSource.get(), FALSE);
+    GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_bin.get()), GST_DEBUG_GRAPH_SHOW_ALL, "phil");
+    if ((m_webrtcSinkPad.get() && !gst_pad_is_linked(m_webrtcSinkPad.get())) || !m_webrtcSinkPad)  {
+        finishTeardown();
+        return;
     }
 
+    if (m_fallbackSource) {
+        gst_pad_add_probe(m_fallbackPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BLOCK | GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM), reinterpret_cast<GstPadProbeCallback>(+[](GstPad* pad, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+            if (GST_EVENT_TYPE(GST_PAD_PROBE_INFO_DATA(info)) != GST_EVENT_EOS)
+                return GST_PAD_PROBE_OK;
+
+            gst_pad_remove_probe(pad, GST_PAD_PROBE_INFO_ID(info));
+
+            auto self = reinterpret_cast<RealtimeOutgoingMediaSourceGStreamer*>(userData);
+            gst_element_unlink(self->m_fallbackSource.get(), self->m_inputSelector.get());
+            gst_element_set_state(self->m_fallbackSource.get(), GST_STATE_NULL);
+            gst_element_release_request_pad(self->m_inputSelector.get(), self->m_fallbackPad.get());
+
+            self->finishTeardown();
+            return GST_PAD_PROBE_DROP;
+        }), this , nullptr);
+
+        gst_element_send_event(m_fallbackSource.get(), gst_event_new_eos());
+
+        // gst_element_set_locked_state(m_bin.get(), TRUE);
+        // gst_element_set_state(m_fallbackSource.get(), GST_STATE_READY);
+        // gst_element_unlink(m_fallbackSource.get(), m_inputSelector.get());
+        // gst_element_set_state(m_fallbackSource.get(), GST_STATE_NULL);
+        // gst_element_release_request_pad(m_inputSelector.get(), m_fallbackPad.get());
+        // gst_element_set_locked_state(m_bin.get(), FALSE);
+        return;
+    }
+    finishTeardown();
+}
+
+void RealtimeOutgoingMediaSourceGStreamer::finishTeardown()
+{
     stopOutgoingSource();
 
     if (GST_IS_PAD(m_webrtcSinkPad.get())) {

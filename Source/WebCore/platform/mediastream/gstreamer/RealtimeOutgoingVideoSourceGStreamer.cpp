@@ -93,9 +93,9 @@ void RealtimeOutgoingVideoSourceGStreamer::updateStats(GstBuffer*)
     gst_structure_set(m_stats.get(), "frames-sent", G_TYPE_UINT64, framesSent, "frames-encoded", G_TYPE_UINT64, framesSent, nullptr);
 }
 
-void RealtimeOutgoingVideoSourceGStreamer::teardown()
+void RealtimeOutgoingVideoSourceGStreamer::finishTeardown()
 {
-    RealtimeOutgoingMediaSourceGStreamer::teardown();
+    RealtimeOutgoingMediaSourceGStreamer::finishTeardown();
     m_videoConvert.clear();
     m_videoFlip.clear();
     m_videoRate.clear();
@@ -155,7 +155,7 @@ bool RealtimeOutgoingVideoSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
     }
 
     // Align MTU with libwebrtc implementation, also helping to reduce packet fragmentation.
-    g_object_set(m_payloader.get(), "auto-header-extension", TRUE, "mtu", 1200, nullptr);
+    g_object_set(m_payloader.get(), "auto-header-extension", FALSE, "mtu", 1200, nullptr);
 
     if (!videoEncoderSetFormat(WEBKIT_VIDEO_ENCODER(m_encoder.get()), WTFMove(encoderCaps))) {
         GST_ERROR_OBJECT(m_bin.get(), "Unable to set encoder format");
@@ -313,6 +313,8 @@ void RealtimeOutgoingVideoSourceGStreamer::setParameters(GUniquePtr<GstStructure
     auto* firstEncoding = gst_value_list_get_value(encodingsValue, 0);
     RELEASE_ASSERT(GST_VALUE_HOLDS_STRUCTURE(firstEncoding));
     auto* structure = gst_value_get_structure(firstEncoding);
+
+    // TODO: Handle rid (string), bitrate-priority (double), scale-resolution-down-by (double).
 
     if (gst_structure_has_field(structure, "max-framerate")) {
         if (!m_videoRate)
