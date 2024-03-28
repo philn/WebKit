@@ -808,7 +808,6 @@ bool GStreamerMediaEndpoint::addTrack(GStreamerRtpSenderBackend& sender, MediaSt
     sender.setRTCSender(WTFMove(rtcSender));
 
     GST_DEBUG_OBJECT(m_pipeline.get(), "Sender configured");
-    onNegotiationNeeded();
     return true;
 }
 
@@ -817,7 +816,6 @@ void GStreamerMediaEndpoint::removeTrack(GStreamerRtpSenderBackend& sender)
     GST_DEBUG_OBJECT(m_pipeline.get(), "Removing track");
     sender.stopSource();
     sender.clearSource();
-    onNegotiationNeeded();
 }
 
 void GStreamerMediaEndpoint::doCreateOffer(const RTCOfferOptions& options)
@@ -1232,7 +1230,7 @@ GStreamerRtpSenderBackend::Source GStreamerMediaEndpoint::createLinkedSourceForT
 ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::addTransceiver(MediaStreamTrack& track, const RTCRtpTransceiverInit& init)
 {
     GST_DEBUG_OBJECT(m_pipeline.get(), "Creating transceiver associated with %s track %s", track.kind().string().ascii().data(), track.id().ascii().data());
-    return createTransceiverBackends(track.kind(), init, createSourceForTrack(track));
+    return createTransceiverBackends(track.kind(), init, createLinkedSourceForTrack(track));
 }
 
 std::unique_ptr<GStreamerRtpTransceiverBackend> GStreamerMediaEndpoint::transceiverBackendFromSender(GStreamerRtpSenderBackend& backend)
@@ -1329,7 +1327,6 @@ std::unique_ptr<RTCDataChannelHandler> GStreamerMediaEndpoint::createDataChannel
     if (!channel)
         return nullptr;
 
-    onNegotiationNeeded();
     return WTF::makeUnique<GStreamerDataChannelHandler>(WTFMove(channel));
 }
 
