@@ -61,7 +61,7 @@ GStreamerRtpSenderBackend::GStreamerRtpSenderBackend(GStreamerPeerConnectionBack
     , m_initData(WTFMove(initData))
 {
     ensureDebugCategoryIsRegistered();
-    GST_DEBUG_OBJECT(m_rtcSender.get(), "constructed with associated source");
+    GST_DEBUG_OBJECT(m_rtcSender.get(), "constructed with associated source, initData: %" GST_PTR_FORMAT, m_initData.get());
 }
 
 void GStreamerRtpSenderBackend::clearSource()

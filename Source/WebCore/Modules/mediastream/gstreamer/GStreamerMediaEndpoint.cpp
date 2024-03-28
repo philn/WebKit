@@ -322,7 +322,6 @@ static std::optional<std::pair<RTCSdpType, String>> fetchDescription(GstElement*
     }
 
     GUniquePtr<char> sdpString(gst_sdp_message_as_text(description->sdp));
-    GST_TRACE_OBJECT(webrtcBin, "%s-description SDP: %s", name, sdpString.get());
     return { { fromSessionDescriptionType(*description.get()), String::fromLatin1(sdpString.get()) } };
 }
 
@@ -985,7 +984,6 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
     m_peerConnectionBackend.addPendingTrackEvent({ Ref(transceiver->receiver()), Ref(transceiver->receiver().track()), { }, Ref(*transceiver) });
 
     auto mediaStreamBin = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(m_pipeline.get()), data.mediaStreamBinName.ascii().data()));
-    auto tee = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(mediaStreamBin.get()), "tee"));
     GstElement* bin = nullptr;
     auto& track = transceiver->receiver().track();
     auto& source = track.privateTrack().source();
@@ -1002,6 +1000,7 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
     }
     ASSERT(bin);
 
+    GST_DEBUG_OBJECT(m_pipeline.get(), "Incoming track %s with caps %" GST_PTR_FORMAT " is associated with bin %" GST_PTR_FORMAT " and transceiver %" GST_PTR_FORMAT, data.trackId.ascii().data(), data.caps.get(), bin, rtcTransceiver.get());
     gst_bin_add(GST_BIN_CAST(m_pipeline.get()), bin);
 
     auto& mediaStream = mediaStreamFromRTCStream(data.mediaStreamId);
@@ -1724,15 +1723,16 @@ bool GStreamerMediaEndpoint::isNegotiationNeeded(uint32_t eventId) const
     if (signalingState != GST_WEBRTC_SIGNALING_STATE_STABLE)
         return false;
 
-    if (!m_foo) {
-        m_foo = true;
-        return true;
-    }
-    return false;
-    // bool result = eventId == m_negotiationNeededEventId;
+    // if (!m_foo) {
+    //     m_foo = true;
+    // return true;
+    // }
+    // return false;
+    bool result = eventId == m_negotiationNeededEventId;
 
-    // GST_DEBUG_OBJECT(m_pipeline.get(), "Negotiation needed: %s (eventId: %u)", WTF::boolForPrinting(result), eventId);
-    // return result;
+
+    GST_DEBUG_OBJECT(m_pipeline.get(), "Negotiation needed: %s (eventId: %u)", WTF::boolForPrinting(result), eventId);
+    return result;
 }
 
 std::optional<bool> GStreamerMediaEndpoint::canTrickleIceCandidates() const

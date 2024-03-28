@@ -154,7 +154,7 @@ ExceptionOr<void> GStreamerRtpTransceiverBackend::setCodecPreferences(const Vect
             return result.releaseException();
         gst_caps_append(gstCodecs.get(), result.releaseReturnValue());
     }
-    GST_DEBUG("phil Setting codec preferences on %" GST_PTR_FORMAT " to %" GST_PTR_FORMAT, m_rtcTransceiver.get(), gstCodecs.get());
+    GST_DEBUG("Setting codec preferences on %" GST_PTR_FORMAT " to %" GST_PTR_FORMAT, m_rtcTransceiver.get(), gstCodecs.get());
     g_object_set(m_rtcTransceiver.get(), "codec-preferences", gstCodecs.get(), nullptr);
     return { };
 }
