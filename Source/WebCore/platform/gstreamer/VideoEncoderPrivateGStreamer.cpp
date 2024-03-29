@@ -818,20 +818,63 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
                 break;
             };
         }, [](GstElement* encoder, const WebKitVideoEncoderBitRateAllocation& bitRateAllocation) {
-            // TODO phil
+            ALLOW_DEPRECATED_DECLARATIONS_BEGIN;
+            GUniquePtr<GValueArray> bitrates(g_value_array_new(3));
+            GUniquePtr<GValueArray> layerIds(g_value_array_new(4));
             unsigned numberLayers = 1;
+            GValue intValue G_VALUE_INIT;
+            const char* scalabilityString = nullptr;
+
+            g_value_init(&intValue, G_TYPE_INT);
+
             switch (bitRateAllocation.scalabilityMode()) {
             case VideoEncoder::ScalabilityMode::L1T1:
                 numberLayers = 1;
+                scalabilityString = "L1T1";
+                if (auto value = bitRateAllocation.getBitRate(0, 0)) {
+                    g_value_set_int(&intValue, *value);
+                    g_value_array_append(bitrates.get(), &intValue);
+                }
                 break;
             case VideoEncoder::ScalabilityMode::L1T2:
                 numberLayers = 2;
+                scalabilityString = "L1T2";
+                if (auto value = bitRateAllocation.getBitRate(0, 0)) {
+                    g_value_set_int(&intValue, *value);
+                    g_value_array_append(bitrates.get(), &intValue);
+                }
+                if (auto value = bitRateAllocation.getBitRate(0, 1)) {
+                    g_value_set_int(&intValue, *value);
+                    g_value_array_append(bitrates.get(), &intValue);
+                }
                 break;
             case VideoEncoder::ScalabilityMode::L1T3:
                 numberLayers = 3;
+                scalabilityString = "L1T3";
+                if (auto value = bitRateAllocation.getBitRate(0, 0)) {
+                    g_value_set_int(&intValue, *value);
+                    g_value_array_append(bitrates.get(), &intValue);
+                }
+                if (auto value = bitRateAllocation.getBitRate(0, 1)) {
+                    g_value_set_int(&intValue, *value);
+                    g_value_array_append(bitrates.get(), &intValue);
+                }
+                if (auto value = bitRateAllocation.getBitRate(0, 2)) {
+                    g_value_set_int(&intValue, *value);
+                    g_value_array_append(bitrates.get(), &intValue);
+                }
                 break;
             }
-            g_object_set(encoder, "temporal-scalability-number-layers", numberLayers, nullptr);
+            int d[] = { 0, 2, 1, 2 };
+            for(unsigned i = 0; i < 4; i++) {
+                g_value_set_int(&intValue, d[i]);
+                g_value_array_append(layerIds.get(), &intValue);
+            }
+            GST_DEBUG_OBJECT(encoder, "Configuring for %s scalability mode", scalabilityString);
+            g_object_set(encoder, "temporal-scalability-number-layers", numberLayers,
+                         "temporal-scalability-target-bitrate", bitrates.get(),
+                         "temporal-scalability-layer-id", layerIds.get(), nullptr);
+            ALLOW_DEPRECATED_DECLARATIONS_END;
         });
 
     Encoders::registerEncoder(Vp9, "vp9enc", nullptr, "video/x-vp9", nullptr,

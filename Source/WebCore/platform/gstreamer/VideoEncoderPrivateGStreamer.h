@@ -58,12 +58,12 @@ public:
 
     void setBitRate(unsigned spatialLayerIndex, unsigned temporalLayerIndex, uint32_t bitRate)
     {
-        *m_bitRates[spatialLayerIndex][temporalLayerIndex] = bitRate;
+        m_bitRates[spatialLayerIndex][temporalLayerIndex].emplace(bitRate);
     }
 
-    uint32_t getBitRate(unsigned spatialLayerIndex, unsigned temporalLayerIndex)
+    std::optional<uint32_t> getBitRate(unsigned spatialLayerIndex, unsigned temporalLayerIndex) const
     {
-        return m_bitRates[spatialLayerIndex][temporalLayerIndex].value_or(0);
+        return m_bitRates[spatialLayerIndex][temporalLayerIndex];
     }
 
     WebCore::VideoEncoder::ScalabilityMode scalabilityMode() const { return m_scalabilityMode; }

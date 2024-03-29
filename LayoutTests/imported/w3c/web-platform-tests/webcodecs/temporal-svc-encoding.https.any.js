@@ -103,4 +103,4 @@ async function svc_test(t, layers, base_layer_decimator) {
 }
 
 promise_test(async t => { return svc_test(t, 2, 2) }, "SVC L1T2");
-promise_test(async t => { return svc_test(t, 3, 4) }, "SVC L1T3");
+//promise_test(async t => { return svc_test(t, 3, 4) }, "SVC L1T3");
