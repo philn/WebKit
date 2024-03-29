@@ -94,6 +94,7 @@ using SetBitrateFunc = Function<void(GObject* encoder, const char* propertyName,
 using SetupFunc = Function<void(WebKitVideoEncoder*)>;
 using SetBitrateModeFunc = Function<void(GstElement*, BitrateMode)>;
 using SetLatencyModeFunc = Function<void(GstElement*, LatencyMode)>;
+using SetBitRateAllocationFunc = Function<void(GstElement*, const WebKitVideoEncoderBitRateAllocation&)>;
 
 struct EncoderDefinition {
     GRefPtr<GstCaps> caps;
@@ -105,9 +106,15 @@ struct EncoderDefinition {
     SetupFunc setupEncoder;
     SetBitrateModeFunc setBitrateMode;
     SetLatencyModeFunc setLatencyMode;
+    SetBitRateAllocationFunc setBitRateAllocation;
     const char* bitratePropertyName;
     const char* keyframeIntervalPropertyName;
 };
+
+static void defaultSetBitRateAllocation(GstElement*, const WebKitVideoEncoderBitRateAllocation&)
+{
+    notImplemented();
+}
 
 enum EncoderId {
     None,
@@ -133,7 +140,7 @@ public:
     }
 
     static void registerEncoder(EncoderId id, const char* name, const char* parserName, const char* capsString, const char* encodedFormatString,
-        SetupFunc&& setupEncoder, const char* bitratePropertyName, SetBitrateFunc&& setBitrate, const char* keyframeIntervalPropertyName, SetBitrateModeFunc&& setBitrateMode, SetLatencyModeFunc&& setLatency)
+        SetupFunc&& setupEncoder, const char* bitratePropertyName, SetBitrateFunc&& setBitrate, const char* keyframeIntervalPropertyName, SetBitrateModeFunc&& setBitrateMode, SetLatencyModeFunc&& setLatency, SetBitRateAllocationFunc&& setBitRateAllocation = defaultSetBitRateAllocation)
     {
         auto encoderFactory = adoptGRef(gst_element_factory_find(name));
         if (!encoderFactory) {
@@ -173,6 +180,7 @@ public:
             .setupEncoder = WTFMove(setupEncoder),
             .setBitrateMode = WTFMove(setBitrateMode),
             .setLatencyMode = WTFMove(setLatency),
+            .setBitRateAllocation = WTFMove(setBitRateAllocation),
             .bitratePropertyName = bitratePropertyName,
             .keyframeIntervalPropertyName = keyframeIntervalPropertyName,
         }));
@@ -208,6 +216,8 @@ struct _WebKitVideoEncoderPrivate {
     BitrateMode bitrateMode;
     LatencyMode latencyMode;
     String codecString;
+    //VideoEncoder::ScalabilityMode scalabilityMode;
+    RefPtr<WebKitVideoEncoderBitRateAllocation> bitRateAllocation;
 };
 
 #define webkit_video_encoder_parent_class parent_class
@@ -494,6 +504,17 @@ bool videoEncoderSetFormat(WebKitVideoEncoder* self, GRefPtr<GstCaps>&& caps, co
     return videoEncoderSetEncoder(self, encoderId, WTFMove(caps), codecString);
 }
 
+void videoEncoderSetBitRateAllocation(WebKitVideoEncoder* self, RefPtr<WebKitVideoEncoderBitRateAllocation>&& allocation)
+{
+    auto* priv = self->priv;
+    priv->bitRateAllocation = WTFMove(allocation);
+
+    if (priv->encoderId != None) {
+        auto encoder = Encoders::definition(priv->encoderId);
+        encoder->setBitRateAllocation(priv->encoder.get(), *priv->bitRateAllocation);
+    }
+}
+
 static void videoEncoderSetProperty(GObject* object, guint propertyId, const GValue* value, GParamSpec* pspec)
 {
     auto* self = WEBKIT_VIDEO_ENCODER(object);
@@ -570,6 +591,7 @@ static void videoEncoderConstructed(GObject* encoder)
 
     self->priv->bitrateMode = CONSTANT_BITRATE_MODE;
     self->priv->latencyMode = REALTIME_LATENCY_MODE;
+    // self->priv->scalabilityMode = VideoEncoder::ScalabilityMode::L1T1;
 
     auto* sinkPad = webkitGstGhostPadFromStaticTemplate(&sinkTemplate, "sink", nullptr);
     GST_OBJECT_FLAG_SET(sinkPad, GST_PAD_FLAG_NEED_PARENT);
@@ -795,6 +817,21 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
                 gst_util_set_object_arg(G_OBJECT(encoder), "end-usage", "cq");
                 break;
             };
+        }, [](GstElement* encoder, const WebKitVideoEncoderBitRateAllocation& bitRateAllocation) {
+            // TODO phil
+            unsigned numberLayers = 1;
+            switch (bitRateAllocation.scalabilityMode()) {
+            case VideoEncoder::ScalabilityMode::L1T1:
+                numberLayers = 1;
+                break;
+            case VideoEncoder::ScalabilityMode::L1T2:
+                numberLayers = 2;
+                break;
+            case VideoEncoder::ScalabilityMode::L1T3:
+                numberLayers = 3;
+                break;
+            }
+            g_object_set(encoder, "temporal-scalability-number-layers", numberLayers, nullptr);
         });
 
     Encoders::registerEncoder(Vp9, "vp9enc", nullptr, "video/x-vp9", nullptr,
