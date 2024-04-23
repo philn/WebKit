@@ -59,6 +59,24 @@ Ref<RealtimeMediaSource> GStreamerRtpReceiverBackend::createSource(const String&
     return RealtimeIncomingAudioSourceGStreamer::create(AtomString { trackId });
 }
 
+void GStreamerRtpReceiverBackend::notifyConnectedState()
+{
+    GRefPtr<GstWebRTCDTLSTransport> transport;
+    g_object_get(m_rtcReceiver.get(), "transport", &transport.outPtr(), nullptr);
+    if (!transport)
+        return;
+
+    GRefPtr<GstWebRTCICETransport> iceTransport;
+    g_object_get(transport.get(), "transport", &iceTransport.outPtr(), nullptr);
+    if (!iceTransport)
+        return;
+
+    g_object_set_qdata(G_OBJECT(transport.get()), dtlsTransportTrackReadyQuark(), GINT_TO_POINTER(1));
+    g_object_set_qdata(G_OBJECT(iceTransport.get()), iceTransportTrackReadyQuark(), GINT_TO_POINTER(1));
+    g_object_notify(G_OBJECT(transport.get()), "state");
+    g_object_notify(G_OBJECT(iceTransport.get()), "state");
+}
+
 Ref<RTCRtpTransformBackend> GStreamerRtpReceiverBackend::rtcRtpTransformBackend()
 {
     return GStreamerRtpReceiverTransformBackend::create(m_rtcReceiver);

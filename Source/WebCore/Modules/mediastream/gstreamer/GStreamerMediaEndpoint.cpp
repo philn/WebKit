@@ -1017,6 +1017,9 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
     m_peerConnectionBackend.dispatchPendingTrackEvents(mediaStream);
     gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
 
+    auto receiverBackend = reinterpret_cast<GStreamerRtpReceiverBackend*>(transceiver->receiver().backend());
+    receiverBackend->notifyConnectedState();
+
 #ifndef GST_DISABLE_GST_DEBUG
     auto dotFileName = makeString(GST_OBJECT_NAME(m_pipeline.get()), ".connected-"_s, data.mediaStreamId);
     GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, dotFileName.utf8().data());

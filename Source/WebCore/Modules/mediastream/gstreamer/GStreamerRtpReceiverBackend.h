@@ -38,6 +38,7 @@ public:
     GstWebRTCRTPReceiver* rtcReceiver() { return m_rtcReceiver.get(); }
     Ref<RealtimeMediaSource> createSource(const String& trackKind, const String& trackId);
 
+    void notifyConnectedState();
 private:
     RTCRtpParameters getParameters() final;
     Vector<RTCRtpContributingSource> getContributingSources() const final;

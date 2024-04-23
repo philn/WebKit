@@ -301,6 +301,18 @@ inline void unmapRtpBuffer(GstBuffer*, GstRTPBuffer* rtpBuffer)
 
 using GstMappedRtpBuffer = GstBufferMapper<GstRTPBuffer, mapRtpBuffer, unmapRtpBuffer>;
 
+static inline GQuark iceTransportTrackReadyQuark()
+{
+    static GQuark quark = g_quark_from_static_string("ice-transport-track-ready");
+    return quark;
+}
+
+static inline GQuark dtlsTransportTrackReadyQuark()
+{
+    static GQuark quark = g_quark_from_static_string("dtls-transport-track-ready");
+    return quark;
+}
+
 } // namespace WebCore
 
 #endif // ENABLE(WEB_RTC) && USE(GSTREAMER_WEBRTC)

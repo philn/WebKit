@@ -209,6 +209,11 @@ GRefPtr<GstElement> GStreamerIncomingTrackProcessor::createParser()
 {
     GRefPtr<GstElement> parsebin = makeGStreamerElement("parsebin", nullptr);
     g_signal_connect(parsebin.get(), "element-added", G_CALLBACK(+[](GstBin*, GstElement* element, gpointer) {
+        if (g_str_has_prefix(GST_ELEMENT_NAME(element), "h264parse")) {
+            GST_DEBUG("phil h264parse configured");
+            g_object_set(element, "config-interval", -1, nullptr);
+            return;
+        }
         auto elementClass = makeString(gst_element_get_metadata(element, GST_ELEMENT_METADATA_KLASS));
         auto classifiers = elementClass.split('/');
         if (!classifiers.contains("Depayloader"_s))
