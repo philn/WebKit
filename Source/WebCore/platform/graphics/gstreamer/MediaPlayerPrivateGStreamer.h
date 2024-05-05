@@ -432,8 +432,6 @@ protected:
 
     bool updateVideoSinkStatistics();
 
-    virtual void createTrack(TrackPrivateBaseGStreamer::TrackType, unsigned, GstStream*);
-
 private:
     class TaskAtMediaTimeScheduler {
     public:
@@ -481,8 +479,6 @@ private:
     friend class MediaPlayerFactoryGStreamer;
     static void getSupportedTypes(HashSet<String>&);
     static MediaPlayer::SupportsType supportsType(const MediaEngineSupportParameters&);
-
-    friend class MediaPlayerPrivateGStreamerMSE;
 
     void syncOnClock(bool sync);
 
@@ -599,9 +595,9 @@ private:
 #endif
     GRefPtr<GstElement> m_downloadBuffer;
 
-    HashMap<AtomString, RefPtr<AudioTrackPrivateGStreamer>> m_audioTracks;
-    HashMap<AtomString, RefPtr<VideoTrackPrivateGStreamer>> m_videoTracks;
-    HashMap<AtomString, RefPtr<InbandTextTrackPrivateGStreamer>> m_textTracks;
+    HashMap<AtomString, Ref<AudioTrackPrivateGStreamer>> m_audioTracks;
+    HashMap<AtomString, Ref<VideoTrackPrivateGStreamer>> m_videoTracks;
+    HashMap<AtomString, Ref<InbandTextTrackPrivateGStreamer>> m_textTracks;
     RefPtr<InbandMetadataTextTrackPrivateGStreamer> m_chaptersTrack;
 #if USE(GSTREAMER_MPEGTS)
     HashMap<AtomString, RefPtr<InbandMetadataTextTrackPrivateGStreamer>> m_metadataTracks;

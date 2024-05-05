@@ -42,7 +42,7 @@ public:
         return adoptRef(*new AudioTrackPrivateGStreamer(WTFMove(player), index, WTFMove(pad), shouldHandleStreamStartEvent));
     }
 
-    static RefPtr<AudioTrackPrivateGStreamer> create(ThreadSafeWeakPtr<MediaPlayerPrivateGStreamer>&& player, unsigned index, GstStream* stream)
+    static Ref<AudioTrackPrivateGStreamer> create(ThreadSafeWeakPtr<MediaPlayerPrivateGStreamer>&& player, unsigned index, GstStream* stream)
     {
         return adoptRef(*new AudioTrackPrivateGStreamer(WTFMove(player), index, stream));
     }

@@ -88,8 +88,6 @@ public:
     WTFLogChannel& logChannel() const final { return WebCore::LogMediaSource; }
 #endif
 
-    void createTrack(TrackPrivateBaseGStreamer::TrackType, unsigned, GstStream*) final;
-
 private:
     explicit MediaPlayerPrivateGStreamerMSE(MediaPlayer*);
 

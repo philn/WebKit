@@ -39,9 +39,12 @@
 
 #include "ContentType.h"
 #include "Logging.h"
+#include "MediaPlayerPrivateGStreamer.h"
 #include "MediaPlayerPrivateGStreamerMSE.h"
 #include "MediaSourceTrackGStreamer.h"
+#include "NotImplemented.h"
 #include "SourceBufferPrivateGStreamer.h"
+#include "TimeRanges.h"
 #include "WebKitMediaSourceGStreamer.h"
 #include <wtf/NativePromise.h>
 #include <wtf/RefPtr.h>
@@ -161,7 +164,8 @@ void MediaSourcePrivateGStreamer::startPlaybackIfHasAllTracks()
     Vector<RefPtr<MediaSourceTrackGStreamer>> tracks;
     for (auto& privateSourceBuffer : m_sourceBuffers) {
         auto sourceBuffer = downcast<SourceBufferPrivateGStreamer>(privateSourceBuffer);
-        tracks.appendVector(sourceBuffer->tracks());
+        for (auto& [_, track] : sourceBuffer->tracks())
+            tracks.append(track);
     }
     m_playerPrivate.startSource(tracks);
 }

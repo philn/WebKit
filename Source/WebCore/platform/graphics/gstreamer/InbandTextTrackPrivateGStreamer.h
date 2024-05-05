@@ -47,7 +47,7 @@ public:
         return create(index, WTFMove(pad));
     }
 
-    static RefPtr<InbandTextTrackPrivateGStreamer> create(ThreadSafeWeakPtr<MediaPlayerPrivateGStreamer>&&, unsigned index, GstStream* stream)
+    static Ref<InbandTextTrackPrivateGStreamer> create(ThreadSafeWeakPtr<MediaPlayerPrivateGStreamer>&&, unsigned index, GstStream* stream)
     {
         return adoptRef(*new InbandTextTrackPrivateGStreamer(index, stream));
     }

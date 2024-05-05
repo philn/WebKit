@@ -33,7 +33,7 @@
 
 #if ENABLE(MEDIA_SOURCE) && USE(GSTREAMER)
 
-#include "TrackPrivateBase.h"
+#include "TrackPrivateBaseGStreamer.h"
 #include "TrackQueue.h"
 #include <wtf/DataMutex.h>
 
@@ -41,17 +41,14 @@ namespace WebCore {
 
 class MediaSourceTrackGStreamer final: public ThreadSafeRefCounted<MediaSourceTrackGStreamer> {
 public:
-    static Ref<MediaSourceTrackGStreamer> create(RefPtr<TrackPrivateBase>&&, GRefPtr<GstCaps>&& initialCaps);
+    static Ref<MediaSourceTrackGStreamer> create(TrackPrivateBaseGStreamer::TrackType, TrackID, const AtomString&, GRefPtr<GstCaps>&& initialCaps);
     virtual ~MediaSourceTrackGStreamer();
 
-    TrackPrivateBaseGStreamer::TrackType type() const;
-    TrackID id() const { return m_track->id(); }
-    const AtomString& stringId() const;
+    TrackPrivateBaseGStreamer::TrackType type() const { return m_type; }
+    TrackID id() const { return m_id; }
+    const AtomString& stringId() const { return m_stringId; }
     GRefPtr<GstCaps>& initialCaps() { return m_initialCaps; }
     DataMutex<TrackQueue>& queueDataMutex() { return m_queueDataMutex; }
-
-    GRefPtr<GstStream> stream() const;
-    RefPtr<TrackPrivateBase> trackPrivate() const { return m_track; }
 
     bool isReadyForMoreSamples();
 
@@ -68,15 +65,17 @@ public:
     void remove();
 
 private:
-    explicit MediaSourceTrackGStreamer(RefPtr<TrackPrivateBase>&&, GRefPtr<GstCaps>&& initialCaps);
+    explicit MediaSourceTrackGStreamer(TrackPrivateBaseGStreamer::TrackType, TrackID, const AtomString&, GRefPtr<GstCaps>&& initialCaps);
 
-    RefPtr<TrackPrivateBase> m_track;
+    TrackPrivateBaseGStreamer::TrackType m_type;
+    TrackID m_id;
+    const AtomString m_stringId;
     GRefPtr<GstCaps> m_initialCaps;
     DataMutex<TrackQueue> m_queueDataMutex;
 
     bool m_isRemoved { false };
 };
 
-} // namespace WebCore
+}
 
-#endif // ENABLE(MEDIA_SOURCE) && USE(GSTREAMER)
+#endif
