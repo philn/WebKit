@@ -26,7 +26,6 @@ promise_test((test) => {
                 }
                 outgoingConnection.addTrack(stream.getVideoTracks()[0], stream);
                 assert_equals(outgoingConnection.connectionState, "new");
-
             }, (connection) => {
                 incomingConnection = connection;
                 assert_equals(incomingConnection.connectionState, "new");
@@ -38,7 +37,11 @@ promise_test((test) => {
                     resolve(trackEvent.streams[0]);
                 };
             });
-            setTimeout(() => reject("Test timed out"), 5000);
+            setTimeout(() => {
+                console.log(`outgoingEvents: ${outgoingEvents}`);
+                console.log(`incomingEvents: ${incomingEvents}`);
+                reject("Test timed out");
+            }, 5000);
         });
     }).then((stream) => {
         video.srcObject = stream;
