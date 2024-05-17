@@ -553,7 +553,7 @@ void GStreamerMediaEndpoint::doSetLocalDescription(const RTCSessionDescription* 
         }
 
 #ifndef GST_DISABLE_GST_DEBUG
-        auto dotFileName = makeString(GST_OBJECT_NAME(m_pipeline.get()), ".setLocalDescription"_s);
+        auto dotFileName = makeString(span(GST_OBJECT_NAME(m_pipeline.get())), ".setLocalDescription"_s);
         GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, dotFileName.utf8().data());
 #endif
 
@@ -664,7 +664,7 @@ void GStreamerMediaEndpoint::doSetRemoteDescription(const RTCSessionDescription&
         }
 
 #ifndef GST_DISABLE_GST_DEBUG
-        auto dotFileName = makeString(GST_OBJECT_NAME(m_pipeline.get()), ".setRemoteDescription"_s);
+        auto dotFileName = makeString(span(GST_OBJECT_NAME(m_pipeline.get())), ".setRemoteDescription"_s);
         GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, dotFileName.utf8().data());
 #endif
 
