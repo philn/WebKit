@@ -48,23 +48,27 @@ void RealtimeIncomingVideoSourceGStreamer::setUpstreamBin(const GRefPtr<GstEleme
 {
     RealtimeIncomingSourceGStreamer::setUpstreamBin(bin);
 
-    auto tee = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(m_upstreamBin.get()), "tee"));
-    auto sinkPad = adoptGRef(gst_element_get_static_pad(tee.get(), "sink"));
-    gst_pad_add_probe(sinkPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer) -> GstPadProbeReturn {
-        auto videoFrameTimeMetadata = std::make_optional<VideoFrameTimeMetadata>({ });
-        videoFrameTimeMetadata->receiveTime = MonotonicTime::now().secondsSinceEpoch();
+    auto ntpCaps = adoptGRef(gst_caps_new_empty_simple("timestamp/x-ntp"));
+    auto sinkPad = adoptGRef(gst_element_get_static_pad(bin.get(), "sink"));
+    gst_pad_add_probe(sinkPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+        VideoFrameTimeMetadata videoFrameTimeMetadata;
+        videoFrameTimeMetadata.receiveTime = MonotonicTime::now().secondsSinceEpoch();
 
         auto* buffer = GST_BUFFER_CAST(GST_PAD_PROBE_INFO_DATA(info));
         {
             GstMappedRtpBuffer rtpBuffer(buffer, GST_MAP_READ);
             if (rtpBuffer)
-                videoFrameTimeMetadata->rtpTimestamp = gst_rtp_buffer_get_timestamp(rtpBuffer.mappedData());
+                videoFrameTimeMetadata.rtpTimestamp = gst_rtp_buffer_get_timestamp(rtpBuffer.mappedData());
         }
+
+        auto ntpCaps = reinterpret_cast<GstCaps*>(userData);
+        if (auto referenceTimeStampMeta = gst_buffer_get_reference_timestamp_meta(buffer, ntpCaps))
+            videoFrameTimeMetadata.captureTime = Seconds::fromNanoseconds(static_cast<double>(referenceTimeStampMeta->timestamp));
 
         buffer = webkitGstBufferSetVideoFrameTimeMetadata(buffer, WTFMove(videoFrameTimeMetadata));
         GST_PAD_PROBE_INFO_DATA(info) = buffer;
         return GST_PAD_PROBE_OK;
-    }, nullptr, nullptr);
+    }, ntpCaps.leakRef(), reinterpret_cast<GDestroyNotify>(gst_caps_unref));
 }
 
 const RealtimeMediaSourceSettings& RealtimeIncomingVideoSourceGStreamer::settings()
