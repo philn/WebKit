@@ -421,18 +421,26 @@ static std::optional<GStreamerMediaEndpointTransceiverState> toGStreamerMediaEnd
     GUniqueOutPtr<char> mid;
     GstWebRTCRTPTransceiverDirection currentDirection;
     g_object_get(transceiver, "receiver", &receiver.outPtr(), "current-direction", &currentDirection, "mid", &mid.outPtr(), nullptr);
-    GST_TRACE_OBJECT(webrtcBin, "cadu: receiver = %" GST_PTR_FORMAT ", current-direction = %d, mid = %s", receiver.get(), currentDirection, mid ? mid.get() : "null");
+#ifndef GST_DISABLE_GST_DEBUG
+    GUniquePtr<char> desc(g_enum_to_string(GST_TYPE_WEBRTC_RTP_TRANSCEIVER_DIRECTION, currentDirection));
+    GST_TRACE_OBJECT(webrtcBin, "Receiver = %" GST_PTR_FORMAT ", current-direction = %s, mid = %s", receiver.get(), desc.get(), GST_STR_NULL(mid.get()));
+#endif
     if (!mid)
         return { };
 
     GUniqueOutPtr<GstWebRTCSessionDescription> localDescription, remoteDescription;
     g_object_get(webrtcBin, "local-description", &localDescription.outPtr(), "remote-description", &remoteDescription.outPtr(), nullptr);
 
-    if (localDescription)
-        GST_DEBUG_OBJECT(webrtcBin, "cadu: local-description:\n%s", gst_sdp_message_as_text(localDescription->sdp));
-    if (remoteDescription)
-        GST_DEBUG_OBJECT(webrtcBin, "cadu: remote-description:\n%s", gst_sdp_message_as_text(remoteDescription->sdp));
-
+#ifndef GST_DISABLE_GST_DEBUG
+    if (localDescription) {
+        GUniquePtr<char> sdp(gst_sdp_message_as_text(localDescription->sdp));
+        GST_TRACE_OBJECT(webrtcBin, "Local-description:\n%s", sdp.get());
+    }
+    if (remoteDescription) {
+        GUniquePtr<char> sdp(gst_sdp_message_as_text(remoteDescription->sdp));
+        GST_TRACE_OBJECT(webrtcBin, "Remote-description:\n%s", sdp.get());
+    }
+#endif
     Vector<String> streamIds;
     if (remoteDescription && remoteDescription->sdp && (currentDirection == GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_SENDRECV || currentDirection == GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY))
     {
@@ -448,7 +456,7 @@ static Vector<GStreamerMediaEndpointTransceiverState> transceiverStatesFromWebRT
     Vector<GStreamerMediaEndpointTransceiverState> states;
     GRefPtr<GArray> transceivers;
     g_signal_emit_by_name(webrtcBin, "get-transceivers", &transceivers.outPtr());
-    GST_TRACE_OBJECT(webrtcBin, "cadu: Number of transceivers: %d", transceivers ? transceivers->len : 0);
+    GST_TRACE_OBJECT(webrtcBin, "Filling transceiver states for %u transceivers", transceivers ? transceivers->len : 0);
     if (!transceivers || !transceivers->len)
         return states;
 
@@ -677,8 +685,6 @@ void GStreamerMediaEndpoint::doSetRemoteDescription(const RTCSessionDescription&
         });
 
         GST_DEBUG_OBJECT(m_webrtcBin.get(), "Transceiver states: %s", WTF::LogArgument<decltype(transceiverStates)>::toString(transceiverStates).utf8().data());
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         GRefPtr<GstWebRTCSCTPTransport> transport;
         g_object_get(m_webrtcBin.get(), "sctp-transport", &transport.outPtr(), nullptr);
@@ -1158,16 +1164,13 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
 
     gst_bin_add(GST_BIN_CAST(m_pipeline.get()), bin);
 
-    // auto& mediaStream = mediaStreamFromRTCStream(data.mediaStreamId);
-    // mediaStream.addTrackFromPlatform(track);
+    auto& mediaStream = mediaStreamFromRTCStream(data.mediaStreamId);
 
-    for (auto& processor : m_trackProcessors.values()) {
-        if (!processor->isReady())
-            return;
-    }
+    GST_DEBUG_OBJECT(m_pipeline.get(), "Incoming streams ready, notifying observers");
+    mediaStream.privateStream().forEachTrack([](auto& track) {
+        track.dataFlowStarted();
+    });
 
-    // GST_DEBUG_OBJECT(m_pipeline.get(), "Incoming streams gathered, now dispatching track events");
-    // m_peerConnectionBackend.dispatchPendingTrackEvents(mediaStream);
     gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
 
 #ifndef GST_DISABLE_GST_DEBUG
