@@ -42,7 +42,7 @@ RealtimeOutgoingAudioSourceGStreamer::RealtimeOutgoingAudioSourceGStreamer(const
     : RealtimeOutgoingMediaSourceGStreamer(RealtimeOutgoingMediaSourceGStreamer::Type::Audio, ssrcGenerator)
 {
     initializePreProcessor();
-    connectFallbackSource();
+    // connectFallbackSource();
 }
 
 void RealtimeOutgoingAudioSourceGStreamer::initializePreProcessor()

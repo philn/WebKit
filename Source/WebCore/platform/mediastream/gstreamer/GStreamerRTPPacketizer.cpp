@@ -59,6 +59,7 @@ GStreamerRTPPacketizer::~GStreamerRTPPacketizer()
 
 void GStreamerRTPPacketizer::stop()
 {
+    return;
     GST_DEBUG_OBJECT(m_bin.get(), "Stopping");
     Locker locker { m_eosLock };
     // We have a linked encoder/payloader, so to replace them we need to block upstream data flow,

@@ -49,7 +49,7 @@ RealtimeOutgoingVideoSourceGStreamer::RealtimeOutgoingVideoSourceGStreamer(const
     : RealtimeOutgoingMediaSourceGStreamer(RealtimeOutgoingMediaSourceGStreamer::Type::Video, ssrcGenerator)
 {
     initializePreProcessor();
-    connectFallbackSource();
+    // connectFallbackSource();
 }
 
 void RealtimeOutgoingVideoSourceGStreamer::initializePreProcessor()
