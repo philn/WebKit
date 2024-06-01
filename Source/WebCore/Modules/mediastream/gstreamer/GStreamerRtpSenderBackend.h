@@ -80,7 +80,6 @@ public:
     void takeSource(GStreamerRtpSenderBackend&);
 
     void stopSource();
-    void tearDown();
 
 private:
     bool replaceTrack(RTCRtpSender&, MediaStreamTrack*) final;

@@ -1,0 +1,5 @@
+
+PASS setParameters() when transceiver is stopped should reject with InvalidStateError
+PASS setParameters() with already used parameters should work if the event loop has not been relinquished
+FAIL setParameters() with already used parameters should reject with InvalidStateError if the event loop has been relinquished assert_unreached: Should have rejected: undefined Reached unreachable code
+

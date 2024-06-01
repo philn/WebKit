@@ -85,9 +85,9 @@ public:
 
     std::optional<bool> canTrickleIceCandidates() const;
 
-    void configureAndLinkSource(RealtimeOutgoingMediaSourceGStreamer&, bool shouldLookForUnusedPads = false);
+    void configureSource(RealtimeOutgoingMediaSourceGStreamer&, GUniquePtr<GstStructure>&&);
 
-    bool addTrack(GStreamerRtpSenderBackend&, MediaStreamTrack&, const FixedVector<String>&);
+    ExceptionOr<std::unique_ptr<GStreamerRtpSenderBackend>> addTrack(MediaStreamTrack&, const FixedVector<String>&);
     void removeTrack(GStreamerRtpSenderBackend&);
 
     struct Backends {
@@ -99,7 +99,8 @@ public:
     ExceptionOr<Backends> addTransceiver(MediaStreamTrack&, const RTCRtpTransceiverInit&, PeerConnectionBackend::IgnoreNegotiationNeededFlag);
     std::unique_ptr<GStreamerRtpTransceiverBackend> transceiverBackendFromSender(GStreamerRtpSenderBackend&);
 
-    GStreamerRtpSenderBackend::Source createLinkedSourceForTrack(MediaStreamTrack&);
+    GStreamerRtpSenderBackend::Source createSourceForTrack(MediaStreamTrack&);
+    GStreamerRtpSenderBackend::Source createMutedSource(RealtimeMediaSource::Type);
 
     void collectTransceivers();
 
@@ -155,9 +156,8 @@ private:
     int pickAvailablePayloadType();
 
     ExceptionOr<Backends> createTransceiverBackends(const String& kind, const RTCRtpTransceiverInit&, GStreamerRtpSenderBackend::Source&&, PeerConnectionBackend::IgnoreNegotiationNeededFlag);
-    GStreamerRtpSenderBackend::Source createSourceForTrack(MediaStreamTrack&);
 
-    void processSDPMessage(const GstSDPMessage*, Function<void(unsigned index, const char* mid, const GstSDPMedia*)>);
+    void processSDPMessage(const GstSDPMessage*, Function<void(unsigned index, StringView mid, const GstSDPMedia*)>);
 
     WARN_UNUSED_RETURN GRefPtr<GstPad> requestPad(const GRefPtr<GstCaps>&, const String& mediaStreamID);
 
@@ -206,11 +206,16 @@ private:
 
     RefPtr<UniqueSSRCGenerator> m_ssrcGenerator;
 
-    HashMap<GRefPtr<GstWebRTCRTPTransceiver>, RefPtr<GStreamerIncomingTrackProcessor>> m_trackProcessors;
+    using SSRC = unsigned;
+    HashMap<SSRC, RefPtr<GStreamerIncomingTrackProcessor>> m_trackProcessors;
 
     Vector<String> m_pendingIncomingMediaStreamIDs;
 
     bool m_shouldIgnoreNegotiationNeededSignal { false };
+
+    Vector<String> m_pendingIncomingTracks;
+
+    Vector<RefPtr<RealtimeOutgoingMediaSourceGStreamer>> m_unlinkedOutgoingSources;
 };
 
 } // namespace WebCore
