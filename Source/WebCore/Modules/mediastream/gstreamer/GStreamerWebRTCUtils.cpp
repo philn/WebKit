@@ -175,6 +175,31 @@ static inline RTCRtpEncodingParameters toRTCEncodingParameters(const GstStructur
     return parameters;
 }
 
+static inline RTCRtpCodecParameters toRTCCodecParameters(const GstStructure* rtcParameters)
+{
+    RTCRtpCodecParameters parameters;
+
+    unsigned pt;
+    if (gst_structure_get_uint(rtcParameters, "pt", &pt))
+        parameters.payloadType = pt;
+
+    if (const char* mimeType = gst_structure_get_string(rtcParameters, "mime-type"))
+        parameters.mimeType = String::fromUTF8(mimeType);
+
+    uint64_t clockRate;
+    if (gst_structure_get_uint64(rtcParameters, "clock-rate", &clockRate))
+        parameters.clockRate = clockRate;
+
+    unsigned channels;
+    if (gst_structure_get_uint(rtcParameters, "channels", &channels))
+        parameters.channels = channels;
+
+    if (const char* fmtpLine = gst_structure_get_string(rtcParameters, "fmtp-line"))
+        parameters.sdpFmtpLine = String::fromUTF8(fmtpLine);
+
+    return parameters;
+}
+
 RTCRtpSendParameters toRTCRtpSendParameters(const GstStructure* rtcParameters)
 {
     if (!rtcParameters)
@@ -183,16 +208,32 @@ RTCRtpSendParameters toRTCRtpSendParameters(const GstStructure* rtcParameters)
     RTCRtpSendParameters parameters;
     parameters.transactionId = span(gst_structure_get_string(rtcParameters, "transaction-id"));
 
-    auto* encodings = gst_structure_get_value(rtcParameters, "encodings");
+    auto encodings = gst_structure_get_value(rtcParameters, "encodings");
     unsigned size = gst_value_list_get_size(encodings);
     for (unsigned i = 0; i < size; i++) {
-        const auto* value = gst_value_list_get_value(encodings, i);
+        const auto value = gst_value_list_get_value(encodings, i);
         RELEASE_ASSERT(GST_VALUE_HOLDS_STRUCTURE(value));
         parameters.encodings.append(toRTCEncodingParameters(gst_value_get_structure(value)));
     }
 
-    // FIXME: Handle rtcParameters.degradation_preference.
+    auto codecs = gst_structure_get_value(rtcParameters, "codecs");
+    unsigned codecsSize = gst_value_list_get_size(codecs);
+    for (unsigned i = 0; i < codecsSize; i++) {
+        const auto value = gst_value_list_get_value(codecs, i);
+        RELEASE_ASSERT(GST_VALUE_HOLDS_STRUCTURE(value));
+        parameters.codecs.append(toRTCCodecParameters(gst_value_get_structure(value)));
+    }
+
+    // FIXME: Handle rtcParameters.degradationPreference, headerExtensions, rtcp.
     return parameters;
+}
+
+GUniquePtr<GstStructure> fromRTCCodecParameters(const RTCRtpCodecParameters& parameters)
+{
+    GUniquePtr<GstStructure> rtcParameters(gst_structure_new("codec-parameters", "pt", G_TYPE_UINT, parameters.payloadType,
+        "mime-type", G_TYPE_STRING, parameters.mimeType.utf8().data(), "clock-rate", G_TYPE_ULONG, parameters.clockRate,
+        "channels", G_TYPE_UINT, parameters.channels, "fmtp-line", G_TYPE_STRING, parameters.sdpFmtpLine.utf8().data(), nullptr));
+    return rtcParameters;
 }
 
 GUniquePtr<GstStructure> fromRTCSendParameters(const RTCRtpSendParameters& parameters)
@@ -209,6 +250,21 @@ GUniquePtr<GstStructure> fromRTCSendParameters(const RTCRtpSendParameters& param
         g_value_unset(&value);
     }
     gst_structure_take_value(gstParameters.get(), "encodings", &encodingsValue);
+
+    GValue codecsValue = G_VALUE_INIT;
+    g_value_init(&codecsValue, GST_TYPE_LIST);
+    for (auto& codec : parameters.codecs) {
+        auto codecData = fromRTCCodecParameters(codec);
+        GValue value = G_VALUE_INIT;
+        g_value_init(&value, GST_TYPE_STRUCTURE);
+        gst_value_set_structure(&value, codecData.get());
+        gst_value_list_append_value(&encodingsValue, &value);
+        g_value_unset(&value);
+    }
+    gst_structure_take_value(gstParameters.get(), "codecs", &codecsValue);
+
+    // FIXME: Missing serialization for degradationPreference, headerExtensions, rtcp.
+
     return gstParameters;
 }
 
@@ -504,17 +560,13 @@ std::optional<int> payloadTypeForEncodingName(const char* encodingName)
     return { };
 }
 
-GRefPtr<GstCaps> capsFromRtpCapabilities(RefPtr<UniqueSSRCGenerator> ssrcGenerator, const RTCRtpCapabilities& capabilities, Function<void(GstStructure*)> supplementCapsCallback)
+GRefPtr<GstCaps> capsFromRtpCapabilities(const RTCRtpCapabilities& capabilities, Function<void(GstStructure*)> supplementCapsCallback)
 {
     auto caps = adoptGRef(gst_caps_new_empty());
     for (unsigned index = 0; auto& codec : capabilities.codecs) {
         auto components = codec.mimeType.split('/');
         auto* codecStructure = gst_structure_new("application/x-rtp", "media", G_TYPE_STRING, components[0].ascii().data(),
             "encoding-name", G_TYPE_STRING, components[1].convertToASCIIUppercase().ascii().data() , "clock-rate", G_TYPE_INT, codec.clockRate, nullptr);
-
-        auto ssrc = ssrcGenerator->generateSSRC();
-        if (ssrc != std::numeric_limits<uint32_t>::max())
-            gst_structure_set(codecStructure, "ssrc", G_TYPE_UINT, ssrc, nullptr);
 
         if (!codec.sdpFmtpLine.isEmpty()) {
             for (auto& fmtp : codec.sdpFmtpLine.split(';')) {

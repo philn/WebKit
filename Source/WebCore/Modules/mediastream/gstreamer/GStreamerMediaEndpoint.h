@@ -87,7 +87,7 @@ public:
 
     void configureAndLinkSource(RealtimeOutgoingMediaSourceGStreamer&, bool shouldLookForUnusedPads = false);
 
-    bool addTrack(GStreamerRtpSenderBackend&, MediaStreamTrack&, const FixedVector<String>&);
+    ExceptionOr<std::unique_ptr<GStreamerRtpSenderBackend>> addTrack(MediaStreamTrack&, const FixedVector<String>&);
     void removeTrack(GStreamerRtpSenderBackend&);
 
     struct Backends {
@@ -100,6 +100,7 @@ public:
     std::unique_ptr<GStreamerRtpTransceiverBackend> transceiverBackendFromSender(GStreamerRtpSenderBackend&);
 
     GStreamerRtpSenderBackend::Source createLinkedSourceForTrack(MediaStreamTrack&);
+    GStreamerRtpSenderBackend::Source createLinkedMutedSource(RealtimeMediaSource::Type);
 
     void collectTransceivers();
 
@@ -154,7 +155,6 @@ private:
     int pickAvailablePayloadType();
 
     ExceptionOr<Backends> createTransceiverBackends(const String& kind, const RTCRtpTransceiverInit&, GStreamerRtpSenderBackend::Source&&);
-    GStreamerRtpSenderBackend::Source createSourceForTrack(MediaStreamTrack&);
 
     void processSDPMessage(const GstSDPMessage*, Function<void(unsigned index, const char* mid, const GstSDPMedia*)>);
 

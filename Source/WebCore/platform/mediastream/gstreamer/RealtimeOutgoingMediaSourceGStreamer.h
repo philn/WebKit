@@ -22,6 +22,7 @@
 #if USE(GSTREAMER_WEBRTC)
 
 #include "GRefPtrGStreamer.h"
+#include "GStreamerRTPPacketizer.h"
 #include "GStreamerWebRTCUtils.h"
 #include "MediaStreamTrackPrivate.h"
 #include "RTCRtpCapabilities.h"
@@ -38,12 +39,14 @@ public:
 
     void start();
     void stop();
-    void setSource(Ref<MediaStreamTrackPrivate>&&);
     virtual void flush();
+
+    void setSourceFromTrack(MediaStreamTrack&);
     MediaStreamTrackPrivate& source() const { return m_source->get(); }
 
     const String& mediaStreamID() const { return m_mediaStreamId; }
     const GRefPtr<GstCaps>& allowedCaps() const;
+    WARN_UNUSED_RETURN GRefPtr<GstCaps> rtpCaps() const;
 
     void link();
     const GRefPtr<GstPad>& pad() const { return m_webrtcSinkPad; }
@@ -52,12 +55,16 @@ public:
     GRefPtr<GstWebRTCRTPSender> sender() const { return m_sender; }
     GRefPtr<GstElement> bin() const { return m_bin; }
 
-    virtual bool setPayloadType(const GRefPtr<GstCaps>&) { return false; }
+    bool configurePacketizers(GRefPtr<GstCaps>&&);
     virtual void teardown();
 
     GUniquePtr<GstStructure> parameters();
-    virtual void fillEncodingParameters(const GUniquePtr<GstStructure>&) { }
+    // virtual void fillEncodingParameters(const GUniquePtr<GstStructure>&) { }
+    void setInitialParameters(GUniquePtr<GstStructure>&&);
     virtual void setParameters(GUniquePtr<GstStructure>&&) { }
+
+    virtual WARN_UNUSED_RETURN GRefPtr<GstPad> outgoingSourcePad() const = 0;
+    virtual RefPtr<GStreamerRTPPacketizer> createPacketizer(RefPtr<UniqueSSRCGenerator>, const GstStructure*, GUniquePtr<GstStructure>&&) = 0;
 
 protected:
     enum Type {
@@ -65,11 +72,14 @@ protected:
         Video
     };
     explicit RealtimeOutgoingMediaSourceGStreamer(Type, const RefPtr<UniqueSSRCGenerator>&, const String& mediaStreamId, MediaStreamTrack&);
+    explicit RealtimeOutgoingMediaSourceGStreamer(Type, const RefPtr<UniqueSSRCGenerator>&);
 
-    void initializeFromTrack();
+    void initializeSourceFromTrackPrivate();
     virtual void sourceEnabledChanged();
 
     bool isStopped() const { return m_isStopped; }
+
+    bool linkPacketizer(RefPtr<GStreamerRTPPacketizer>&&);
 
     Type m_type;
     String m_mediaStreamId;
@@ -83,14 +93,12 @@ protected:
     GRefPtr<GstElement> m_bin;
     GRefPtr<GstElement> m_outgoingSource;
     GRefPtr<GstElement> m_liveSync;
+    GRefPtr<GstElement> m_preProcessor;
     GRefPtr<GstElement> m_inputSelector;
     GRefPtr<GstPad> m_fallbackPad;
-    GRefPtr<GstElement> m_valve;
-    GRefPtr<GstElement> m_preEncoderQueue;
-    GRefPtr<GstElement> m_encoder;
-    GRefPtr<GstElement> m_payloader;
-    GRefPtr<GstElement> m_postEncoderQueue;
-    GRefPtr<GstElement> m_capsFilter;
+    GRefPtr<GstElement> m_tee;
+    GRefPtr<GstElement> m_rtpFunnel;
+    GRefPtr<GstElement> m_rtpCapsfilter;
     mutable GRefPtr<GstCaps> m_allowedCaps;
     GRefPtr<GstWebRTCRTPTransceiver> m_transceiver;
     GRefPtr<GstWebRTCRTPSender> m_sender;
@@ -99,12 +107,11 @@ protected:
     GUniquePtr<GstStructure> m_parameters;
     GRefPtr<GstElement> m_fallbackSource;
 
-    struct PayloaderState {
-        unsigned seqnum;
-    };
-    std::optional<PayloaderState> m_payloaderState;
+    Vector<RefPtr<GStreamerRTPPacketizer>> m_packetizers;
 
 private:
+    void initialize();
+
     void sourceMutedChanged();
 
     void stopOutgoingSource();
@@ -119,12 +126,9 @@ private:
     // MediaStreamTrackPrivateObserver API
     void trackMutedChanged(MediaStreamTrackPrivate&) override { sourceMutedChanged(); }
     void trackEnabledChanged(MediaStreamTrackPrivate&) override { sourceEnabledChanged(); }
-    void trackSettingsChanged(MediaStreamTrackPrivate&) override { initializeFromTrack(); }
+    void trackSettingsChanged(MediaStreamTrackPrivate&) override { initializeSourceFromTrackPrivate(); }
     void trackEnded(MediaStreamTrackPrivate&) override { }
 
-    void unlinkPayloader();
-
-    unsigned long m_padBlockedProbe { 0 };
 };
 
 } // namespace WebCore

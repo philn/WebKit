@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "GStreamerVideoRTPPacketizer.h"
 #if USE(GSTREAMER_WEBRTC)
 
 #include "GUniquePtrGStreamer.h"
@@ -29,26 +30,32 @@ namespace WebCore {
 class RealtimeOutgoingVideoSourceGStreamer final : public RealtimeOutgoingMediaSourceGStreamer {
 public:
     static Ref<RealtimeOutgoingVideoSourceGStreamer> create(const RefPtr<UniqueSSRCGenerator>& ssrcGenerator, const String& mediaStreamId, MediaStreamTrack& track) { return adoptRef(*new RealtimeOutgoingVideoSourceGStreamer(ssrcGenerator, mediaStreamId, track)); }
+    static Ref<RealtimeOutgoingVideoSourceGStreamer> createMuted(const RefPtr<UniqueSSRCGenerator>& ssrcGenerator) { return adoptRef(*new RealtimeOutgoingVideoSourceGStreamer(ssrcGenerator)); }
 
     void setApplyRotation(bool shouldApplyRotation) { m_shouldApplyRotation = shouldApplyRotation; }
 
-    bool setPayloadType(const GRefPtr<GstCaps>&) final;
     void teardown() final;
     void flush() final;
 
     void setParameters(GUniquePtr<GstStructure>&&) final;
-    void fillEncodingParameters(const GUniquePtr<GstStructure>&) final;
+    // void fillEncodingParameters(const GUniquePtr<GstStructure>&) final;
 
     const GstStructure* stats() const { return m_stats.get(); }
 
+    WARN_UNUSED_RETURN GRefPtr<GstPad> outgoingSourcePad() const final;
+    RefPtr<GStreamerRTPPacketizer> createPacketizer(RefPtr<UniqueSSRCGenerator>, const GstStructure*, GUniquePtr<GstStructure>&&) final;
+
 protected:
     explicit RealtimeOutgoingVideoSourceGStreamer(const RefPtr<UniqueSSRCGenerator>&, const String& mediaStreamId, MediaStreamTrack&);
+    explicit RealtimeOutgoingVideoSourceGStreamer(const RefPtr<UniqueSSRCGenerator>&);
 
     void sourceEnabledChanged() final;
 
     bool m_shouldApplyRotation { false };
 
 private:
+    void initializePreProcessor();
+
     RTCRtpCapabilities rtpCapabilities() const final;
 
     void startUpdatingStats();
@@ -59,11 +66,6 @@ private:
     void linkOutgoingSource() final;
 
     void updateStats(GstBuffer*);
-
-    GRefPtr<GstElement> m_videoConvert;
-    GRefPtr<GstElement> m_videoFlip;
-    GRefPtr<GstElement> m_videoRate;
-    GRefPtr<GstElement> m_frameRateCapsFilter;
 
     GUniquePtr<GstStructure> m_stats;
 

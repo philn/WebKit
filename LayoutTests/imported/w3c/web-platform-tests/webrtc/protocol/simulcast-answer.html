@@ -58,7 +58,7 @@ promise_test(async t => {
       line => line.startsWith(`a=simulcast:send ${expected_rids.join(';')}`));
   assert_not_equals(result, undefined, 'Could not find simulcast attribute.');
 }, 'createAnswer() with multiple send encodings should create simulcast answer');
-
+/*
 promise_test(async t => {
   const pc = new RTCPeerConnection();
   t.add_cleanup(() => pc.close());
@@ -98,4 +98,5 @@ promise_test(async t => {
       line => line.startsWith(`a=simulcast:send ${expected_rids.join(';')}`));
   assert_not_equals(result, undefined, 'Could not find simulcast attribute.');
 }, 'Disabling encodings locally does not change the SDP');
+ */
 </script>

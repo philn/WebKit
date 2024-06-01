@@ -262,6 +262,7 @@ static inline std::optional<RTCErrorDetailType> toRTCErrorDetailType(GstWebRTCEr
 RefPtr<RTCError> toRTCError(GError*);
 
 GUniquePtr<GstStructure> fromRTCEncodingParameters(const RTCRtpEncodingParameters&);
+GUniquePtr<GstStructure> fromRTCCodecParameters(const RTCRtpCodecParameters&);
 RTCRtpSendParameters toRTCRtpSendParameters(const GstStructure*);
 GUniquePtr<GstStructure> fromRTCSendParameters(const RTCRtpSendParameters&);
 
@@ -283,7 +284,7 @@ private:
 
 std::optional<int> payloadTypeForEncodingName(const char* encodingName);
 
-WARN_UNUSED_RETURN GRefPtr<GstCaps> capsFromRtpCapabilities(RefPtr<UniqueSSRCGenerator>, const RTCRtpCapabilities&, Function<void(GstStructure*)> supplementCapsCallback);
+WARN_UNUSED_RETURN GRefPtr<GstCaps> capsFromRtpCapabilities(const RTCRtpCapabilities&, Function<void(GstStructure*)> supplementCapsCallback);
 
 GstWebRTCRTPTransceiverDirection getDirectionFromSDPMedia(const GstSDPMedia*);
 WARN_UNUSED_RETURN GRefPtr<GstCaps> capsFromSDPMedia(const GstSDPMedia*);

@@ -61,7 +61,7 @@ GStreamerRtpSenderBackend::GStreamerRtpSenderBackend(GStreamerPeerConnectionBack
     , m_initData(WTFMove(initData))
 {
     ensureDebugCategoryIsRegistered();
-    GST_DEBUG_OBJECT(m_rtcSender.get(), "constructed with associated source");
+    GST_DEBUG_OBJECT(m_rtcSender.get(), "constructed with associated source with init data: %" GST_PTR_FORMAT, m_initData.get());
 }
 
 void GStreamerRtpSenderBackend::clearSource()
@@ -77,6 +77,17 @@ void GStreamerRtpSenderBackend::setSource(Source&& source)
     GST_DEBUG_OBJECT(m_rtcSender.get(), "Setting source");
     m_source = WTFMove(source);
     ASSERT(hasSource());
+
+    if (!m_currentParameters && !m_initData)
+        return;
+
+    GUniquePtr<GstStructure> parameters(gst_structure_copy(m_currentParameters ? m_currentParameters.get() : m_initData.get()));
+    switchOn(m_source, [&](Ref<RealtimeOutgoingAudioSourceGStreamer>& source) {
+        source->setParameters(WTFMove(parameters));
+    }, [&](Ref<RealtimeOutgoingVideoSourceGStreamer>& source) {
+        source->setParameters(WTFMove(parameters));
+    }, [](std::nullptr_t&) {
+    });
 }
 
 void GStreamerRtpSenderBackend::takeSource(GStreamerRtpSenderBackend& backend)
@@ -150,7 +161,7 @@ bool GStreamerRtpSenderBackend::replaceTrack(RTCRtpSender& sender, MediaStreamTr
         ASSERT(track->source().type() == RealtimeMediaSource::Type::Audio);
         if (replace) {
             source->stop();
-            source->setSource(track->privateTrack());
+            source->setSourceFromTrack(*track);
             source->flush();
         }
         source->start();
@@ -158,7 +169,7 @@ bool GStreamerRtpSenderBackend::replaceTrack(RTCRtpSender& sender, MediaStreamTr
         ASSERT(track->source().type() == RealtimeMediaSource::Type::Video);
         if (replace) {
             source->stop();
-            source->setSource(track->privateTrack());
+            source->setSourceFromTrack(*track);
             source->flush();
         }
         source->start();
