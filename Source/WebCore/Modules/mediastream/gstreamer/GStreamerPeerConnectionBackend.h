@@ -117,6 +117,8 @@ private:
 
     Ref<RTCRtpReceiver> createReceiver(std::unique_ptr<GStreamerRtpReceiverBackend>&&, const String& trackKind, const String& trackId);
 
+    void doPlatformLog(const StringView&) const final;
+
     void suspend() final;
     void resume() final;
 

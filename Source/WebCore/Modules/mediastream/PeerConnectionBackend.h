@@ -223,6 +223,9 @@ public:
     virtual void startGatheringStatLogs(Function<void(String&&)>&&) { }
     virtual void stopGatheringStatLogs() { }
 
+    template<typename... Argument>
+    void platformLog(UNUSED_VARIADIC_PARAMS const Argument&... arguments) const;
+
 protected:
     void doneGatheringCandidates();
 
@@ -249,6 +252,8 @@ protected:
     void addPendingTrackEvent(PendingTrackEvent&&);
 
     void dispatchTrackEvent(PendingTrackEvent&);
+
+    virtual void doPlatformLog(const StringView&) const;
 
 private:
     virtual void doCreateOffer(RTCOfferOptions&&) = 0;

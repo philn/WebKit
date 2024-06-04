@@ -73,6 +73,16 @@ GStreamerPeerConnectionBackend::GStreamerPeerConnectionBackend(RTCPeerConnection
 
 GStreamerPeerConnectionBackend::~GStreamerPeerConnectionBackend() = default;
 
+void GStreamerPeerConnectionBackend::doPlatformLog(const StringView& message) const
+{
+    PeerConnectionBackend::doPlatformLog(message);
+    if (auto pipeline = m_endpoint->pipeline()) {
+        GST_DEBUG_OBJECT(pipeline, "%s", message.toString().utf8().data());
+        return;
+    }
+    GST_DEBUG("%s", message.toString().utf8().data());
+}
+
 void GStreamerPeerConnectionBackend::suspend()
 {
     m_endpoint->suspend();

@@ -50,6 +50,7 @@
 #include "RTCTrackEvent.h"
 #include "WebRTCProvider.h"
 #include <wtf/EnumTraits.h>
+#include <wtf/Logger.h>
 #include <wtf/UUID.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/StringConcatenateNumbers.h>
@@ -348,13 +349,17 @@ void PeerConnectionBackend::setRemoteDescriptionSucceeded(std::optional<Descript
 
         if (descriptionStates) {
             m_peerConnection.updateDescriptions(WTFMove(*descriptionStates));
-            if (m_peerConnection.isClosed())
+            if (m_peerConnection.isClosed()) {
+                platformLog("PeerConnection closed after descriptions update");
                 return;
+            }
         }
 
         m_peerConnection.processIceTransportChanges();
-        if (m_peerConnection.isClosed())
+        if (m_peerConnection.isClosed()) {
+            platformLog("PeerConnection closed after ICE transport changes");
             return;
+        }
 
         if (transceiverStates) {
             // Compute track related events.
@@ -373,31 +378,43 @@ void PeerConnectionBackend::setRemoteDescriptionSucceeded(std::optional<Descript
                     processRemoteTracks(*transceiver, WTFMove(transceiverState), addList, removeList, trackEventList, muteTrackList);
             }
 
+            platformLog("Processing ", muteTrackList.size(), " muted tracks");
             for (auto& track : muteTrackList) {
                 track->setShouldFireMuteEventImmediately(true);
                 track->source().setMuted(true);
                 track->setShouldFireMuteEventImmediately(false);
-                if (m_peerConnection.isClosed())
+                if (m_peerConnection.isClosed()) {
+                    platformLog("PeerConnection closed while processing muted tracks");
                     return;
+                }
             }
 
+            platformLog("Removing ", removeList.size(), " tracks");
             for (auto& pair : removeList) {
                 pair.stream->privateStream().removeTrack(pair.track->privateTrack());
-                if (m_peerConnection.isClosed())
+                if (m_peerConnection.isClosed()) {
+                    platformLog("PeerConnection closed while removing tracks");
                     return;
+                }
             }
 
+            platformLog("Adding ", addList.size(), " tracks");
             for (auto& pair : addList) {
                 pair.stream->addTrackFromPlatform(pair.track.copyRef());
-                if (m_peerConnection.isClosed())
+                if (m_peerConnection.isClosed()) {
+                    platformLog("PeerConnection closed while adding tracks");
                     return;
+                }
             }
 
+            platformLog("Dispatching ", trackEventList.size(), " track events");
             for (auto& event : trackEventList) {
                 RefPtr track = event->track();
                 m_peerConnection.dispatchEvent(event);
-                if (m_peerConnection.isClosed())
+                if (m_peerConnection.isClosed()) {
+                    platformLog("PeerConnection closed while dispatching track events");
                     return;
+                }
 
                 track->source().setMuted(false);
             }
@@ -457,6 +474,13 @@ void PeerConnectionBackend::addPendingTrackEvent(PendingTrackEvent&& event)
 {
     ASSERT(!m_peerConnection.isStopped());
     m_pendingTrackEvents.append(WTFMove(event));
+}
+
+template<typename... Argument>
+void PeerConnectionBackend::platformLog(UNUSED_VARIADIC_PARAMS const Argument&... arguments) const
+{
+    auto logMessage = makeString(WTF::LogArgument<Argument>::toString(arguments)...);
+    doPlatformLog(logMessage);
 }
 
 static String extractIPAddress(StringView sdp)
@@ -539,6 +563,11 @@ void PeerConnectionBackend::validateSDP(const String& sdp) const
 #else
     UNUSED_PARAM(sdp);
 #endif
+}
+
+void PeerConnectionBackend::doPlatformLog(const StringView& message) const
+{
+    DEBUG_LOG(LOGIDENTIFIER, message.toString().utf8().data());
 }
 
 void PeerConnectionBackend::newICECandidate(String&& sdp, String&& mid, unsigned short sdpMLineIndex, String&& serverURL, std::optional<DescriptionStates>&& descriptions)
