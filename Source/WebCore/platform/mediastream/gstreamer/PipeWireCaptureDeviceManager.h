@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2018 Metrological Group B.V.
- * Copyright (C) 2020 Igalia S.L.
- * Author: Thibault Saunier <tsaunier@igalia.com>
- * Author: Alejandro G. Castro <alex@igalia.com>
+ * Copyright (C) 2024 Igalia S.L
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -24,26 +21,30 @@
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 
-#include "GStreamerCapturer.h"
+#include <wtf/CompletionHandler.h>
+#include <wtf/Forward.h>
+#include <wtf/RefCounted.h>
+
+#include "DesktopPortal.h"
+#include "MediaConstraints.h"
+#include "MediaDeviceHashSalts.h"
+#include "PipeWireCaptureDevice.h"
+#include "RealtimeMediaSource.h"
 
 namespace WebCore {
 
-class GStreamerAudioCapturer final : public GStreamerCapturer {
+class PipeWireCaptureDeviceManager : public RefCounted<PipeWireCaptureDeviceManager> {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    GStreamerAudioCapturer(GStreamerCaptureDevice&&);
-    GStreamerAudioCapturer(const PipeWireCaptureDevice&);
-    ~GStreamerAudioCapturer() = default;
+    static RefPtr<PipeWireCaptureDeviceManager> create(CaptureDevice::DeviceType);
+    PipeWireCaptureDeviceManager(CaptureDevice::DeviceType);
 
-    GstElement* createConverter() final;
-    const char* name() final { return "Audio"; }
-
-    bool setSampleRate(int);
-
-    using SinkAudioDataCallback = Function<void(GRefPtr<GstSample>&&, MediaTime&&)>;
-    void setSinkAudioCallback(SinkAudioDataCallback&&);
+    CaptureSourceOrError createCaptureSource(const CaptureDevice&, MediaDeviceHashSalts&&, const MediaConstraints*);
 
 private:
-    std::pair<unsigned long, SinkAudioDataCallback> m_sinkAudioDataCallback;
+    CaptureDevice::DeviceType m_deviceType;
+    RefPtr<DesktopPortalCamera> m_portal;
+    GRefPtr<GstDeviceProvider> m_pipewireDeviceProvider;
 };
 
 } // namespace WebCore
