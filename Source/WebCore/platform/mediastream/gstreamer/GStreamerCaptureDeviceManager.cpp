@@ -204,7 +204,7 @@ void GStreamerCaptureDeviceManager::addDevice(GRefPtr<GstDevice>&& device)
     // This isn't really a UID but should be good enough (libwebrtc
     // itself does that at least for pulseaudio devices).
     GUniquePtr<char> deviceName(gst_device_get_display_name(device.get()));
-    GST_INFO("Registering device %s", deviceName.get());
+    GST_INFO("Registering device '%s' with class '%s'", deviceName.get(), deviceClass.ascii().data());
     gboolean isDefault = FALSE;
     gst_structure_get_boolean(properties.get(), "is-default", &isDefault);
     auto label = makeString(isDefault ? "default: "_s : ""_s, span(deviceName.get()));

@@ -46,7 +46,7 @@ static void initializeAudioCapturerDebugCategory()
 {
     static std::once_flag debugRegisteredFlag;
     std::call_once(debugRegisteredFlag, [] {
-        GST_DEBUG_CATEGORY_INIT(webkit_audio_capturer_debug, "webkitaudiocapturer", 0, "WebKit Audio Capturer");
+        GST_DEBUG_CATEGORY_INIT(webkit_audio_capturer_debug, "webkitcaptureraudio", 0, "WebKit Audio Capturer");
     });
 }
 
@@ -56,8 +56,8 @@ GStreamerAudioCapturer::GStreamerAudioCapturer(GStreamerCaptureDevice&& device)
     initializeAudioCapturerDebugCategory();
 }
 
-GStreamerAudioCapturer::GStreamerAudioCapturer()
-    : GStreamerCapturer("appsrc", adoptGRef(gst_caps_new_simple("audio/x-raw", "rate", G_TYPE_INT, s_audioCaptureSampleRate, nullptr)), CaptureDevice::DeviceType::Microphone)
+GStreamerAudioCapturer::GStreamerAudioCapturer(const PipeWireCaptureDevice& device)
+    : GStreamerCapturer(device)
 {
     initializeAudioCapturerDebugCategory();
 }

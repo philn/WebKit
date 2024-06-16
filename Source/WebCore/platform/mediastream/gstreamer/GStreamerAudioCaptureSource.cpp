@@ -29,8 +29,6 @@
 #include "GStreamerAudioStreamDescription.h"
 #include "GStreamerCaptureDeviceManager.h"
 
-#include <gst/app/gstappsink.h>
-#include <gst/gst.h>
 #include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
@@ -48,6 +46,9 @@ class GStreamerAudioCaptureSourceFactory : public AudioCaptureFactory {
 public:
     CaptureSourceOrError createAudioCaptureSource(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints, PageIdentifier) final
     {
+        // Here, like in GStreamerVideoCaptureSource, we could rely on the DesktopPortal and
+        // PipeWireCaptureDeviceManager, but there is no audio desktop portal yet. See
+        // https://github.com/flatpak/xdg-desktop-portal/discussions/1142.
         return GStreamerAudioCaptureSource::create(String { device.persistentId() }, WTFMove(hashSalts), constraints);
     }
 private:
@@ -93,7 +94,7 @@ GStreamerAudioCaptureSource::GStreamerAudioCaptureSource(GStreamerCaptureDevice&
 
     static std::once_flag debugRegisteredFlag;
     std::call_once(debugRegisteredFlag, [] {
-        GST_DEBUG_CATEGORY_INIT(webkit_audio_capture_source_debug, "webkitaudiocapturesource", 0, "WebKit Audio Capture Source.");
+        GST_DEBUG_CATEGORY_INIT(webkit_audio_capture_source_debug, "webkitcapturesourceaudio", 0, "WebKit Audio Capture Source.");
     });
 
     auto& singleton = GStreamerAudioCaptureDeviceManager::singleton();

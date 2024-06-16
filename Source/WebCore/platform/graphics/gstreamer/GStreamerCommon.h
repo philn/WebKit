@@ -309,6 +309,7 @@ void configureVideoDecoderForHarnessing(const GRefPtr<GstElement>&);
 void configureMediaStreamVideoDecoder(GstElement*);
 void configureVideoRTPDepayloader(GstElement*);
 
+bool gstObjectHasProperty(GstObject*, const char* name);
 bool gstObjectHasProperty(GstElement*, const char* name);
 bool gstObjectHasProperty(GstPad*, const char* name);
 
