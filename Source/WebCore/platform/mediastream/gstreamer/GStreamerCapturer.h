@@ -65,7 +65,7 @@ public:
     void removeObserver(GStreamerCapturerObserver&);
     void forEachObserver(NOESCAPE const Function<void(GStreamerCapturerObserver&)>&);
 
-    void setupPipeline();
+    virtual void setupPipeline();
     void start();
     void stop();
     bool isStopped() const;
