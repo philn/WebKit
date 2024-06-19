@@ -23,13 +23,11 @@
 #if USE(GSTREAMER) && ENABLE(MEDIA_SOURCE)
 
 #include "AudioTrackPrivateGStreamer.h"
-#include "GStreamerCommon.h"
 #include "GStreamerMediaDescription.h"
 #include "InbandTextTrackPrivateGStreamer.h"
 #include "MediaSampleGStreamer.h"
 #include "VideoTrackPrivateGStreamer.h"
 #include <gst/base/gsttypefindhelper.h>
-#include <wtf/glib/RunLoopSourcePriority.h>
 
 GST_DEBUG_CATEGORY(webkit_source_buffer_parser_debug);
 #define GST_CAT_DEFAULT webkit_source_buffer_parser_debug
@@ -131,12 +129,12 @@ void GStreamerSourceBufferParser::pushNewBuffer(GRefPtr<GstBuffer>&& buffer)
         m_harness->start(WTFMove(caps));
     }
 
-    m_harness->pushBuffer(WTFMove(buffer));
-    m_workQueue->dispatch([weakThis = ThreadSafeWeakPtr { *this }, this] {
+    m_workQueue->dispatch([weakThis = ThreadSafeWeakPtr { *this }, this, buffer = WTFMove(buffer)]() mutable {
         RefPtr self = weakThis.get();
         if (!self)
             return;
 
+        m_harness->pushBuffer(WTFMove(buffer));
         if (!processOutputEvents()) {
             m_sourceBufferPrivate.appendParsingFailed();
             return;
@@ -160,9 +158,14 @@ bool GStreamerSourceBufferParser::processOutputEvents()
             }
             // FIXME: Process stream-collection updates?
             if (!m_initializationSegment && GST_EVENT_TYPE(event.get()) == GST_EVENT_STREAM_COLLECTION) {
-                GstStreamCollection* collection = nullptr;
-                gst_event_parse_stream_collection(event.get(), &collection);
-                notifyInitializationSegment(*collection);
+                GRefPtr<GstStreamCollection> collection;
+                gst_event_parse_stream_collection(event.get(), &collection.outPtr());
+                callOnMainThreadAndWait([weakThis = ThreadSafeWeakPtr { *this }, this, collection = WTFMove(collection)] {
+                    RefPtr self = weakThis.get();
+                    if (!self)
+                        return;
+                    notifyInitializationSegment(*collection.get());
+                });
             }
 #if ENABLE(ENCRYPTED_MEDIA)
             if (GST_EVENT_TYPE(event.get()) == GST_EVENT_PROTECTION) {
@@ -191,8 +194,7 @@ void GStreamerSourceBufferParser::notifyInitializationSegment(GstStreamCollectio
 {
     SourceBufferPrivateClient::InitializationSegment initializationSegment;
     gint64 timeLength = 0;
-    if (gst_element_query_duration(m_harness->element(), GST_FORMAT_TIME, &timeLength)
-        && static_cast<guint64>(timeLength) != GST_CLOCK_TIME_NONE)
+    if (gst_element_query_duration(m_harness->element(), GST_FORMAT_TIME, &timeLength) && static_cast<guint64>(timeLength) != GST_CLOCK_TIME_NONE)
         initializationSegment.duration = MediaTime(GST_TIME_AS_USECONDS(timeLength), G_USEC_PER_SEC);
     else
         initializationSegment.duration = MediaTime::positiveInfiniteTime();
@@ -232,8 +234,6 @@ void GStreamerSourceBufferParser::notifyInitializationSegment(GstStreamCollectio
         };
     }
     m_initializationSegment = WTFMove(initializationSegment);
-    // FIXME: Relay entire stream-collection to SourceBufferPrivateGStreamer so that it can be
-    // directly re-used by the msesrc?
     SourceBufferPrivateClient::InitializationSegment segment = m_initializationSegment.value();
     m_sourceBufferPrivate.didReceiveInitializationSegment(WTFMove(segment));
 }

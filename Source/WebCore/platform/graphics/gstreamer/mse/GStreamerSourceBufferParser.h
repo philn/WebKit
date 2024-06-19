@@ -29,8 +29,7 @@
 
 namespace WebCore {
 
-class GStreamerSourceBufferParser
-    : public ThreadSafeRefCountedAndCanMakeThreadSafeWeakPtr<GStreamerSourceBufferParser> {
+class GStreamerSourceBufferParser : public ThreadSafeRefCountedAndCanMakeThreadSafeWeakPtr<GStreamerSourceBufferParser> {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     static Ref<GStreamerSourceBufferParser> create(SourceBufferPrivateGStreamer& sourceBufferPrivate, const RefPtr<MediaPlayerPrivateGStreamerMSE>& mediaPlayerPrivate)
