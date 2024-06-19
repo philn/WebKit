@@ -52,6 +52,8 @@ InbandTextTrackPrivateGStreamer::InbandTextTrackPrivateGStreamer(unsigned index,
 {
     ensureTextTrackDebugCategoryInitialized();
     installUpdateConfigurationHandlers();
+
+    updateConfigurationFromTags(getAllTags(m_pad));
 }
 
 InbandTextTrackPrivateGStreamer::InbandTextTrackPrivateGStreamer(unsigned index, GstStream* stream)

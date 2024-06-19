@@ -96,12 +96,16 @@ static GRefPtr<GstPad> findBestUpstreamPad(GRefPtr<GstPad> pad)
 TrackPrivateBaseGStreamer::TrackPrivateBaseGStreamer(TrackType type, TrackPrivateBase* owner, unsigned index, GRefPtr<GstPad>&& pad, bool shouldHandleStreamStartEvent)
     : m_notifier(MainThreadNotifier<MainThreadNotification>::create())
     , m_index(index)
+    , m_stringId(makeAtomString(index))
+    , m_id(trackIdFromStringIdOrIndex(type, m_stringId, index))
     , m_type(type)
     , m_owner(owner)
     , m_shouldHandleStreamStartEvent(shouldHandleStreamStartEvent)
 {
     setPad(WTFMove(pad));
     ASSERT(m_pad);
+
+    m_trackID = index;
 
     // We can't call notifyTrackOfTagsChanged() directly, because we need tagsChanged() to setup m_tags.
     tagsChanged();

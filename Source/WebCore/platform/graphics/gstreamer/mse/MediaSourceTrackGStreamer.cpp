@@ -75,6 +75,20 @@ TrackPrivateBaseGStreamer::TrackType MediaSourceTrackGStreamer::type() const
     return TrackPrivateBaseGStreamer::TrackType::Unknown;
 }
 
+unsigned MediaSourceTrackGStreamer::index() const
+{
+    switch (m_track->type()) {
+    case WebCore::TrackPrivateBase::Type::Audio:
+        return static_cast<AudioTrackPrivateGStreamer*>(m_track.get())->index();
+    case WebCore::TrackPrivateBase::Type::Video:
+        return static_cast<VideoTrackPrivateGStreamer*>(m_track.get())->index();
+    case WebCore::TrackPrivateBase::Type::Text:
+        return static_cast<InbandTextTrackPrivateGStreamer*>(m_track.get())->index();
+    }
+    ASSERT_NOT_REACHED();
+    return -1;
+}
+
 const AtomString& MediaSourceTrackGStreamer::stringId() const
 {
     switch (m_track->type()) {

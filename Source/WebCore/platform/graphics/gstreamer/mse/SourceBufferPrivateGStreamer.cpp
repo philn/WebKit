@@ -165,7 +165,9 @@ void SourceBufferPrivateGStreamer::removedFromMediaSource()
 RefPtr<MediaSourceTrackGStreamer> SourceBufferPrivateGStreamer::findTrackWithID(TrackID trackId)
 {
     auto index = m_tracks.findIf([trackId](auto& track) -> bool {
-        return track->id() == trackId;
+        if (track->stream() && track->id() == trackId)
+            return true;
+        return track->index() == trackId;
     });
     if (index == WTF::notFound)
         return nullptr;

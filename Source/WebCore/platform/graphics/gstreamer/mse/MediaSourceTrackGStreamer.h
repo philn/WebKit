@@ -45,6 +45,7 @@ public:
     virtual ~MediaSourceTrackGStreamer();
 
     TrackPrivateBaseGStreamer::TrackType type() const;
+    unsigned index() const;
     TrackID id() const { return m_track->id(); }
     const AtomString& stringId() const;
     GRefPtr<GstCaps>& initialCaps() { return m_initialCaps; }

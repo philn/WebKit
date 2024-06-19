@@ -55,6 +55,8 @@ VideoTrackPrivateGStreamer::VideoTrackPrivateGStreamer(ThreadSafeWeakPtr<MediaPl
 {
     ensureVideoTrackDebugCategoryInitialized();
     installUpdateConfigurationHandlers();
+
+    updateConfigurationFromTags(getAllTags(m_pad));
 }
 
 VideoTrackPrivateGStreamer::VideoTrackPrivateGStreamer(ThreadSafeWeakPtr<MediaPlayerPrivateGStreamer>&& player, unsigned index, GstStream* stream)

@@ -54,6 +54,8 @@ AudioTrackPrivateGStreamer::AudioTrackPrivateGStreamer(ThreadSafeWeakPtr<MediaPl
 {
     ensureDebugCategoryInitialized();
     installUpdateConfigurationHandlers();
+
+    updateConfigurationFromTags(getAllTags(m_pad));
 }
 
 AudioTrackPrivateGStreamer::AudioTrackPrivateGStreamer(ThreadSafeWeakPtr<MediaPlayerPrivateGStreamer>&& player, unsigned index, GstStream* stream)
