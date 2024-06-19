@@ -769,20 +769,6 @@ GRefPtr<GstElement> createOptionalParserForFormat([[maybe_unused]] GstBin* bin, 
     return result;
 }
 
-AtomString AppendPipeline::generateTrackId(StreamType streamType, int padIndex)
-{
-    switch (streamType) {
-    case Audio:
-        return makeAtomString('A', padIndex);
-    case Video:
-        return makeAtomString('V', padIndex);
-    case Text:
-        return makeAtomString('T', padIndex);
-    default:
-        return makeAtomString('O', padIndex);
-    }
-}
-
 std::pair<AppendPipeline::CreateTrackResult, AppendPipeline::Track*> AppendPipeline::tryCreateTrackFromPad(GstPad* demuxerSrcPad, int trackIndex)
 {
     ASSERT(isMainThread());
@@ -808,7 +794,7 @@ std::pair<AppendPipeline::CreateTrackResult, AppendPipeline::Track*> AppendPipel
         gst_pad_add_probe(demuxerSrcPad, GST_PAD_PROBE_TYPE_BUFFER, reinterpret_cast<GstPadProbeCallback>(appendPipelineDemuxerBlackHolePadProbe), nullptr, nullptr);
         return { CreateTrackResult::TrackIgnored, nullptr };
     }
-    AtomString trackStringId = generateTrackId(streamType, trackIndex);
+    AtomString trackStringId = makeAtomString(trackIndex);
 
     GST_DEBUG_OBJECT(pipeline(), "Creating new AppendPipeline::Track with id '%s'", trackStringId.string().utf8().data());
     size_t newTrackIndex = m_tracks.size();
@@ -909,21 +895,22 @@ Ref<WebCore::TrackPrivateBase> AppendPipeline::makeWebKitTrack(int trackIndex)
     TrackPrivateBaseGStreamer* gstreamerTrack = nullptr;
     // FIXME: AudioTrackPrivateGStreamer etc. should probably use pads of the playback pipeline rather than the append pipeline.
     GRefPtr<GstPad> pad(appendPipelineTrack.appsinkPad);
+    auto index = appendPipelineTrack.trackId;
     switch (appendPipelineTrack.streamType) {
     case StreamType::Audio: {
-        auto specificTrack = AudioTrackPrivateGStreamer::create(m_playerPrivate, trackIndex, WTFMove(pad), false);
+        auto specificTrack = AudioTrackPrivateGStreamer::create(m_playerPrivate, index, WTFMove(pad), false);
         gstreamerTrack = specificTrack.ptr();
         track = static_cast<TrackPrivateBase*>(specificTrack.ptr());
         break;
     }
     case StreamType::Video: {
-        auto specificTrack = VideoTrackPrivateGStreamer::create(m_playerPrivate, trackIndex, WTFMove(pad), false);
+        auto specificTrack = VideoTrackPrivateGStreamer::create(m_playerPrivate, index, WTFMove(pad), false);
         gstreamerTrack = specificTrack.ptr();
         track = static_cast<TrackPrivateBase*>(specificTrack.ptr());
         break;
     }
     case StreamType::Text: {
-        auto specificTrack = InbandTextTrackPrivateGStreamer::create(trackIndex, WTFMove(pad), false);
+        auto specificTrack = InbandTextTrackPrivateGStreamer::create(index, WTFMove(pad), false);
         gstreamerTrack = specificTrack.ptr();
         track = static_cast<TrackPrivateBase*>(specificTrack.ptr());
         break;

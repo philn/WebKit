@@ -125,7 +125,6 @@ private:
     GstElement* pipeline() { return m_pipeline.get(); }
     GstElement* appsrc() { return m_appsrc.get(); }
 
-    static AtomString generateTrackId(StreamType, int padIndex);
     enum class CreateTrackResult { TrackCreated, TrackIgnored, AppendParsingFailed };
     std::pair<CreateTrackResult, AppendPipeline::Track*> tryCreateTrackFromPad(GstPad* demuxerSrcPad, int padIndex);
 
