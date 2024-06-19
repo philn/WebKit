@@ -24,6 +24,8 @@
 
 #include "GRefPtrGStreamer.h"
 #include <gio/gunixfdlist.h>
+#include <gst/video/video-format.h>
+#include <gst/video/video-info-dma.h>
 #include <optional>
 #include <unistd.h>
 #include <wtf/Scope.h>
@@ -287,10 +289,16 @@ std::optional<PipeWireNodeData> DesktopPortalScreenCast::ScreencastSession::open
         return { };
     }
 
+    auto fourcc = gst_video_dma_drm_fourcc_from_format(GST_VIDEO_FORMAT_BGRA);
+    GUniquePtr<char> drmFormat(gst_video_dma_drm_fourcc_to_string(fourcc, 0));
     auto nodeData = PipeWireNodeData(0);
     nodeData.fd = fd;
     nodeData.path = path();
-    nodeData.caps = adoptGRef(gst_caps_new_empty());
+    nodeData.caps = adoptGRef(gst_caps_new_simple("video/x-raw",
+                                                  "format", G_TYPE_STRING, "DMA_DRM",
+                                                  "drm-format", G_TYPE_STRING, drmFormat.get(),
+                                                  nullptr));
+    gst_caps_set_features_simple(nodeData.caps.get(), gst_caps_features_new("memory:DMABuf", nullptr));
     return nodeData;
 }
 

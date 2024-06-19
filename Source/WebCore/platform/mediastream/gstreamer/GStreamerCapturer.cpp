@@ -63,21 +63,22 @@ GStreamerCapturer::GStreamerCapturer(const PipeWireCaptureDevice& device)
     initializeCapturerDebugCategory();
     m_pipewireDevice.emplace(device);
 
-    const char* mediaType = nullptr;
-    switch(device.type()) {
-    case CaptureDevice::DeviceType::Camera:
-    case CaptureDevice::DeviceType::Screen:
-    case CaptureDevice::DeviceType::Window:
-        mediaType = "video/x-raw";
-        break;
-    case CaptureDevice::DeviceType::Microphone:
-        mediaType = "audio/x-raw";
-        break;
-    default:
-        break;
-    }
-    if (mediaType)
-        m_caps = adoptGRef(gst_caps_new_empty_simple(mediaType));
+    // const char* mediaType = nullptr;
+    // switch(device.type()) {
+    // case CaptureDevice::DeviceType::Camera:
+    // case CaptureDevice::DeviceType::Screen:
+    // case CaptureDevice::DeviceType::Window:
+    //     mediaType = "video/x-raw";
+    //     break;
+    // case CaptureDevice::DeviceType::Microphone:
+    //     mediaType = "audio/x-raw";
+    //     break;
+    // default:
+    //     break;
+    // }
+    // if (mediaType)
+    //     m_caps = adoptGRef(gst_caps_new_empty_simple(mediaType));
+    m_caps = device.caps();
 }
 
 GStreamerCapturer::~GStreamerCapturer()
@@ -139,7 +140,9 @@ GstElement* GStreamerCapturer::createSource()
         ASSERT(m_src);
         auto path = AtomString::number(m_pipewireDevice->objectId());
         // FIXME: The path property is deprecated in favor of target-object but the portal doesn't expose this object.
-        g_object_set(m_src.get(), "path", path.string().ascii().data(), "fd", m_pipewireDevice->fd(), nullptr);
+        g_object_set(m_src.get(), "path", path.string().ascii().data(), "fd", m_pipewireDevice->fd(),
+                     //"always-copy", TRUE,
+                     nullptr);
     } else {
         ASSERT(m_device);
         auto sourceName = makeString(WTF::span(name()), hex(reinterpret_cast<uintptr_t>(this)));
@@ -174,7 +177,7 @@ GstElement* GStreamerCapturer::createSource()
             VideoFrameTimeMetadata metadata;
             metadata.captureTime = MonotonicTime::now().secondsSinceEpoch();
             auto* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
-            auto* modifiedBuffer = webkitGstBufferSetVideoFrameTimeMetadata(buffer, std::make_optional<VideoFrameTimeMetadata>(metadata));
+            auto* modifiedBuffer = webkitGstBufferSetVideoFrameTimeMetadata(buffer, metadata);
             gst_buffer_replace(&buffer, modifiedBuffer);
             return GST_PAD_PROBE_OK;
         }, nullptr, nullptr);
@@ -209,7 +212,7 @@ void GStreamerCapturer::setupPipeline()
     m_capsfilter = makeElement("capsfilter");
     m_sink = makeElement("appsink");
 
-    gst_util_set_object_arg(G_OBJECT(m_capsfilter.get()), "caps-change-mode", "delayed");
+    //gst_util_set_object_arg(G_OBJECT(m_capsfilter.get()), "caps-change-mode", "delayed");
 
     gst_app_sink_set_emit_signals(GST_APP_SINK(m_sink.get()), TRUE);
     g_object_set(m_sink.get(), "enable-last-sample", FALSE, nullptr);

@@ -74,10 +74,21 @@ bool GStreamerVideoCapturer::isCapturingDisplay() const
     return deviceType == CaptureDevice::DeviceType::Screen || deviceType == CaptureDevice::DeviceType::Window;
 }
 
+void GStreamerVideoCapturer::setupPipeline()
+{
+    GStreamerCapturer::setupPipeline();
+    auto pad = adoptGRef(gst_element_get_static_pad(m_sink.get(), "sink"));
+    gst_pad_add_probe(pad.get(), GST_PAD_PROBE_TYPE_QUERY_DOWNSTREAM, reinterpret_cast<GstPadProbeCallback>(+[](GstPad*, GstPadProbeInfo* info, gpointer) -> GstPadProbeReturn {
+        if (GST_QUERY_TYPE(GST_PAD_PROBE_INFO_QUERY(info)) == GST_QUERY_ALLOCATION)
+            gst_query_add_allocation_meta(GST_PAD_PROBE_INFO_QUERY(info), GST_VIDEO_META_API_TYPE, nullptr);
+        return GST_PAD_PROBE_OK;
+    }), nullptr, nullptr);
+}
+
 GstElement* GStreamerVideoCapturer::createConverter()
 {
     if (isCapturingDisplay())
-        return makeGStreamerElement("videoconvert", nullptr);
+        return makeGStreamerElement("identity", nullptr);
 
     auto* bin = gst_bin_new(nullptr);
     auto* videoscale = makeGStreamerElement("videoscale", "videoscale");

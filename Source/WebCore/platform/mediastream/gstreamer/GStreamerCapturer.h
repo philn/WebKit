@@ -62,7 +62,7 @@ public:
     void removeObserver(GStreamerCapturerObserver&);
     void forEachObserver(const Function<void(GStreamerCapturerObserver&)>&);
 
-    void setupPipeline();
+    virtual void setupPipeline();
     void start();
     void stop();
     WARN_UNUSED_RETURN GRefPtr<GstCaps> caps();
