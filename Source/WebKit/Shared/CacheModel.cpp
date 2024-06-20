@@ -27,6 +27,7 @@
 #include "CacheModel.h"
 
 #include <algorithm>
+#include <wtf/Assertions.h>
 #include <wtf/RAMSize.h>
 #include <wtf/Seconds.h>
 #include <wtf/StdLibExtras.h>
@@ -183,8 +184,12 @@ uint64_t calculateURLCacheDiskCapacity(CacheModel cacheModel, uint64_t diskFreeS
         if (units != 1)
             value = value.substring(0, value.length()-1);
 
-        size_t size = size_t(parseInteger<uint64_t>(value).value_or(0) * units);
-        urlCacheDiskCapacity = (unsigned long)(size);
+        urlCacheDiskCapacity = parseInteger<uint64_t>(value).value_or(0) * units;
+        if (urlCacheDiskCapacity > diskFreeSize * MB) {
+            WTFLogAlways("Disabling cache due to lack of disk space (wanted space: %ju, disk free space: %ju [bytes])",
+                         urlCacheDiskCapacity, diskFreeSize * MB);
+            urlCacheDiskCapacity = 0;
+        }
     }
 
     return urlCacheDiskCapacity;
