@@ -183,7 +183,7 @@ uint64_t calculateURLCacheDiskCapacity(CacheModel cacheModel, uint64_t diskFreeS
         if (units != 1)
             value = value.substring(0, value.length()-1);
 
-        size_t size = size_t(parseInteger<uint64_t>(s).value_or(1) * units);
+        size_t size = size_t(parseInteger<uint64_t>(value).value_or(0) * units);
         urlCacheDiskCapacity = (unsigned long)(size);
     }
 
