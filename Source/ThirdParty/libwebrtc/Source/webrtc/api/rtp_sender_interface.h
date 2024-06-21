@@ -116,6 +116,12 @@ class RTC_EXPORT RtpSenderInterface : public webrtc::RefCountInterface,
       std::unique_ptr<VideoEncoderFactory::EncoderSelectorInterface>
           encoder_selector) = 0;
 
+#if defined(WEBRTC_WEBKIT_BUILD)
+  virtual RTCError GenerateKeyFrame(const std::vector<std::string>& rids) {
+    return RTCError::OK();
+  }
+#endif
+
   // Default implementation of SetFrameTransformer.
   // TODO: bugs.webrtc.org/15929 - remove when all implementations are good
   void SetFrameTransformer(rtc::scoped_refptr<FrameTransformerInterface>
