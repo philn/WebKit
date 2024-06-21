@@ -144,14 +144,14 @@ static UniqueRef<webrtc::VideoEncoder> createInternalEncoder(LibWebRTCVPXVideoEn
 {
     switch (type) {
     case LibWebRTCVPXVideoEncoder::Type::VP8:
-        return makeUniqueRefFromNonNullUniquePtr(webrtc::VP8Encoder::Create());
+        return makeUniqueRefFromNonNullUniquePtr(webrtc::CreateVp8Encoder(webrtc::EnvironmentFactory().Create()));
     case LibWebRTCVPXVideoEncoder::Type::VP9:
-        return makeUniqueRefFromNonNullUniquePtr(webrtc::VP9Encoder::Create());
+        return makeUniqueRefFromNonNullUniquePtr(webrtc::CreateVp9Encoder(webrtc::EnvironmentFactory().Create()));
     case LibWebRTCVPXVideoEncoder::Type::VP9_P2:
-        return makeUniqueRefFromNonNullUniquePtr(webrtc::VP9Encoder::Create(cricket::CreateVideoCodec(webrtc::SdpVideoFormat { cricket::kVp9CodecName, { { "profile-id", "2" } } } )));
+        return makeUniqueRefFromNonNullUniquePtr(webrtc::CreateVp9Encoder(webrtc::EnvironmentFactory().Create(), { webrtc::VP9Profile::kProfile2 }));
 #if ENABLE(AV1)
     case LibWebRTCVPXVideoEncoder::Type::AV1:
-        return makeUniqueRefFromNonNullUniquePtr(webrtc::CreateLibaomAv1Encoder());
+        return makeUniqueRefFromNonNullUniquePtr(webrtc::CreateLibaomAv1Encoder(webrtc::EnvironmentFactory().Create()));
 #endif
     }
 }

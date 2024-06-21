@@ -316,6 +316,14 @@ private:
 
     std::vector<rtc::scoped_refptr<webrtc::RtpTransceiverInterface>> GetTransceivers() const final;
 
+    bool ShouldFireNegotiationNeededEvent(uint32_t) final { return false; }
+    void ReconfigureBandwidthEstimation(const webrtc::BandwidthEstimationSettings&) final { }
+    void SetAudioPlayout(bool) final { }
+    void SetAudioRecording(bool) final { }
+    absl::optional<bool> can_trickle_ice_candidates() final { return { }; }
+    void AddAdaptationResource(rtc::scoped_refptr<webrtc::Resource>) final { }
+    rtc::Thread* signaling_thread() const final { return nullptr; }
+
 protected:
     void SetRemoteDescription(webrtc::SetSessionDescriptionObserver*, webrtc::SessionDescriptionInterface*) final { ASSERT_NOT_REACHED(); }
     void SetRemoteDescription(std::unique_ptr<webrtc::SessionDescriptionInterface>, rtc::scoped_refptr<webrtc::SetRemoteDescriptionObserverInterface>) override;
