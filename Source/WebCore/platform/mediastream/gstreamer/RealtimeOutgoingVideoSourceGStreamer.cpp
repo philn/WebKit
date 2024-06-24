@@ -105,8 +105,16 @@ void RealtimeOutgoingVideoSourceGStreamer::teardown()
     m_stats.reset();
 }
 
-bool RealtimeOutgoingVideoSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>& caps)
+bool RealtimeOutgoingVideoSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>& codecPreferences)
 {
+    // Filter out RTX codecs, otherwise we might attempt to create a rtprtxpay payloader, which
+    // makes no sense. This workaround will not be needed anymore once simulcast support is added.
+    auto caps = adoptGRef(gst_caps_copy(codecPreferences.get()));
+    gst_caps_filter_and_map_in_place(caps.get(), [](GstCapsFeatures*, GstStructure* structure, gpointer) -> gboolean {
+        const char* encodingName = gst_structure_get_string(structure, "encoding-name");
+        return !equalIgnoringASCIICase(encodingName, "rtx"_s);
+    }, nullptr);
+
     GST_DEBUG_OBJECT(m_bin.get(), "Setting payload caps: %" GST_PTR_FORMAT, caps.get());
     // FIXME: We use only the first structure of the caps. This not be the right approach specially
     // we don't have a payloader or encoder for that format.

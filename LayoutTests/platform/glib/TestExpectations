@@ -2143,7 +2143,6 @@ webkit.org/b/235885 fast/mediastream/RTCPeerConnection-have-local-pranswer.html 
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-have-remote-offer.html [ Failure ]
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-have-remote-pranswer.html [ Failure ]
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-icecandidate-event.html [ Failure ]
-webkit.org/b/235885 fast/mediastream/RTCPeerConnection-media-setup-callbacks-single-dialog.html [ Failure ]
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-media-setup-two-dialogs.html [ Failure Timeout ]
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-onnegotiationneeded.html [ Skip ] # Timeout.
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-remotely-assigned-transceiver-mid.html [ Pass Failure Timeout ]
@@ -2214,6 +2213,13 @@ imported/w3c/web-platform-tests/webrtc/protocol/sdes-dont-dont-dont.html [ Pass 
 imported/w3c/web-platform-tests/webrtc/protocol/split.https.html [ Pass ]
 imported/w3c/web-platform-tests/webrtc/protocol/unknown-mediatypes.html [ Pass ]
 imported/w3c/web-platform-tests/webrtc/protocol/rtx-codecs.https.html [ Pass ]
+
+# Support for encoded transforms is incomplete.
+imported/w3c/web-platform-tests/webrtc-encoded-transform [ Skip ]
+
+# https://gitlab.freedesktop.org/gstreamer/gstreamer/-/issues/3641
+imported/w3c/web-platform-tests/webrtc/protocol/handover.html [ Timeout ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-addIceCandidate-timing.https.html [ Timeout ]
 
 # Missing support for ICE restarts
 webkit.org/b/235885 webrtc/peerconnection-page-cache-long.html [ Skip ]
