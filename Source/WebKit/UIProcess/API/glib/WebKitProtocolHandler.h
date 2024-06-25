@@ -34,6 +34,7 @@ public:
 private:
     void handleRequest(WebKitURISchemeRequest*);
     void handleGPU(WebKitURISchemeRequest*);
+    void handleWebRTCInternals(WebKitURISchemeRequest*);
 };
 
 } // namespace WebKit

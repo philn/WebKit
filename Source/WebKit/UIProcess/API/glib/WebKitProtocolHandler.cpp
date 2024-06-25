@@ -108,9 +108,13 @@ void WebKitProtocolHandler::handleRequest(WebKitURISchemeRequest* request)
         handleGPU(request);
         return;
     }
+    if (requestURL.host() == "webrtc-internals"_s) {
+        handleWebRTCInternals(request);
+        return;
+    }
 
     GUniquePtr<GError> error(g_error_new_literal(WEBKIT_POLICY_ERROR, WEBKIT_POLICY_ERROR_CANNOT_SHOW_URI, "Not found"));
-        webkit_uri_scheme_request_finish_error(request, error.get());
+    webkit_uri_scheme_request_finish_error(request, error.get());
 }
 
 static inline ASCIILiteral webkitPortName()
@@ -683,6 +687,21 @@ void WebKitProtocolHandler::handleGPU(WebKitURISchemeRequest* request)
 
     if (requestURL.path() == "/stdout"_s)
         WTFLogAlways("GPU information\n%s", prettyPrintJSON(infoAsString).utf8().data());
+}
+
+void WebKitProtocolHandler::handleWebRTCInternals(WebKitURISchemeRequest* request)
+{
+    GString* html = g_string_new(
+        "<html><head><title>WebRTC Internals</title>"
+        "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />"
+        "</head><body>Hello");
+
+    Ref page = webkitURISchemeRequestGetWebPage(request);
+
+    g_string_append_printf(html, "</body></html>");
+    gsize streamLength = html->len;
+    GRefPtr<GInputStream> stream = adoptGRef(g_memory_input_stream_new_from_data(g_string_free(html, FALSE), streamLength, g_free));
+    webkit_uri_scheme_request_finish(request, stream.get(), streamLength, "text/html");
 }
 
 } // namespace WebKit
