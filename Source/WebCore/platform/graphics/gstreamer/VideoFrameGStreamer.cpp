@@ -41,11 +41,23 @@
 #elif USE(SKIA)
 #include <skia/core/SkData.h>
 #include <skia/core/SkImage.h>
+#include <skia/gpu/GrBackendSurface.h>
+#include <skia/gpu/ganesh/SkImageGanesh.h>
+#include <skia/gpu/ganesh/gl/GrGLBackendSurface.h>
+#include <skia/gpu/gl/GrGLTypes.h>
 
 IGNORE_CLANG_WARNINGS_BEGIN("cast-align")
 #include <skia/core/SkPixmap.h>
 IGNORE_CLANG_WARNINGS_END
+
+#if USE(GSTREAMER_GL)
+#include <gst/gl/gl.h>
+#include <gst/gl/gstglfuncs.h>
+#include <gst/gl/gstglbufferpool.h>
+#include <gst/gl/gstglmemory.h>
 #endif
+
+#endif // USE(SKIA)
 
 GST_DEBUG_CATEGORY(webkit_video_frame_debug);
 #define GST_CAT_DEFAULT webkit_video_frame_debug
@@ -86,6 +98,40 @@ static RefPtr<ImageGStreamer> convertSampleToImage(const GRefPtr<GstSample>& sam
     return ImageGStreamer::create(WTFMove(convertedSample));
 }
 
+static GQuark _skImageQuark()
+{
+    static GQuark quark = 0;
+
+    if (!quark)
+        quark = g_quark_from_static_string("SkImageQuark");
+    return quark;
+}
+
+static GstBufferPool* gstGLBufferPool(GstGLContext* context, const GRefPtr<GstCaps>& caps, size_t size)
+{
+    // FIXME: This is leaking currently.
+    static GstBufferPool* pool = nullptr;
+    if (!pool) {
+        pool = gst_gl_buffer_pool_new(context);
+        auto config = gst_buffer_pool_get_config(pool);
+        unsigned min = 0;
+        unsigned max = 0;
+        gst_buffer_pool_config_set_params(config, caps.get(), size, min, max);
+        gst_buffer_pool_config_add_option(config, GST_BUFFER_POOL_OPTION_VIDEO_META);
+        gst_buffer_pool_set_config(pool, config);
+        gst_buffer_pool_set_active(pool, TRUE);
+    }
+    return pool;
+}
+
+struct GLThreadData {
+    GLuint sourceTextureId;
+    GLuint destinationTextureId;
+    int width;
+    int height;
+    unsigned memoryPlane;
+};
+
 RefPtr<VideoFrame> VideoFrame::fromNativeImage(NativeImage& image)
 {
     ensureVideoFrameDebugCategoryInitialized();
@@ -111,30 +157,6 @@ RefPtr<VideoFrame> VideoFrame::fromNativeImage(NativeImage& image)
     auto height = imageInfo.height();
     auto size = imageInfo.computeMinByteSize();
 
-    GRefPtr<GstBuffer> buffer;
-    if (platformImage->isTextureBacked()) {
-        if (!PlatformDisplay::sharedDisplayForCompositing().skiaGLContext()->makeContextCurrent())
-            return nullptr;
-
-        auto data = SkData::MakeUninitialized(size);
-        GrDirectContext* grContext = PlatformDisplay::sharedDisplayForCompositing().skiaGrContext();
-        if (!platformImage->readPixels(grContext, imageInfo, static_cast<uint8_t*>(data->writable_data()), strides[0], 0, 0))
-            return nullptr;
-
-        auto* bytes = data->writable_data();
-        buffer = adoptGRef(gst_buffer_new_wrapped_full(GST_MEMORY_FLAG_READONLY, bytes, size, 0, size, data.release(), [](gpointer userData) {
-            auto data = sk_sp<SkData>(static_cast<SkData*>(userData));
-        }));
-    } else {
-        SkPixmap pixmap;
-        if (!platformImage->peekPixels(&pixmap))
-            return nullptr;
-
-        buffer = adoptGRef(gst_buffer_new_wrapped_full(GST_MEMORY_FLAG_READONLY, pixmap.writable_addr(), size, 0, size, SkRef(platformImage.get()), [](gpointer userData) {
-            SkSafeUnref(static_cast<SkImage*>(userData));
-        }));
-    }
-
     GstVideoFormat format = GST_VIDEO_FORMAT_UNKNOWN;
     switch (imageInfo.colorType()) {
     case kBGRA_8888_SkColorType:
@@ -149,11 +171,109 @@ RefPtr<VideoFrame> VideoFrame::fromNativeImage(NativeImage& image)
     default:
         return nullptr;
     }
+
+    GstVideoInfo videoInfo;
+    gst_video_info_init(&videoInfo);
+    videoInfo.width = width;
+    videoInfo.height = height;
+    videoInfo.finfo = gst_video_format_get_info(format);
+    // FIXME: This should be set somehow from the SkImage colorimetry.
+    videoInfo.colorimetry = { GST_VIDEO_COLOR_RANGE_0_255, GST_VIDEO_COLOR_MATRIX_RGB, GST_VIDEO_TRANSFER_SRGB, GST_VIDEO_COLOR_PRIMARIES_BT709 };
+
+    GRefPtr<GstBuffer> buffer;
+    GRefPtr<GstCaps> caps;
+    if (platformImage->isTextureBacked()) {
+        auto& display = PlatformDisplay::sharedDisplayForCompositing();
+
+        caps = adoptGRef(gst_video_info_to_caps(&videoInfo));
+        gst_caps_set_features_simple(caps.get(), gst_caps_features_from_string(GST_CAPS_FEATURE_MEMORY_GL_MEMORY));
+
+        auto context = display.gstGLContext();
+        auto pool = gstGLBufferPool(context, caps, size);
+
+        gst_printerrln("context: %" GST_PTR_FORMAT, context);
+        gst_gl_context_activate(context, TRUE);
+        gst_buffer_pool_acquire_buffer(pool, &buffer.outPtr(), nullptr);
+
+        GstMappedFrame frame(buffer.get(), &videoInfo, static_cast<GstMapFlags>(GST_MAP_WRITE | GST_MAP_GL));
+        auto outputTextureMemory = reinterpret_cast<GstGLMemory*>(frame.get()->map[0].memory);
+        auto outputTextureId = gst_gl_memory_get_texture_id(outputTextureMemory);
+
+        unsigned textureID = 0;
+        GrBackendTexture backendTexture;
+        if (SkImages::GetBackendTextureFromImage(platformImage, &backendTexture, false)) {
+            GrGLTextureInfo textureInfo;
+            if (GrBackendTextures::GetGLTextureInfo(backendTexture, &textureInfo))
+                textureID = textureInfo.fID;
+        }
+
+        if (!textureID) {
+            GST_WARNING("Unable to get SkImage texture ID");
+            return nullptr;
+        }
+
+        GLThreadData data;
+        data.sourceTextureId = textureID;
+        data.destinationTextureId = outputTextureId;
+        data.width = width;
+        data.height = height;
+        data.memoryPlane = outputTextureMemory->plane;
+        gst_gl_context_thread_add(context, reinterpret_cast<GstGLContextThreadFunc>(+[](GstGLContext*, gpointer userData) {
+            auto data = static_cast<GLThreadData*>(userData);
+
+            GLint boundTexture = 0;
+            GLint boundFramebuffer = 0;
+            GLint boundActiveTexture = 0;
+
+            glGetIntegerv(GL_TEXTURE_BINDING_2D, &boundTexture);
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &boundFramebuffer);
+            glGetIntegerv(GL_ACTIVE_TEXTURE, &boundActiveTexture);
+
+            //glActiveTexture(GL_TEXTURE0 + data->memoryPlane);
+            //glBindTexture(GL_TEXTURE_2D, data->sourceTextureId);
+
+            {
+                auto& display = PlatformDisplay::sharedDisplayForCompositing();
+                if (!display.skiaGLContext()->makeContextCurrent()) {
+                    gst_printerrln("oh no");
+                    return;
+                }
+                // glBindTexture(GL_TEXTURE_2D, data->destinationTextureId);
+                glBindTexture(GL_TEXTURE_2D, data->sourceTextureId);
+
+                GLuint fboId = 0;
+                glGenFramebuffers(1, &fboId);
+                glBindFramebuffer(GL_FRAMEBUFFER, fboId);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, data->sourceTextureId, 0);
+
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, data->destinationTextureId);
+                glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0, data->width, data->height, 0);
+
+                glBindTexture(GL_TEXTURE_2D, boundTexture);
+                glBindFramebuffer(GL_FRAMEBUFFER, boundFramebuffer);
+                glBindTexture(GL_TEXTURE_2D, boundTexture);
+                glActiveTexture(boundActiveTexture);
+                glDeleteFramebuffers(1, &fboId);
+            }
+        }), &data);
+
+        gst_mini_object_set_qdata(GST_MINI_OBJECT_CAST(outputTextureMemory), _skImageQuark(), SkRef(platformImage.get()), [](gpointer userData) {
+            SkSafeUnref(static_cast<SkImage*>(userData));
+        });
+    } else {
+        SkPixmap pixmap;
+        if (!platformImage->peekPixels(&pixmap))
+            return nullptr;
+
+        buffer = adoptGRef(gst_buffer_new_wrapped_full(GST_MEMORY_FLAG_READONLY, pixmap.writable_addr(), size, 0, size, SkRef(platformImage.get()), [](gpointer userData) {
+            SkSafeUnref(static_cast<SkImage*>(userData));
+        }));
+        caps = adoptGRef(gst_video_info_to_caps(&videoInfo));
+        gst_buffer_add_video_meta_full(buffer.get(), GST_VIDEO_FRAME_FLAG_NONE, format, width, height, 1, offsets, strides);
+    }
 #endif
 
-    gst_buffer_add_video_meta_full(buffer.get(), GST_VIDEO_FRAME_FLAG_NONE, format, width, height, 1, offsets, strides);
-
-    auto caps = adoptGRef(gst_caps_new_simple("video/x-raw", "format", G_TYPE_STRING, gst_video_format_to_string(format), "width", G_TYPE_INT, width, "height", G_TYPE_INT, height, nullptr));
     auto sample = adoptGRef(gst_sample_new(buffer.get(), caps.get(), nullptr, nullptr));
     FloatSize presentationSize { static_cast<float>(width), static_cast<float>(height) };
     return VideoFrameGStreamer::create(WTFMove(sample), presentationSize);
@@ -383,14 +503,8 @@ VideoFrameGStreamer::VideoFrameGStreamer(GRefPtr<GstSample>&& sample, const Floa
     ensureVideoFrameDebugCategoryInitialized();
     ASSERT(m_sample);
 
-    if (!metadata)
-        return;
-
-    GstBuffer* buffer = gst_sample_get_buffer(m_sample.get());
-    RELEASE_ASSERT(buffer);
-    buffer = webkitGstBufferSetVideoFrameTimeMetadata(buffer, WTFMove(metadata));
-    m_sample = adoptGRef(gst_sample_make_writable(m_sample.leakRef()));
-    gst_sample_set_buffer(m_sample.get(), buffer);
+    if (metadata)
+        setMetadata(WTFMove(metadata));
 }
 
 VideoFrameGStreamer::VideoFrameGStreamer(const GRefPtr<GstSample>& sample, const FloatSize& presentationSize, const MediaTime& presentationTime, Rotation videoRotation, PlatformVideoColorSpace&& colorSpace)
@@ -403,21 +517,26 @@ VideoFrameGStreamer::VideoFrameGStreamer(const GRefPtr<GstSample>& sample, const
 
 void VideoFrameGStreamer::setFrameRate(double frameRate)
 {
-    auto caps = gst_sample_get_caps(m_sample.get());
+    auto caps = adoptGRef(gst_caps_copy(gst_sample_get_caps(m_sample.get())));
     int frameRateNumerator, frameRateDenominator;
     gst_util_double_to_fraction(frameRate, &frameRateNumerator, &frameRateDenominator);
-    gst_caps_set_simple(caps, "framerate", GST_TYPE_FRACTION, frameRateNumerator, frameRateDenominator, nullptr);
+    gst_caps_set_simple(caps.get(), "framerate", GST_TYPE_FRACTION, frameRateNumerator, frameRateDenominator, nullptr);
 
     auto buffer = gst_sample_get_buffer(m_sample.get());
     GST_BUFFER_DURATION(buffer) = toGstClockTime(1_s / frameRate);
+
+    m_sample = adoptGRef(gst_sample_make_writable(m_sample.leakRef()));
+    gst_sample_set_caps(m_sample.get(), caps.get());
 }
 
 void VideoFrameGStreamer::setMaxFrameRate(double maxFrameRate)
 {
-    auto caps = gst_sample_get_caps(m_sample.get());
+    auto caps = adoptGRef(gst_caps_copy(gst_sample_get_caps(m_sample.get())));
     int frameRateNumerator, frameRateDenominator;
     gst_util_double_to_fraction(maxFrameRate, &frameRateNumerator, &frameRateDenominator);
-    gst_caps_set_simple(caps, "framerate", GST_TYPE_FRACTION, 0, 1, "max-framerate", GST_TYPE_FRACTION, frameRateNumerator, frameRateDenominator, nullptr);
+    gst_caps_set_simple(caps.get(), "framerate", GST_TYPE_FRACTION, 0, 1, "max-framerate", GST_TYPE_FRACTION, frameRateNumerator, frameRateDenominator, nullptr);
+    m_sample = adoptGRef(gst_sample_make_writable(m_sample.leakRef()));
+    gst_sample_set_caps(m_sample.get(), caps.get());
 }
 
 void VideoFrameGStreamer::setPresentationTime(const MediaTime& presentationTime)
@@ -425,6 +544,15 @@ void VideoFrameGStreamer::setPresentationTime(const MediaTime& presentationTime)
     updateTimestamp(presentationTime, VideoFrame::ShouldCloneWithDifferentTimestamp::No);
     auto buffer = gst_sample_get_buffer(m_sample.get());
     GST_BUFFER_PTS(buffer) = GST_BUFFER_DTS(buffer) = toGstClockTime(1_s / presentationTime.toDouble());
+}
+
+void VideoFrameGStreamer::setMetadata(std::optional<VideoFrameTimeMetadata>&& metadata)
+{
+    GstBuffer* buffer = gst_sample_get_buffer(m_sample.get());
+    RELEASE_ASSERT(buffer);
+    buffer = webkitGstBufferSetVideoFrameTimeMetadata(buffer, WTFMove(metadata));
+    m_sample = adoptGRef(gst_sample_make_writable(m_sample.leakRef()));
+    gst_sample_set_buffer(m_sample.get(), buffer);
 }
 
 static void copyPlane(uint8_t* destination, const uint8_t* source, uint64_t sourceStride, const ComputedPlaneLayout& spanPlaneLayout)

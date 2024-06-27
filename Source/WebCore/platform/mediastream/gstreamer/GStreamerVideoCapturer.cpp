@@ -28,6 +28,10 @@
 #include "VideoFrameGStreamer.h"
 #include <gst/app/gstappsink.h>
 
+#if USE(GSTREAMER_GL)
+#include <gst/gl/gstglmemory.h>
+#endif
+
 GST_DEBUG_CATEGORY(webkit_video_capturer_debug);
 #define GST_CAT_DEFAULT webkit_video_capturer_debug
 
@@ -47,12 +51,18 @@ GStreamerVideoCapturer::GStreamerVideoCapturer(GStreamerCaptureDevice&& device)
     : GStreamerCapturer(WTFMove(device), adoptGRef(gst_caps_new_empty_simple("video/x-raw")))
 {
     initializeVideoCapturerDebugCategory();
+#if USE(GSTREAMER_GL)
+    gst_caps_set_features_simple(m_caps.get(), gst_caps_features_from_string(GST_CAPS_FEATURE_MEMORY_GL_MEMORY));
+#endif
 }
 
 GStreamerVideoCapturer::GStreamerVideoCapturer(const char* sourceFactory, CaptureDevice::DeviceType deviceType)
     : GStreamerCapturer(sourceFactory, adoptGRef(gst_caps_new_empty_simple("video/x-raw")), deviceType)
 {
     initializeVideoCapturerDebugCategory();
+#if USE(GSTREAMER_GL)
+    gst_caps_set_features_simple(m_caps.get(), gst_caps_features_from_string(GST_CAPS_FEATURE_MEMORY_GL_MEMORY));
+#endif
 }
 
 void GStreamerVideoCapturer::setSinkVideoFrameCallback(SinkVideoFrameCallback&& callback)
@@ -87,6 +97,7 @@ GstElement* GStreamerVideoCapturer::createConverter()
         gst_caps_set_features(m_caps.get(), 0, gst_caps_features_new("memory:DMABuf", nullptr));
         return makeGStreamerElement("identity", nullptr);
     }
+    return makeGStreamerElement("identity", nullptr);
 
     auto* bin = gst_bin_new(nullptr);
     auto* videoscale = makeGStreamerElement("videoscale", "videoscale");

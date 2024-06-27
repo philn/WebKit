@@ -677,7 +677,9 @@ ImageBuffer* MockRealtimeVideoSource::imageBufferInternal()
     if (m_imageBuffer)
         return m_imageBuffer.get();
 
-    m_imageBuffer = ImageBuffer::create(captureSize(), RenderingPurpose::Unspecified, 1, DestinationColorSpace::SRGB(), ImageBufferPixelFormat::BGRA8);
+    OptionSet<ImageBufferOptions> options;
+    options.add(ImageBufferOptions::Accelerated);
+    m_imageBuffer = ImageBuffer::create(captureSize(), RenderingPurpose::MediaPainting, 1, DestinationColorSpace::SRGB(), ImageBufferPixelFormat::BGRA8, options);
     if (!m_imageBuffer)
         return nullptr;
 

@@ -112,20 +112,29 @@ void MockRealtimeVideoSourceGStreamer::updateSampleBuffer()
     if (!imageBuffer)
         return;
 
-    auto pixelBuffer = imageBuffer->getPixelBuffer({ AlphaPremultiplication::Premultiplied, PixelFormat::BGRA8, DestinationColorSpace::SRGB() }, { { }, imageBuffer->truncatedLogicalSize() });
-    if (!pixelBuffer)
+    PlatformImagePtr platformImage;
+    if (auto nativeImage = imageBuffer->copyNativeImage())
+        platformImage = nativeImage->platformImage();
+
+    auto nativeImage = NativeImage::create(WTFMove(platformImage));
+    if (!nativeImage)
         return;
 
-    VideoFrameTimeMetadata metadata;
-    metadata.captureTime = MonotonicTime::now().secondsSinceEpoch();
-    auto presentationTime = MediaTime::createWithDouble((elapsedTime()).seconds());
-    auto videoFrame = VideoFrameGStreamer::createFromPixelBuffer(pixelBuffer.releaseNonNull(), VideoFrameGStreamer::CanvasContentType::Canvas2D, videoFrameRotation(), presentationTime, m_capturer->size(), frameRate(), false, WTFMove(metadata));
+    auto videoFrame = VideoFrame::fromNativeImage(*nativeImage.get());
     if (!videoFrame)
         return;
 
+    auto gstVideoFrame = static_cast<VideoFrameGStreamer*>(videoFrame.get());
+    gstVideoFrame->setFrameRate(frameRate());
+    //gstVideoFrame->setPresentationTime(MediaTime::createWithDouble((elapsedTime()).seconds()));
+
+    VideoFrameTimeMetadata metadata;
+    metadata.captureTime = MonotonicTime::now().secondsSinceEpoch();
+    gstVideoFrame->setMetadata(WTFMove(metadata));
+
     // Mock GstDevice is an appsrc, see webkitMockDeviceCreateElement().
     ASSERT(GST_IS_APP_SRC(m_capturer->source()));
-    gst_app_src_push_sample(GST_APP_SRC_CAST(m_capturer->source()), videoFrame->sample());
+    gst_app_src_push_sample(GST_APP_SRC_CAST(m_capturer->source()), gstVideoFrame->sample());
 }
 
 void MockRealtimeVideoSourceGStreamer::setSizeFrameRateAndZoom(const VideoPresetConstraints& constraints)

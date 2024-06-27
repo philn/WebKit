@@ -52,6 +52,7 @@ public:
     void setMaxFrameRate(double);
 
     void setPresentationTime(const MediaTime&);
+    void setMetadata(std::optional<VideoFrameTimeMetadata>&&);
 
     RefPtr<VideoFrameGStreamer> resizeTo(const IntSize&);
 
