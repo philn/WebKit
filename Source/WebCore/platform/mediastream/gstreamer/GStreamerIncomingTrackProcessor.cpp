@@ -23,9 +23,16 @@
 
 #include "GStreamerCommon.h"
 #include "GStreamerRegistryScanner.h"
+// #include <gst/playback/gstplay-enum.h>
 
 GST_DEBUG_CATEGORY(webkit_webrtc_incoming_track_processor_debug);
 #define GST_CAT_DEFAULT webkit_webrtc_incoming_track_processor_debug
+
+typedef enum {
+    GST_AUTOPLUG_SELECT_TRY,
+    GST_AUTOPLUG_SELECT_EXPOSE,
+    GST_AUTOPLUG_SELECT_SKIP
+} GstAutoplugSelectResult;
 
 namespace WebCore {
 
@@ -209,6 +216,7 @@ GRefPtr<GstElement> GStreamerIncomingTrackProcessor::createParser()
     GRefPtr<GstElement> parsebin = makeGStreamerElement("parsebin", nullptr);
     g_signal_connect(parsebin.get(), "element-added", G_CALLBACK(+[](GstBin*, GstElement* element, gpointer) {
         auto elementClass = makeString(gst_element_get_metadata(element, GST_ELEMENT_METADATA_KLASS));
+        GST_DEBUG("parsebin added element %s", GST_OBJECT_NAME(element));
         auto classifiers = elementClass.split('/');
         if (!classifiers.contains("Depayloader"_s))
             return;
@@ -219,9 +227,27 @@ GRefPtr<GstElement> GStreamerIncomingTrackProcessor::createParser()
     g_signal_connect_swapped(parsebin.get(), "pad-added", G_CALLBACK(+[](GStreamerIncomingTrackProcessor* self, GstPad* pad) {
         auto sinkPad = adoptGRef(gst_element_get_static_pad(self->m_tee.get(), "sink"));
         gst_pad_link(pad, sinkPad.get());
+        GST_DEBUG("parsebin added pad %s of element %s", GST_OBJECT_NAME(pad), GST_OBJECT_PARENT(pad) ? GST_OBJECT_NAME(GST_OBJECT_PARENT(pad)) : "null");
         gst_element_sync_state_with_parent(self->m_tee.get());
         self->trackReady();
     }), this);
+
+    g_signal_connect(parsebin.get(), "autoplug-select", G_CALLBACK(+[](GstElement*, GstPad*, GstCaps*, GstElementFactory* factory, gpointer) {
+        GUniquePtr<char> factoryName(gst_object_get_name(GST_OBJECT(factory)));
+        // StringView factoryNameView = StringView::fromLatin1(factoryName.get());
+        // if (factoryNameView.startsWith("brcm"_s)) {
+        //     GST_DEBUG("parsebin skipping %s", factoryName.get());
+        //     return GST_AUTOPLUG_SELECT_SKIP;
+        // } else
+            GST_DEBUG("parsebin autoplug-select for %s", factoryName.get());
+        return GST_AUTOPLUG_SELECT_TRY;
+    }), nullptr);
+
+    g_signal_connect(parsebin.get(), "unknown-type", G_CALLBACK(+[](GstElement*, GstPad* pad, GstCaps* caps, gpointer) {
+        GST_WARNING("parsebin unknown-type for pad %s with caps %" GST_PTR_FORMAT, GST_OBJECT_NAME(pad), caps);
+    }), nullptr);
+
+    // g_object_set(parsebin.get(), "expose-all-streams", TRUE, nullptr);
     return parsebin;
 }
 

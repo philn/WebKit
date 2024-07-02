@@ -1330,7 +1330,7 @@ MediaCapabilitiesEnabled:
     WebKit:
       default: true
     WebCore:
-      default: false
+      default: true
 
 MediaCaptionFormatTypesAllowedInCaptivePortalMode:
   type: String
@@ -1412,9 +1412,9 @@ MediaDevicesEnabled:
     WebKitLegacy:
       default: false
     WebKit:
-      default: false
+      default: true
     WebCore:
-      default: false
+      default: true
 
 MediaEnabled:
   type: bool
@@ -1723,9 +1723,7 @@ PeerConnectionEnabled:
     WebKitLegacy:
       default: true
     WebKit:
-      "USE(LIBWEBRTC)": WebCore::LibWebRTCProvider::webRTCAvailable()
-      "USE(GSTREAMER_WEBRTC)": true
-      default: false
+      default: true
     WebCore:
       default: true
 

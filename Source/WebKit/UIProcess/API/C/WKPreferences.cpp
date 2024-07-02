@@ -1250,42 +1250,42 @@ bool WKPreferencesGetUseGiantTiles(WKPreferencesRef preferencesRef)
 
 void WKPreferencesSetMediaDevicesEnabled(WKPreferencesRef preferencesRef, bool enabled)
 {
-    toImpl(preferencesRef)->setMediaDevicesEnabled(enabled);
+    toImpl(preferencesRef)->setMediaDevicesEnabled(true);
 }
 
 bool WKPreferencesGetMediaDevicesEnabled(WKPreferencesRef preferencesRef)
 {
-    return toImpl(preferencesRef)->mediaDevicesEnabled();
+    return true;
 }
 
 void WKPreferencesSetMediaStreamEnabled(WKPreferencesRef preferencesRef, bool enabled)
 {
-    toImpl(preferencesRef)->setMediaStreamEnabled(enabled);
+    toImpl(preferencesRef)->setMediaStreamEnabled(true);
 }
 
 bool WKPreferencesGetMediaStreamEnabled(WKPreferencesRef preferencesRef)
 {
-    return toImpl(preferencesRef)->mediaStreamEnabled();
+    return true;
 }
 
 void WKPreferencesSetPeerConnectionEnabled(WKPreferencesRef preferencesRef, bool enabled)
 {
-    toImpl(preferencesRef)->setPeerConnectionEnabled(enabled);
+    toImpl(preferencesRef)->setPeerConnectionEnabled(true);
 }
 
 bool WKPreferencesGetPeerConnectionEnabled(WKPreferencesRef preferencesRef)
 {
-    return toImpl(preferencesRef)->peerConnectionEnabled();
+    return true;
 }
 
 void WKPreferencesSetWebRTCMDNSICECandidatesEnabled(WKPreferencesRef preferencesRef, bool enabled)
 {
-    toImpl(preferencesRef)->setWebRTCMDNSICECandidatesEnabled(enabled);
+    toImpl(preferencesRef)->setWebRTCMDNSICECandidatesEnabled(true);
 }
 
 bool WKPreferencesGetWebRTCMDNSICECandidatesEnabled(WKPreferencesRef preferencesRef)
 {
-    return toImpl(preferencesRef)->webRTCMDNSICECandidatesEnabled();
+    return true;
 }
 
 void WKPreferencesSetSpatialNavigationEnabled(WKPreferencesRef preferencesRef, bool enabled)

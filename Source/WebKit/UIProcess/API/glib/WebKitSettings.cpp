@@ -408,7 +408,7 @@ ALLOW_DEPRECATED_DECLARATIONS_END
         webkit_settings_set_media_content_types_requiring_hardware_support(settings, g_value_get_string(value));
         break;
     case PROP_ENABLE_WEBRTC:
-        webkit_settings_set_enable_webrtc(settings, g_value_get_boolean(value));
+        webkit_settings_set_enable_webrtc(settings, TRUE);
         break;
     case PROP_ENABLE_NON_COMPOSITED_WEBGL:
         webkit_settings_set_enable_non_composited_webgl(settings, g_value_get_boolean(value));
@@ -633,7 +633,7 @@ ALLOW_DEPRECATED_DECLARATIONS_END
         g_value_set_string(value, webkit_settings_get_media_content_types_requiring_hardware_support(settings));
         break;
     case PROP_ENABLE_WEBRTC:
-        g_value_set_boolean(value, webkit_settings_get_enable_webrtc(settings));
+        g_value_set_boolean(value, TRUE);
         break;
     case PROP_ENABLE_NON_COMPOSITED_WEBGL:
         g_value_set_boolean(value, webkit_settings_get_enable_non_composited_webgl(settings));
@@ -1641,7 +1641,7 @@ static void webkit_settings_class_init(WebKitSettingsClass* klass)
         "enable-webrtc",
         _("Enable WebRTC"),
         _("Whether WebRTC content should be handled"),
-        FALSE,
+        TRUE,
         readWriteConstructParamFlags);
 
     /**
@@ -3484,7 +3484,7 @@ gboolean webkit_settings_get_enable_webrtc(WebKitSettings* settings)
 {
     g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
 
-    return settings->priv->preferences->peerConnectionEnabled();
+    return true;
 }
 
 /**
@@ -3503,13 +3503,8 @@ void webkit_settings_set_enable_webrtc(WebKitSettings* settings, gboolean enable
     g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
 
     WebKitSettingsPrivate* priv = settings->priv;
-    bool currentValue = priv->preferences->peerConnectionEnabled();
-    if (currentValue == enabled)
-        return;
-
-    if (enabled)
-        webkit_settings_set_enable_media_stream(settings, enabled);
-    priv->preferences->setPeerConnectionEnabled(enabled);
+    webkit_settings_set_enable_media_stream(settings, TRUE);
+    priv->preferences->setPeerConnectionEnabled(TRUE);
     g_object_notify_by_pspec(G_OBJECT(settings), sObjProperties[PROP_ENABLE_WEBRTC]);
 }
 
