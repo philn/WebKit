@@ -462,6 +462,7 @@ private:
         Function<void()> m_task = Function<void()>();
     };
 
+    void tearDown();
     bool isPlayerShuttingDown() const { return m_isPlayerShuttingDown.load(); }
     MediaTime maxTimeLoaded() const;
     bool setVideoSourceOrientation(ImageOrientation);
