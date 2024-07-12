@@ -212,6 +212,7 @@ static inline RTCIceGatheringState toRTCIceGatheringState(GstWebRTCICEGatheringS
 
 static inline GstWebRTCBundlePolicy bundlePolicyFromConfiguration(const MediaEndpointConfiguration& configuration)
 {
+    return GST_WEBRTC_BUNDLE_POLICY_MAX_BUNDLE;
     switch (configuration.bundlePolicy) {
     case RTCBundlePolicy::Balanced:
         return GST_WEBRTC_BUNDLE_POLICY_BALANCED;

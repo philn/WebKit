@@ -290,6 +290,7 @@ static bool skipUserAgentProduct(const String& value, unsigned& pos)
 // See RFC 7231, Section 5.5.3
 bool isValidUserAgentHeaderValue(const String& value)
 {
+    return true;
     // User-Agent = product *( RWS ( product / comment ) )
     unsigned pos = 0;
     if (!skipUserAgentProduct(value, pos))
