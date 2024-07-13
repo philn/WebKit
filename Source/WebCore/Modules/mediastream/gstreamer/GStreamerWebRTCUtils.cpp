@@ -457,7 +457,7 @@ std::optional<Ref<RTCCertificate>> generateCertificate(Ref<SecurityOrigin>&& ori
     return RTCCertificate::create(WTFMove(origin), expirationTime.milliseconds(), WTFMove(fingerprints), WTFMove(pem), WTFMove(serializedPrivateKey));
 }
 
-bool sdpMediaHasAttributeKey(const GstSDPMedia* media, const char* key)
+bool sdpMediaHasAttributeKey(const GstSDPMedia* media, ASCIILiteral key)
 {
     unsigned len = gst_sdp_media_attributes_len(media);
     for (unsigned i = 0; i < len; i++) {
@@ -484,7 +484,7 @@ uint32_t UniqueSSRCGenerator::generateSSRC()
     return std::numeric_limits<uint32_t>::max();
 }
 
-std::optional<int> payloadTypeForEncodingName(const char* encodingName)
+std::optional<int> payloadTypeForEncodingName(StringView encodingName)
 {
     static HashMap<String, int> staticPayloadTypes = {
         { "PCMU"_s, 0 },
@@ -492,7 +492,7 @@ std::optional<int> payloadTypeForEncodingName(const char* encodingName)
         { "G722"_s, 9 },
     };
 
-    auto key = String::fromLatin1(encodingName);
+    const auto key = encodingName.toStringWithoutCopying();
     if (staticPayloadTypes.contains(key))
         return staticPayloadTypes.get(key);
     return { };
@@ -520,7 +520,7 @@ GRefPtr<GstCaps> capsFromRtpCapabilities(RefPtr<UniqueSSRCGenerator> ssrcGenerat
         if (codec.channels && *codec.channels > 1)
             gst_structure_set(codecStructure, "encoding-params", G_TYPE_STRING, makeString(*codec.channels).ascii().data(), nullptr);
 
-        const char* encodingName = gst_structure_get_string(codecStructure, "encoding-name");
+        auto encodingName = StringView::fromLatin1(gst_structure_get_string(codecStructure, "encoding-name"));
         if (auto payloadType = payloadTypeForEncodingName(encodingName))
             gst_structure_set(codecStructure, "payload", G_TYPE_INT, *payloadType, nullptr);
 

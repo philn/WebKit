@@ -654,7 +654,7 @@ void GStreamerMediaEndpoint::doSetRemoteDescription(const RTCSessionDescription&
             m_mediaForMid.set(String::fromLatin1(mid), g_str_equal(mediaType, "audio") ? RealtimeMediaSource::Type::Audio : RealtimeMediaSource::Type::Video);
 
             // https://gitlab.freedesktop.org/gstreamer/gst-plugins-bad/-/merge_requests/1907
-            if (sdpMediaHasAttributeKey(media, "ice-lite")) {
+            if (sdpMediaHasAttributeKey(media, "ice-lite"_s)) {
                 GRefPtr<GstWebRTCICE> ice;
                 g_object_get(m_webrtcBin.get(), "ice-agent", &ice.outPtr(), nullptr);
                 g_object_set(ice.get(), "ice-lite", TRUE, nullptr);
@@ -894,7 +894,7 @@ GRefPtr<GstPad> GStreamerMediaEndpoint::requestPad(const GRefPtr<GstCaps>& allow
             i++;
             continue;
         }
-        auto payloadType = payloadTypeForEncodingName(gst_structure_get_string(structure, "encoding-name"));
+        auto payloadType = payloadTypeForEncodingName(StringView::fromLatin1(gst_structure_get_string(structure, "encoding-name")));
         if (!payloadType) {
             if (availablePayloadType < 128)
                 payloadType = availablePayloadType++;

@@ -109,7 +109,7 @@ bool GStreamerRtpTransceiverBackend::stopped() const
     return m_isStopped;
 }
 
-static inline WARN_UNUSED_RETURN ExceptionOr<GstCaps*> toRtpCodecCapability(const RTCRtpCodecCapability& codec, int& dynamicPayloadType, const char* msid)
+static inline WARN_UNUSED_RETURN ExceptionOr<GstCaps*> toRtpCodecCapability(const RTCRtpCodecCapability& codec, int& dynamicPayloadType, const GUniquePtr<char>& msid)
 {
     if (!codec.mimeType.startsWith("video/"_s) && !codec.mimeType.startsWith("audio/"_s))
         return Exception { ExceptionCode::InvalidModificationError, "RTCRtpCodecCapability bad mimeType"_s };
@@ -118,7 +118,7 @@ static inline WARN_UNUSED_RETURN ExceptionOr<GstCaps*> toRtpCodecCapability(cons
     const auto mediaType = components[0];
     const auto codecName = components[1];
 
-    int payloadType = payloadTypeForEncodingName(codecName.ascii().data()).value_or(dynamicPayloadType++);
+    int payloadType = payloadTypeForEncodingName(codecName).value_or(dynamicPayloadType++);
     auto* caps = gst_caps_new_simple("application/x-rtp", "media", G_TYPE_STRING, mediaType.ascii().data(), "encoding-name", G_TYPE_STRING, codecName.ascii().data(), "clock-rate", G_TYPE_INT, codec.clockRate, "payload", G_TYPE_INT, payloadType, nullptr);
     if (codec.channels)
         gst_caps_set_simple(caps, "channels", G_TYPE_INT, *codec.channels, nullptr);
@@ -136,7 +136,7 @@ static inline WARN_UNUSED_RETURN ExceptionOr<GstCaps*> toRtpCodecCapability(cons
     }
 
     if (msid)
-        gst_caps_set_simple(caps, "a-msid", G_TYPE_STRING, msid, nullptr);
+        gst_caps_set_simple(caps, "a-msid", G_TYPE_STRING, msid.get(), nullptr);
 
     GST_DEBUG("Codec capability: %" GST_PTR_FORMAT, caps);
     return caps;
@@ -161,7 +161,7 @@ ExceptionOr<void> GStreamerRtpTransceiverBackend::setCodecPreferences(const Vect
     GUniquePtr<char> msid = getMsidFromCurrentCodecPreferences(m_rtcTransceiver.get());
     int dynamicPayloadType = 96;
     for (auto& codec : codecs) {
-        auto result = toRtpCodecCapability(codec, dynamicPayloadType, msid.get());
+        auto result = toRtpCodecCapability(codec, dynamicPayloadType, msid);
         if (result.hasException())
             return result.releaseException();
         gst_caps_append(gstCodecs.get(), result.releaseReturnValue());
