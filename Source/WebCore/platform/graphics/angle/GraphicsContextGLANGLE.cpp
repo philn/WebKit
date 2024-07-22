@@ -25,6 +25,8 @@
  */
 
 #include "config.h"
+#include "ANGLE/entry_points_gles_2_0_autogen.h"
+#include <gst/video/video-info.h>
 
 #if ENABLE(WEBGL)
 #include "GraphicsContextGLANGLE.h"
@@ -3442,6 +3444,10 @@ bool GraphicsContextGLANGLE::copyTextureFromVideoFrame(VideoFrame& videoFrame, P
     auto yPlaneHeight = GST_VIDEO_INFO_PLANE_STRIDE(info, 0);
     auto uvPlaneWidth = GST_VIDEO_INFO_WIDTH(info);
     auto uvPlaneHeight = GST_VIDEO_INFO_PLANE_STRIDE(info, 0);
+    auto uvPlaneOffset = GST_VIDEO_INFO_PLANE_OFFSET(info, 1);
+
+    auto uvPlaneData = mappedFrame.planeData(0);
+    auto yPlaneData = mappedFrame.planeData(1);
 
     GLuint uvTexture = 0;
     GL_GenTextures(1, &uvTexture);
@@ -3450,16 +3456,20 @@ bool GraphicsContextGLANGLE::copyTextureFromVideoFrame(VideoFrame& videoFrame, P
     });
     GL_ActiveTexture(GL_TEXTURE1);
     GL_BindTexture(videoTextureTarget, uvTexture);
+    //GL_TexImage2D(videoTextureTarget, 0, GL_RG, uvPlaneWidth, uvPlaneHeight, 0, GL_RG, GL_UNSIGNED_BYTE, nullptr);
     GL_TexParameteri(videoTextureTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     GL_TexParameteri(videoTextureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     GL_TexParameteri(videoTextureTarget, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL_TexParameteri(videoTextureTarget, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    auto uvHandle = WebCore::createPbufferAndAttachIOSurface(m_display, m_config, videoTextureTarget, EGL_IOSURFACE_READ_HINT_ANGLE, GL_RG, uvPlaneWidth, uvPlaneHeight, GL_UNSIGNED_BYTE, surface, 1);
-    if (!uvHandle)
-        return false;
-    auto uvHandleCleanup = makeScopeExit([display = m_display, uvHandle] {
-        WebCore::destroyPbufferAndDetachIOSurface(display, uvHandle);
-    });
+    // auto uvHandle = WebCore::createPbufferAndAttachIOSurface(m_display, m_config, videoTextureTarget, EGL_IOSURFACE_READ_HINT_ANGLE, GL_RG, uvPlaneWidth, uvPlaneHeight, GL_UNSIGNED_BYTE, surface, 1);
+    // if (!uvHandle)
+    //     return false;
+    // auto uvHandleCleanup = makeScopeExit([display = m_display, uvHandle] {
+    //     WebCore::destroyPbufferAndDetachIOSurface(display, uvHandle);
+    // });
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, uvPlaneWidth, uvPlaneHeight, 0, GL_RG, GL_UNSIGNED_BYTE, uvPlaneData);
+    GL_BindTexture(GL_TEXTURE_2D, 0);
 
     GLuint yTexture = 0;
     GL_GenTextures(1, &yTexture);
@@ -3472,31 +3482,43 @@ bool GraphicsContextGLANGLE::copyTextureFromVideoFrame(VideoFrame& videoFrame, P
     GL_TexParameteri(videoTextureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     GL_TexParameteri(videoTextureTarget, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     GL_TexParameteri(videoTextureTarget, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    auto yHandle = WebCore::createPbufferAndAttachIOSurface(m_display, m_config, videoTextureTarget, EGL_IOSURFACE_READ_HINT_ANGLE, GL_RED, yPlaneWidth, yPlaneHeight, GL_UNSIGNED_BYTE, surface, 0);
-    if (!yHandle)
-        return false;
-    auto yHandleCleanup = makeScopeExit([display = m_display, yHandle] {
-        destroyPbufferAndDetachIOSurface(display, yHandle);
-    });
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, yPlaneWidth, yPlaneHeight, 0, GL_RED, GL_UNSIGNED_BYTE, yPlaneData);
+    GL_BindTexture(GL_TEXTURE_2D, 0);
+    // auto yHandle = WebCore::createPbufferAndAttachIOSurface(m_display, m_config, videoTextureTarget, EGL_IOSURFACE_READ_HINT_ANGLE, GL_RED, yPlaneWidth, yPlaneHeight, GL_UNSIGNED_BYTE, surface, 0);
+    // if (!yHandle)
+    //     return false;
+    // auto yHandleCleanup = makeScopeExit([display = m_display, yHandle] {
+    //     destroyPbufferAndDetachIOSurface(display, yHandle);
+    // });
 
     // Configure the drawing parameters.
-    GL_Uniform1i(m_yTextureUniformLocation, 0);
-    GL_Uniform1i(m_uvTextureUniformLocation, 1);
-    GL_Uniform1i(m_yuvFlipYUniformLocation, flipY ? 1 : 0);
-    GL_Uniform1i(m_yuvFlipXUniformLocation, flipX ? 1 : 0);
-    GL_Uniform1i(m_yuvSwapXYUniformLocation, swapXY ? 1 : 0);
-    GL_Uniform2f(m_yTextureSizeUniformLocation, yPlaneWidth, yPlaneHeight);
-    GL_Uniform2f(m_uvTextureSizeUniformLocation, uvPlaneWidth, uvPlaneHeight);
+    // GL_Uniform1i(m_yTextureUniformLocation, 0);
+    // GL_Uniform1i(m_uvTextureUniformLocation, 1);
+    // GL_Uniform1i(m_yuvFlipYUniformLocation, flipY ? 1 : 0);
+    // GL_Uniform1i(m_yuvFlipXUniformLocation, flipX ? 1 : 0);
+    // GL_Uniform1i(m_yuvSwapXYUniformLocation, swapXY ? 1 : 0);
+    // GL_Uniform2f(m_yTextureSizeUniformLocation, yPlaneWidth, yPlaneHeight);
+    // GL_Uniform2f(m_uvTextureSizeUniformLocation, uvPlaneWidth, uvPlaneHeight);
 
-    auto range = pixelRangeFromPixelFormat(pixelFormat);
-    auto transferFunction = transferFunctionFromString(dynamic_cf_cast<CFStringRef>(CVBufferGetAttachment(image, kCVImageBufferYCbCrMatrixKey, nil)));
-    auto colorMatrix = YCbCrToRGBMatrixForRangeAndTransferFunction(range, transferFunction);
-    GL_UniformMatrix4fv(m_colorMatrixUniformLocation, 1, GL_FALSE, colorMatrix);
+    // auto range = pixelRangeFromPixelFormat(pixelFormat);
+    // auto transferFunction = transferFunctionFromString(dynamic_cf_cast<CFStringRef>(CVBufferGetAttachment(image, kCVImageBufferYCbCrMatrixKey, nil)));
+    // auto colorMatrix = YCbCrToRGBMatrixForRangeAndTransferFunction(range, transferFunction);
+    // GL_UniformMatrix4fv(m_colorMatrixUniformLocation, 1, GL_FALSE, colorMatrix);
 
     // Do the actual drawing.
-    GL_DrawArrays(GL_TRIANGLES, 0, 6);
+    //GL_DrawArrays(GL_TRIANGLES, 0, 6);
 
-    m_knownContent.set(outputTexture, content);
+
+
+    // ??? https://gist.github.com/ithmz/1b58f2df84024cf780add1f9fd6f6aaa
+    GLint locTexY = glGetUniformLocation(program, "textureY");
+    GLint locTexVU = glGetUniformLocation(program, "textureVU");
+
+    glUseProgram(program);
+    glUniform1i(locTexY, 0); // corresponds to GL_TEXTURE0
+    glUniform1i(locTexVU, 1); // corresponds to GL_TEXTURE1
+
+    //m_knownContent.set(outputTexture, content);
     autoClearTextureOnError.release();
     return true;
 #endif
