@@ -1159,19 +1159,32 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
             return;
     }
 
-    auto& mediaStream = mediaStreamFromRTCStream(data.mediaStreamId);
+    m_pendingIncomingMediaStreamIDs.append(data.mediaStreamId);
 
-    GST_DEBUG_OBJECT(m_pipeline.get(), "Incoming streams ready, notifying observers");
-    mediaStream.privateStream().forEachTrack([](auto& track) {
-        track.dataFlowStarted();
-    });
+    unsigned totalExpectedMediaTracks = 0;
+    for(unsigned i = 0; i < gst_sdp_message_medias_len(description->sdp); i++) {
+        const auto media = gst_sdp_message_get_media(description->sdp, i);
+        const char* mediaType = gst_sdp_media_get_media(media);
+        if (g_str_equal(mediaType, "audio") || g_str_equal(mediaType, "video"))
+            totalExpectedMediaTracks++;
+    }
 
-    gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
+    GST_DEBUG_OBJECT(m_pipeline.get(), "Expecting %u media tracks", totalExpectedMediaTracks);
+    if (m_pendingIncomingMediaStreamIDs.size() < totalExpectedMediaTracks) {
+        GST_DEBUG_OBJECT(m_pipeline.get(), "Only %u track(s) received so far", m_pendingIncomingMediaStreamIDs.size());
+        return;
+    }
 
-#ifndef GST_DISABLE_GST_DEBUG
-    auto dotFileName = makeString(GST_OBJECT_NAME(m_pipeline.get()), ".connected-"_s, data.mediaStreamId);
-    GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, dotFileName.utf8().data());
-#endif
+    for (auto& mediaStreamID: m_pendingIncomingMediaStreamIDs) {
+        auto& mediaStream = mediaStreamFromRTCStream(mediaStreamID);
+        GST_DEBUG_OBJECT(m_pipeline.get(), "Incoming stream %s ready, notifying observers", mediaStreamID.ascii().data());
+        mediaStream.privateStream().forEachTrack([](auto& track) {
+            GST_DEBUG("Incoming stream has track %s", track.id().ascii().data());
+            track.dataFlowStarted();
+        });
+    }
+
+    m_pendingIncomingMediaStreamIDs.clear();
     gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
 }
 
