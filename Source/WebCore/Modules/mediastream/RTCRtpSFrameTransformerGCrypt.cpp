@@ -32,26 +32,18 @@ namespace WebCore {
 
 ExceptionOr<Vector<uint8_t>> RTCRtpSFrameTransformer::computeSaltKey(const Vector<uint8_t>& rawKey)
 {
-    static auto s_usage = "SFrame10"_s;
-    Vector<uint8_t> usage(s_usage.characters8(), 8);
-    static auto s_info = "salt"_s;
-    Vector<uint8_t> info(s_info.characters8(), 4);
-    auto output = gcryptDeriveHKDFBits(rawKey, usage, info, 96 / 8, CryptoAlgorithmIdentifier::SHA_256);
+    auto output = gcryptDeriveHKDFBits(rawKey, "SFrame10"_span, "salt"_span, 96 / 8, CryptoAlgorithmIdentifier::SHA_256);
     if (!output)
-        return Exception { OperationError };
+        return Exception { ExceptionCode::OperationError };
 
     return WTFMove(*output);
 }
 
 static ExceptionOr<Vector<uint8_t>> createBaseSFrameKey(const Vector<uint8_t>& rawKey)
 {
-    static auto s_usage = "SFrame10"_s;
-    Vector<uint8_t> usage(s_usage.characters8(), 8);
-    static auto s_info = "key"_s;
-    Vector<uint8_t> info(s_info.characters8(), 3);
-    auto output = gcryptDeriveHKDFBits(rawKey, usage, info, 128 / 8, CryptoAlgorithmIdentifier::SHA_256);
+    auto output = gcryptDeriveHKDFBits(rawKey, "SFrame10"_span, "key"_span, 128 / 8, CryptoAlgorithmIdentifier::SHA_256);
     if (!output)
-        return Exception { OperationError };
+        return Exception { ExceptionCode::OperationError };
 
     return WTFMove(*output);
 }
@@ -62,13 +54,9 @@ ExceptionOr<Vector<uint8_t>> RTCRtpSFrameTransformer::computeAuthenticationKey(c
     if (key.hasException())
         return key;
 
-    static auto s_usage = "SFrame10 AES CM AEAD"_s;
-    Vector<uint8_t> usage(s_usage.characters8(), 20);
-    static auto s_info = "auth"_s;
-    Vector<uint8_t> info(s_info.characters8(), 4);
-    auto output = gcryptDeriveHKDFBits(key.returnValue(), usage, info, 256 / 8, CryptoAlgorithmIdentifier::SHA_256);
+    auto output = gcryptDeriveHKDFBits(key.returnValue(), "SFrame10 AES CM AEAD"_span, "auth"_span, 256 / 8, CryptoAlgorithmIdentifier::SHA_256);
     if (!output)
-        return Exception { OperationError };
+        return Exception { ExceptionCode::OperationError };
 
     return WTFMove(*output);
 }
@@ -79,18 +67,14 @@ ExceptionOr<Vector<uint8_t>> RTCRtpSFrameTransformer::computeEncryptionKey(const
     if (key.hasException())
         return key;
 
-    static auto s_usage = "SFrame10 AES CM AEAD"_s;
-    Vector<uint8_t> usage(s_usage.characters8(), 20);
-    static auto s_info = "enc"_s;
-    Vector<uint8_t> info(s_info.characters8(), 3);
-    auto output = gcryptDeriveHKDFBits(key.returnValue(), usage, info, 128 / 8, CryptoAlgorithmIdentifier::SHA_256);
+    auto output = gcryptDeriveHKDFBits(key.returnValue(), "SFrame10 AES CM AEAD"_span, "enc"_span, 128 / 8, CryptoAlgorithmIdentifier::SHA_256);
     if (!output)
-        return Exception { OperationError };
+        return Exception { ExceptionCode::OperationError };
 
     return WTFMove(*output);
 }
 
-static std::optional<Vector<uint8_t>> gcryptAES_IV(PAL::GCrypt::CipherOperation operation, const Vector<uint8_t>& key, const Vector<uint8_t>& iv, size_t outputSize, const Vector<uint8_t>& inputText)
+static std::optional<Vector<uint8_t>> gcryptAES_IV(PAL::GCrypt::CipherOperation operation, const Vector<uint8_t>& key, const Vector<uint8_t>& iv, std::span<const uint8_t> data)
 {
     auto algorithm = PAL::GCrypt::aesAlgorithmForKeySize(key.size() * 8);
     if (!algorithm)
@@ -124,8 +108,8 @@ static std::optional<Vector<uint8_t>> gcryptAES_IV(PAL::GCrypt::CipherOperation 
         return std::nullopt;
     }
 
-    Vector<uint8_t> output(outputSize);
-    error = operation(handle, output.data(), output.size(), inputText.data(), inputText.size());
+    Vector<uint8_t> output(data.size());
+    error = operation(handle, output.data(), output.size(), data.data(), data.size_bytes());
     if (error != GPG_ERR_NO_ERROR) {
         PAL::GCrypt::logError(error);
         return std::nullopt;
@@ -134,23 +118,20 @@ static std::optional<Vector<uint8_t>> gcryptAES_IV(PAL::GCrypt::CipherOperation 
     return output;
 }
 
-
-ExceptionOr<Vector<uint8_t>> RTCRtpSFrameTransformer::decryptData(const uint8_t* rawData, size_t size, const Vector<uint8_t>& iv, const Vector<uint8_t>& key)
+ExceptionOr<Vector<uint8_t>> RTCRtpSFrameTransformer::decryptData(std::span<const uint8_t> data, const Vector<uint8_t>& iv, const Vector<uint8_t>& key)
 {
-    Vector<uint8_t> data(rawData, size);
-    auto output = gcryptAES_IV(gcry_cipher_decrypt, key, iv, size, data);
+    auto output = gcryptAES_IV(gcry_cipher_decrypt, key, iv, data);
     if (!output)
-        return Exception { OperationError };
+        return Exception { ExceptionCode::OperationError };
 
     return WTFMove(*output);
 }
 
-ExceptionOr<Vector<uint8_t>> RTCRtpSFrameTransformer::encryptData(const uint8_t* rawData, size_t size, const Vector<uint8_t>& iv, const Vector<uint8_t>& key)
+ExceptionOr<Vector<uint8_t>> RTCRtpSFrameTransformer::encryptData(std::span<const uint8_t> data, const Vector<uint8_t>& iv, const Vector<uint8_t>& key)
 {
-    Vector<uint8_t> data(rawData, size);
-    auto output = gcryptAES_IV(gcry_cipher_encrypt, key, iv, size, data);
+    auto output = gcryptAES_IV(gcry_cipher_encrypt, key, iv, data);
     if (!output)
-        return Exception { OperationError };
+        return Exception { ExceptionCode::OperationError };
 
     return WTFMove(*output);
 }
@@ -165,7 +146,7 @@ static inline Vector<uint8_t, 8> encodeBigEndian(uint64_t value)
     return result;
 }
 
-Vector<uint8_t> RTCRtpSFrameTransformer::computeEncryptedDataSignature(const Vector<uint8_t>& nonce, const uint8_t* header, size_t headerSize, const uint8_t* data, size_t dataSize, const Vector<uint8_t>& key)
+Vector<uint8_t> RTCRtpSFrameTransformer::computeEncryptedDataSignature(const Vector<uint8_t>& nonce, std::span<const uint8_t> header, std::span<const uint8_t> data, const Vector<uint8_t>& key)
 {
     PAL::GCrypt::Handle<gcry_mac_hd_t> hd;
     size_t digestLength = gcry_mac_get_algo_maclen(GCRY_MAC_HMAC_SHA256);
@@ -181,19 +162,16 @@ Vector<uint8_t> RTCRtpSFrameTransformer::computeEncryptedDataSignature(const Vec
 
     Vector<uint8_t> payload;
 
-    auto headerLength = encodeBigEndian(headerSize);
+    auto headerLength = encodeBigEndian(header.size());
     payload.appendVector(headerLength);
 
-    auto dataLength = encodeBigEndian(dataSize);
+    auto dataLength = encodeBigEndian(data.size());
     payload.appendVector(dataLength);
 
     payload.appendVector(nonce);
 
-    Vector<uint8_t> headerVector(header, headerSize);
-    payload.appendVector(headerVector);
-
-    Vector<uint8_t> dataVector(data, dataSize);
-    payload.appendVector(dataVector);
+    payload.append(header);
+    payload.append(data);
 
     err = gcry_mac_write(hd, payload.data(), payload.sizeInBytes());
     if (err)

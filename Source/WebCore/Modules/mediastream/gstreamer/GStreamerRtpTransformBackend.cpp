@@ -24,6 +24,7 @@
 
 #include "GStreamerRtpTransformableFrame.h"
 #include <wtf/text/StringConcatenateNumbers.h>
+#include <wtf/text/MakeString.h>
 
 namespace WebCore {
 
@@ -45,7 +46,7 @@ GStreamerRtpTransformBackend::GStreamerRtpTransformBackend(MediaType mediaType, 
     , m_side(side)
 {
     static Atomic<uint64_t> nBackend = 0;
-    m_backendId = makeString("webkit-webrtc-", mediaType == MediaType::Audio ? "audio" : "video", '-', side == Side::Receiver ? "receiver" : "sender", '-', "transform-", nBackend.exchangeAdd(1));
+    m_backendId = makeString("webkit-webrtc-"_s, mediaType == MediaType::Audio ? "audio"_s : "video"_s, '-', side == Side::Receiver ? "receiver"_s : "sender"_s, '-', "transform-"_s, nBackend.exchangeAdd(1));
 
     static std::once_flag debugRegisteredFlag;
     std::call_once(debugRegisteredFlag, [] {
