@@ -85,19 +85,6 @@ bool RealtimeIncomingSourceGStreamer::setBin(const GRefPtr<GstElement>& bin)
         return GST_PAD_PROBE_OK;
     }), this, nullptr);
 
-    gst_pad_add_probe(sinkPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
-        auto& source = *reinterpret_cast<RealtimeIncomingSourceGStreamer*>(userData);
-        if (!source.m_transformCallback)
-            return GST_PAD_PROBE_OK;
-
-        auto* buffer = GST_BUFFER_CAST(GST_PAD_PROBE_INFO_DATA(info));
-        auto writableBuffer = adoptGRef(gst_buffer_make_writable(buffer));
-        if (auto transformedBuffer = source.m_transformCallback(WTFMove(writableBuffer)))
-            GST_PAD_PROBE_INFO_DATA(info) = transformedBuffer.leakRef();
-
-        return GST_PAD_PROBE_OK;
-    }, this, nullptr);
-
     return true;
 }
 
@@ -195,6 +182,13 @@ void RealtimeIncomingSourceGStreamer::handleDownstreamEvent(GstElement* sink, GR
 void RealtimeIncomingSourceGStreamer::tearDown()
 {
     notImplemented();
+}
+
+GRefPtr<GstBuffer> RealtimeIncomingSourceGStreamer::transform(GRefPtr<GstBuffer>&& buffer)
+{
+    if (!m_transformCallback)
+        return buffer;
+    return m_transformCallback(WTFMove(buffer));
 }
 
 #undef GST_CAT_DEFAULT

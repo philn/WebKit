@@ -1032,6 +1032,26 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
     gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
 }
 
+GRefPtr<GstBuffer> GStreamerMediaEndpoint::transformBuffer(GRefPtr<GstBuffer>&& inputBuffer, const WebRTCTrackData& data)
+{
+    GRefPtr<GstWebRTCRTPTransceiver> rtcTransceiver(data.transceiver);
+    auto* transceiver = m_peerConnectionBackend.existingTransceiver([&](auto& transceiverBackend) {
+        return rtcTransceiver.get() == transceiverBackend.rtcTransceiver();
+    });
+
+    auto& track = transceiver->receiver().track();
+    auto& source = reinterpret_cast<RealtimeIncomingSourceGStreamer&>(track.privateTrack().source());
+    return source.transform(WTFMove(inputBuffer));
+    // if (source.isIncomingAudioSource()) {
+    //     auto& audioSource = static_cast<RealtimeIncomingAudioSourceGStreamer&>(source);
+    //     return audioSource.transform(WTFMove(inputBuffer));
+    // } else if (source.isIncomingVideoSource()) {
+    //     auto& videoSource = static_cast<RealtimeIncomingVideoSourceGStreamer&>(source);
+    //     return videoSource.transform(WTFMove(inputBuffer));
+    // }
+    // return inputBuffer;
+}
+
 void GStreamerMediaEndpoint::connectPad(GstPad* pad)
 {
     GRefPtr<GstWebRTCRTPTransceiver> transceiver;

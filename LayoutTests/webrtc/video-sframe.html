@@ -10,25 +10,24 @@
         <video id="remote" autoplay playsInline></video>
         <script src ="routines.js"></script>
         <script>
-async function doSFrameTest(codec, shouldClose)
+async function doSFrameTest(codec, compatibilityMode, shouldClose)
 {
     let pc1, pc2;
     let sender, receiver;
     const localStream = await navigator.mediaDevices.getUserMedia({video: true});
     const key = await crypto.subtle.importKey("raw", new Uint8Array([143, 77, 43, 10, 72, 19, 37, 67, 236, 219, 24, 93, 26, 165, 91, 178]), "HKDF", false, ["deriveBits", "deriveKey"]);
-             console.log("Getting stream");
     const stream = await new Promise((resolve, reject) => {
         createConnections((firstConnection) => {
             pc1 = firstConnection;
             sender = firstConnection.addTrack(localStream.getTracks()[0], localStream);
             firstConnection.getTransceivers()[0].setCodecPreferences([codec]);
-            let transform = new SFrameTransform({compatibilityMode: "H264"});
+            let transform = new SFrameTransform({compatibilityMode: compatibilityMode});
             transform.setEncryptionKey(key);
             sender.transform = transform;
         }, (secondConnection) => {
             pc2 = secondConnection;
             secondConnection.ontrack = (trackEvent) => {
-                let transform = new SFrameTransform({compatibilityMode: "H264"});
+                let transform = new SFrameTransform({compatibilityMode: compatibilityMode});
                 transform.setEncryptionKey(key);
                 receiver = trackEvent.receiver;
                 receiver.transform = transform;
@@ -37,11 +36,11 @@ async function doSFrameTest(codec, shouldClose)
         });
         setTimeout(() => reject("Test timed out"), 5000);
     });
-             console.log("Got stream");
+
     local.srcObject = localStream;
     remote.srcObject = stream;
     await remote.play();
-/*
+
     if (window.internals) {
         const senderCounter = internals.sframeCounter(sender.transform);
         const receiverCounter = internals.sframeCounter(receiver.transform);
@@ -59,7 +58,7 @@ async function doSFrameTest(codec, shouldClose)
     if (shouldClose) {
         pc1.close();
         pc2.close();
-    }*/
+    }
 }
 
 promise_test((test) => {

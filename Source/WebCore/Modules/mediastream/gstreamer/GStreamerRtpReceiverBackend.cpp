@@ -52,6 +52,7 @@ Vector<RTCRtpSynchronizationSource> GStreamerRtpReceiverBackend::getSynchronizat
 
 Ref<RealtimeMediaSource> GStreamerRtpReceiverBackend::createSource(const String& trackKind, const String& trackId)
 {
+    // FIXME: This looks fishy, a single receiver can create multiple sources, so keeping track of m_incomingSource is odd.
     if (trackKind == "video"_s) {
         auto source = RealtimeIncomingVideoSourceGStreamer::create(AtomString { trackId });
         m_incomingSource = source.copyRef();
@@ -66,7 +67,8 @@ Ref<RealtimeMediaSource> GStreamerRtpReceiverBackend::createSource(const String&
 
 Ref<RTCRtpTransformBackend> GStreamerRtpReceiverBackend::rtcRtpTransformBackend()
 {
-    auto backend = GStreamerRtpReceiverTransformBackend::create(m_rtcReceiver);
+    // FIXME: Un-hardcode this Video enum.
+    auto backend = GStreamerRtpReceiverTransformBackend::create(m_rtcReceiver, GStreamerRtpReceiverTransformBackend::MediaType::Video);
 
     m_incomingSource->setTransformCallback([backend = backend.copyRef()](GRefPtr<GstBuffer>&& buffer) -> GRefPtr<GstBuffer> {
         return backend->transform(WTFMove(buffer));

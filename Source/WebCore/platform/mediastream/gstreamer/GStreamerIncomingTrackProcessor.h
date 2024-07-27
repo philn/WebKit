@@ -55,6 +55,7 @@ private:
 
     GRefPtr<GstElement> incomingTrackProcessor();
     GRefPtr<GstElement> createParser();
+    void installRtpTransformProbe(GRefPtr<GstPad>&&);
 
     void trackReady();
 

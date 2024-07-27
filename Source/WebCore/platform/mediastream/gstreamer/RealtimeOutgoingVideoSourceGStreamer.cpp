@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "RealtimeOutgoingVideoSourceGStreamer.h"
+#include <gst/gstbin.h>
 
 #if USE(GSTREAMER_WEBRTC)
 
@@ -183,6 +184,15 @@ bool RealtimeOutgoingVideoSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
         return false;
     }
 
+    auto encoderElement = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(m_encoder.get()), "encoder"));
+    auto srcPad = adoptGRef(gst_element_get_static_pad(encoderElement.get(), "src"));
+    gst_pad_add_probe(srcPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+        auto& source = *reinterpret_cast<RealtimeOutgoingMediaSourceGStreamer*>(userData);
+        auto writableBuffer = adoptGRef(gst_buffer_make_writable(GST_PAD_PROBE_INFO_BUFFER(info)));
+        GST_PAD_PROBE_INFO_DATA(info) = source.transform(WTFMove(writableBuffer)).leakRef();
+        return GST_PAD_PROBE_OK;
+    }, this, nullptr);
+
     if (auto payloadType = gstStructureGet<int>(structure.get(), "payload"_s))
         g_object_set(m_payloader.get(), "pt", *payloadType, nullptr);
 
@@ -220,7 +230,7 @@ bool RealtimeOutgoingVideoSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
         }
     }
 
-    return gst_element_link_many(m_encoder.get(), m_postEncoderQueue.get(), m_payloader.get(), m_postPayloaderQueue.get(), nullptr);
+    return gst_element_link_many(m_encoder.get(), m_payloader.get(), m_postEncoderQueue.get(), nullptr);
 }
 
 void RealtimeOutgoingVideoSourceGStreamer::connectFallbackSource()

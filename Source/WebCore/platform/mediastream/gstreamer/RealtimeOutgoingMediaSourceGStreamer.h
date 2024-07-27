@@ -61,6 +61,7 @@ public:
 
     using TransformCallback = Function<GRefPtr<GstBuffer>(GRefPtr<GstBuffer>&&)>;
     void setTransformCallback(TransformCallback&& callback) { m_transformCallback = WTFMove(callback); }
+    WARN_UNUSED_RETURN GRefPtr<GstBuffer> transform(GRefPtr<GstBuffer>&&);
 
 protected:
     enum Type {
@@ -93,7 +94,6 @@ protected:
     GRefPtr<GstElement> m_encoder;
     GRefPtr<GstElement> m_payloader;
     GRefPtr<GstElement> m_postEncoderQueue;
-    GRefPtr<GstElement> m_postPayloaderQueue;
     GRefPtr<GstElement> m_capsFilter;
     mutable GRefPtr<GstCaps> m_allowedCaps;
     GRefPtr<GstWebRTCRTPTransceiver> m_transceiver;

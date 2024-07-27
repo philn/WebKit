@@ -191,14 +191,18 @@ GRefPtr<GstElement> GStreamerIncomingTrackProcessor::incomingTrackProcessor()
     GRefPtr<GstElement> decodebin = makeGStreamerElement("decodebin3", nullptr);
     m_isDecoding = true;
 
-    g_signal_connect(decodebin.get(), "deep-element-added", G_CALLBACK(+[](GstBin*, GstBin*, GstElement* element, gpointer) {
+    g_signal_connect(decodebin.get(), "deep-element-added", G_CALLBACK(+[](GstBin*, GstBin*, GstElement* element, gpointer userData) {
         String elementClass = WTF::span(gst_element_get_metadata(element, GST_ELEMENT_METADATA_KLASS));
         auto classifiers = elementClass.split('/');
         if (!classifiers.contains("Depayloader"_s))
             return;
 
         configureVideoRTPDepayloader(element);
-    }), nullptr);
+
+        auto pad = adoptGRef(gst_element_get_static_pad(element, "src"));
+        auto self = reinterpret_cast<GStreamerIncomingTrackProcessor*>(userData);
+        self->installRtpTransformProbe(WTFMove(pad));
+    }), this);
 
     g_signal_connect(decodebin.get(), "element-added", G_CALLBACK(+[](GstBin*, GstElement* element, gpointer userData) {
         String elementClass = WTF::span(gst_element_get_metadata(element, GST_ELEMENT_METADATA_KLASS));
@@ -237,14 +241,17 @@ GRefPtr<GstElement> GStreamerIncomingTrackProcessor::incomingTrackProcessor()
 GRefPtr<GstElement> GStreamerIncomingTrackProcessor::createParser()
 {
     GRefPtr<GstElement> parsebin = makeGStreamerElement("parsebin", nullptr);
-    g_signal_connect(parsebin.get(), "element-added", G_CALLBACK(+[](GstBin*, GstElement* element, gpointer) {
+    g_signal_connect(parsebin.get(), "element-added", G_CALLBACK(+[](GstBin*, GstElement* element, gpointer userData) {
         String elementClass = WTF::span(gst_element_get_metadata(element, GST_ELEMENT_METADATA_KLASS));
         auto classifiers = elementClass.split('/');
         if (!classifiers.contains("Depayloader"_s))
             return;
 
         configureVideoRTPDepayloader(element);
-    }), nullptr);
+        auto pad = adoptGRef(gst_element_get_static_pad(element, "src"));
+        auto self = reinterpret_cast<GStreamerIncomingTrackProcessor*>(userData);
+        self->installRtpTransformProbe(WTFMove(pad));
+    }), this);
 
     auto& quirksManager = GStreamerQuirksManager::singleton();
     if (quirksManager.isEnabled()) {
@@ -269,6 +276,26 @@ GRefPtr<GstElement> GStreamerIncomingTrackProcessor::createParser()
         self->trackReady();
     }), this);
     return parsebin;
+}
+
+void GStreamerIncomingTrackProcessor::installRtpTransformProbe(GRefPtr<GstPad>&& pad)
+{
+    gst_pad_add_probe(pad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+        auto self = reinterpret_cast<GStreamerIncomingTrackProcessor*>(userData);
+        //auto& source = *reinterpret_cast<RealtimeIncomingSourceGStreamer*>(userData);
+        // if (!source.m_transformCallback)
+        //     return GST_PAD_PROBE_OK;
+        auto endPoint = self->m_endPoint.get();
+        if (!endPoint)
+            return GST_PAD_PROBE_OK;
+
+        auto* buffer = GST_BUFFER_CAST(GST_PAD_PROBE_INFO_DATA(info));
+        auto writableBuffer = adoptGRef(gst_buffer_make_writable(buffer));
+        // if (auto transformedBuffer = source.m_transformCallback(WTFMove(writableBuffer)))
+        //     GST_PAD_PROBE_INFO_DATA(info) = gst_buffer_ref(transformedBuffer.get());
+        GST_PAD_PROBE_INFO_DATA(info) = endPoint->transformBuffer(WTFMove(writableBuffer), self->m_data).leakRef();
+        return GST_PAD_PROBE_OK;
+    }, this, nullptr);
 }
 
 void GStreamerIncomingTrackProcessor::trackReady()

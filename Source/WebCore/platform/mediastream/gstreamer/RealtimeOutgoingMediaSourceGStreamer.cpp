@@ -67,55 +67,14 @@ RealtimeOutgoingMediaSourceGStreamer::RealtimeOutgoingMediaSourceGStreamer(Type 
     m_inputSelector = gst_element_factory_make("input-selector", nullptr);
     m_preEncoderQueue = gst_element_factory_make("queue", nullptr);
     m_postEncoderQueue = gst_element_factory_make("queue", nullptr);
-    m_postPayloaderQueue = gst_element_factory_make("queue", nullptr);
     m_capsFilter = gst_element_factory_make("capsfilter", nullptr);
 
-    gst_bin_add_many(GST_BIN_CAST(m_bin.get()), m_liveSync.get(), m_inputSelector.get(), m_preEncoderQueue.get(), m_postEncoderQueue.get(), m_capsFilter.get(), m_postPayloaderQueue.get(), nullptr);
+    gst_bin_add_many(GST_BIN_CAST(m_bin.get()), m_liveSync.get(), m_inputSelector.get(), m_preEncoderQueue.get(), m_postEncoderQueue.get(), m_capsFilter.get(), nullptr);
 
     auto srcPad = adoptGRef(gst_element_get_static_pad(m_capsFilter.get(), "src"));
     gst_element_add_pad(m_bin.get(), gst_ghost_pad_new("src", srcPad.get()));
 
     setSource(track.privateTrack());
-
-    auto payloaderSinkPad = adoptGRef(gst_element_get_static_pad(m_postPayloaderQueue.get(), "sink"));
-    gst_pad_add_probe(payloaderSinkPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
-        auto& source = *reinterpret_cast<RealtimeOutgoingMediaSourceGStreamer*>(userData);
-        if (!source.m_transformCallback)
-            return GST_PAD_PROBE_OK;
-
-        auto* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
-
-        GstMappedRtpBuffer mappedBuffer(buffer, GST_MAP_READ);
-        auto* inputRtpBuffer = mappedBuffer.mappedData();
-        auto* payload = gst_rtp_buffer_get_payload_buffer(inputRtpBuffer);
-        auto payloadLength = gst_rtp_buffer_get_payload_len(inputRtpBuffer);
-        auto csrcCount = gst_rtp_buffer_get_csrc_count(inputRtpBuffer);
-        auto timestamp = gst_rtp_buffer_get_timestamp(inputRtpBuffer);
-
-        auto writablePayload = adoptGRef(gst_buffer_make_writable(payload));
-        if (auto transformedPayload = source.m_transformCallback(WTFMove(writablePayload))) {
-            auto* transformedPacket = gst_rtp_buffer_new_allocate(payloadLength, 0, csrcCount);
-            {
-                GstMappedRtpBuffer writableBuffer(transformedPacket, GST_MAP_WRITE);
-                auto* outputRtpBuffer = writableBuffer.mappedData();
-                gst_rtp_buffer_set_marker(outputRtpBuffer, gst_rtp_buffer_get_marker(inputRtpBuffer));
-                gst_rtp_buffer_set_payload_type(outputRtpBuffer, gst_rtp_buffer_get_payload_type(inputRtpBuffer));
-                gst_rtp_buffer_set_seq(outputRtpBuffer, gst_rtp_buffer_get_seq(inputRtpBuffer));
-                gst_rtp_buffer_set_timestamp(outputRtpBuffer, timestamp);
-                gst_rtp_buffer_set_ssrc(outputRtpBuffer, gst_rtp_buffer_get_ssrc(inputRtpBuffer));
-                for (auto i = 0; i < csrcCount; ++i)
-                    gst_rtp_buffer_set_csrc(outputRtpBuffer, i, gst_rtp_buffer_get_csrc((inputRtpBuffer), i));
-
-                // TODO: copy header extensions data.
-            }
-            mappedBuffer.unmapEarly();
-            transformedPacket = gst_buffer_append(transformedPacket, transformedPayload.leakRef());
-            //GST_PAD_PROBE_INFO_DATA(info) = gst_buffer_ref(transformedPacket.get());
-            gst_buffer_replace(&buffer, transformedPacket);
-        }
-
-        return GST_PAD_PROBE_OK;
-    }, this, nullptr);
 }
 
 RealtimeOutgoingMediaSourceGStreamer::~RealtimeOutgoingMediaSourceGStreamer()
@@ -252,7 +211,7 @@ void RealtimeOutgoingMediaSourceGStreamer::initializeFromTrack()
 void RealtimeOutgoingMediaSourceGStreamer::link()
 {
     GST_DEBUG_OBJECT(m_bin.get(), "Linking webrtcbin pad %" GST_PTR_FORMAT, m_webrtcSinkPad.get());
-    gst_element_link(m_postPayloaderQueue.get(), m_capsFilter.get());
+    gst_element_link(m_postEncoderQueue.get(), m_capsFilter.get());
 
     auto srcPad = adoptGRef(gst_element_get_static_pad(m_bin.get(), "src"));
     gst_pad_link(srcPad.get(), m_webrtcSinkPad.get());
@@ -380,7 +339,6 @@ void RealtimeOutgoingMediaSourceGStreamer::codecPreferencesChanged()
     g_object_get(m_transceiver.get(), "codec-preferences", &codecPreferences.outPtr(), nullptr);
     GST_DEBUG_OBJECT(m_bin.get(), "Codec preferences changed on transceiver %" GST_PTR_FORMAT " to: %" GST_PTR_FORMAT, m_transceiver.get(), codecPreferences.get());
 
-    // FIXME phil what about m_postPayloaderQueue?
     if (m_payloader) {
         // We have a linked encoder/payloader, so to replace the audio encoder and audio/video
         // payloader we need to block upstream data flow, send an EOS event to the first element we
@@ -425,6 +383,13 @@ void RealtimeOutgoingMediaSourceGStreamer::codecPreferencesChanged()
     gst_element_sync_state_with_parent(m_bin.get());
     GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN_CAST(m_bin.get()), GST_DEBUG_GRAPH_SHOW_ALL, "outgoing-media-new-codec-prefs");
     m_isStopped = false;
+}
+
+GRefPtr<GstBuffer> RealtimeOutgoingMediaSourceGStreamer::transform(GRefPtr<GstBuffer>&& buffer)
+{
+    if (!m_transformCallback)
+        return buffer;
+    return m_transformCallback(WTFMove(buffer));
 }
 
 #undef GST_CAT_DEFAULT

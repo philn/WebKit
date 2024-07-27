@@ -45,11 +45,10 @@ public:
 
     void tearDown();
 
-
     using TransformCallback = Function<GRefPtr<GstBuffer>(GRefPtr<GstBuffer>&&)>;
     void setTransformCallback(TransformCallback&& callback) { m_transformCallback = WTFMove(callback); }
 
-    GRefPtr<GstBuffer> transform(GRefPtr<GstBuffer>&& buffer) { return m_transformCallback(WTFMove(buffer)); }
+    WARN_UNUSED_RETURN GRefPtr<GstBuffer> transform(GRefPtr<GstBuffer>&&);
 
 protected:
     RealtimeIncomingSourceGStreamer(const CaptureDevice&);

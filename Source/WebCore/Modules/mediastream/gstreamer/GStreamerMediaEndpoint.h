@@ -116,6 +116,8 @@ public:
 
     void connectIncomingTrack(WebRTCTrackData&);
 
+    WARN_UNUSED_RETURN GRefPtr<GstBuffer> transformBuffer(GRefPtr<GstBuffer>&&, const WebRTCTrackData&);
+
 protected:
 #if !RELEASE_LOG_DISABLED
     void onStatsDelivered(const GstStructure*);

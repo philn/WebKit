@@ -324,7 +324,7 @@ static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
             gst_element_unlink(priv->inputCapsFilter.get(), priv->encoder.get());
             gst_bin_remove(GST_BIN_CAST(self), priv->encoder.get());
         }
-        priv->encoder = gst_element_factory_create(encoderDefinition->factory.get(), nullptr);
+        priv->encoder = gst_element_factory_create(encoderDefinition->factory.get(), "encoder");
         gst_bin_add(GST_BIN_CAST(self), priv->encoder.get());
         shouldLinkEncoder = true;
     } else {
