@@ -20,6 +20,7 @@
 #include "config.h"
 #include "RealtimeOutgoingVideoSourceGStreamer.h"
 #include <gst/gstbin.h>
+#include <gst/gstinfo.h>
 
 #if USE(GSTREAMER_WEBRTC)
 
@@ -185,11 +186,19 @@ bool RealtimeOutgoingVideoSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
     }
 
     auto encoderElement = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(m_encoder.get()), "encoder"));
-    auto srcPad = adoptGRef(gst_element_get_static_pad(encoderElement.get(), "src"));
+    auto srcPad = adoptGRef(gst_element_get_static_pad(m_encoder.get(), "src"));
     gst_pad_add_probe(srcPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
         auto& source = *reinterpret_cast<RealtimeOutgoingMediaSourceGStreamer*>(userData);
         auto writableBuffer = adoptGRef(gst_buffer_make_writable(GST_PAD_PROBE_INFO_BUFFER(info)));
+        {
+            GstMappedBuffer mappedBuffer(writableBuffer.get(), GST_MAP_READ);
+            GST_MEMDUMP("Before:", mappedBuffer.data(), mappedBuffer.size());
+        }
         GST_PAD_PROBE_INFO_DATA(info) = source.transform(WTFMove(writableBuffer)).leakRef();
+        {
+            GstMappedBuffer mappedBuffer(GST_PAD_PROBE_INFO_BUFFER(info), GST_MAP_READ);
+            GST_MEMDUMP("After :", mappedBuffer.data(), mappedBuffer.size());
+        }
         return GST_PAD_PROBE_OK;
     }, this, nullptr);
 
