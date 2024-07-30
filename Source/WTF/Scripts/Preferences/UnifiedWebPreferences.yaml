@@ -7858,6 +7858,7 @@ WebRTCEncodedTransformEnabled:
       default: false
     WebKit:
       "USE(LIBWEBRTC) && PLATFORM(COCOA)": WebKit::defaultPeerConnectionEnabledAvailable()
+      "USE(LIBWEBRTC) && USE(GCRYPT)": WebKit::defaultPeerConnectionEnabledAvailable()
       "USE(GSTREAMER_WEBRTC)": true
       default: false
     WebCore:
