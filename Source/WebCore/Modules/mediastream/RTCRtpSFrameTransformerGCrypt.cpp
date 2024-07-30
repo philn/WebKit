@@ -20,7 +20,7 @@
 #include "config.h"
 #include "RTCRtpSFrameTransformer.h"
 
-#if ENABLE(WEB_RTC)
+#if ENABLE(WEB_RTC) && USE(GCRYPT)
 
 #include "CryptoAlgorithm.h"
 #include "GCryptUtilities.h"
@@ -194,4 +194,4 @@ void RTCRtpSFrameTransformer::updateAuthenticationSize()
 
 } // namespace WebCore
 
-#endif // ENABLE(WEB_RTC)
+#endif // ENABLE(WEB_RTC) && USE(GCRYPT)

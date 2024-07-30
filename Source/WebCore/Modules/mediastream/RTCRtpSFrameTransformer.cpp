@@ -343,7 +343,7 @@ RTCRtpSFrameTransformer::TransformResult RTCRtpSFrameTransformer::transform(std:
     return m_isEncrypting ? encryptFrame(data) : decryptFrame(data);
 }
 
-#if !PLATFORM(COCOA) && !USE(GSTREAMER)
+#if !PLATFORM(COCOA) && !USE(GCRYPT)
 ExceptionOr<Vector<uint8_t>> RTCRtpSFrameTransformer::computeSaltKey(const Vector<uint8_t>&)
 {
     return Exception { ExceptionCode::NotSupportedError };
@@ -377,7 +377,7 @@ Vector<uint8_t> RTCRtpSFrameTransformer::computeEncryptedDataSignature(const Vec
 void RTCRtpSFrameTransformer::updateAuthenticationSize()
 {
 }
-#endif // !PLATFORM(COCOA) && !USE(GSTREAMER)
+#endif // !PLATFORM(COCOA) && !USE(GCRYPT)
 
 } // namespace WebCore
 
