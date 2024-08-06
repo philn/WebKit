@@ -42,6 +42,7 @@ namespace WebCore {
 class GStreamerMediaEndpoint;
 class GStreamerRtpReceiverBackend;
 class GStreamerRtpTransceiverBackend;
+class GStreamerWebRTCProvider;
 class RTCRtpReceiver;
 class RTCRtpReceiverBackend;
 class RTCSessionDescription;
@@ -61,7 +62,7 @@ struct GStreamerIceCandidate {
 class GStreamerPeerConnectionBackend final : public PeerConnectionBackend {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    explicit GStreamerPeerConnectionBackend(RTCPeerConnection&);
+    explicit GStreamerPeerConnectionBackend(RTCPeerConnection&, GStreamerWebRTCProvider&);
     ~GStreamerPeerConnectionBackend();
 
 private:
@@ -87,6 +88,11 @@ private:
     bool isNegotiationNeeded(uint32_t) const final;
 
     std::optional<bool> canTrickleIceCandidates() const final;
+
+    void startGatheringStatLogs(Function<void(String&&)>&&) final;
+    void stopGatheringStatLogs() final;
+    void provideStatLogs(String&&);
+    friend class RtcEventLogOutput;
 
     friend class GStreamerMediaEndpoint;
     friend class GStreamerRtpSenderBackend;
@@ -127,6 +133,8 @@ private:
     bool m_isRemoteDescriptionSet { false };
 
     bool m_isReconfiguring { false };
+
+    Function<void(String&&)> m_rtcStatsLogCallback;
 };
 
 } // namespace WebCore

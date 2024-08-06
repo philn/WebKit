@@ -32,6 +32,7 @@
 #include "ScriptExecutionContextIdentifier.h"
 #include <wtf/CompletionHandler.h>
 #include <wtf/Expected.h>
+#include <wtf/FilePrintStream.h>
 #include <wtf/UniqueRef.h>
 #include <wtf/text/WTFString.h>
 
@@ -48,7 +49,7 @@ class WEBCORE_EXPORT WebRTCProvider {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     static UniqueRef<WebRTCProvider> create();
-    WebRTCProvider() = default;
+    WebRTCProvider();
     virtual ~WebRTCProvider() = default;
 
     static bool webRTCAvailable();
@@ -78,6 +79,17 @@ public:
 
     virtual void setLoggingLevel(WTFLogLevel);
     virtual void clearFactory();
+
+    void setJSONLogStreamingEnabled(bool isEnabled) { m_isJSONLogStreamingEnabled = isEnabled; }
+    bool isJSONLogStreamingEnabled() const { return m_isJSONLogStreamingEnabled; }
+    struct MessageLogEvent {
+        String message;
+        std::optional<std::span<const uint8_t>> payload;
+    };
+    using StatsLogEvent = String;
+
+    using LogEvent = std::variant<MessageLogEvent, StatsLogEvent>;
+    virtual void emitJSONLogEvent(uintptr_t, LogEvent&&);
 
 protected:
 #if ENABLE(WEB_RTC)
@@ -113,6 +125,9 @@ private:
 
     virtual std::optional<MediaCapabilitiesDecodingInfo> videoDecodingCapabilitiesOverride(const VideoConfiguration&);
     virtual std::optional<MediaCapabilitiesEncodingInfo> videoEncodingCapabilitiesOverride(const VideoConfiguration&);
+
+    bool m_isJSONLogStreamingEnabled { false };
+    std::unique_ptr<FilePrintStream> m_logFile;
 };
 
 } // namespace WebCore

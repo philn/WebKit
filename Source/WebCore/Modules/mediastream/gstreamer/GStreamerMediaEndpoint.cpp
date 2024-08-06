@@ -30,6 +30,7 @@
 #include "GStreamerRtpReceiverBackend.h"
 #include "GStreamerRtpTransceiverBackend.h"
 #include "GStreamerSctpTransportBackend.h"
+#include "GStreamerWebRTCProvider.h"
 #include "GStreamerWebRTCUtils.h"
 #include "JSDOMPromiseDeferred.h"
 #include "JSRTCStatsReport.h"
@@ -63,15 +64,18 @@ GST_DEBUG_CATEGORY(webkit_webrtc_endpoint_debug);
 
 namespace WebCore {
 
-GStreamerMediaEndpoint::GStreamerMediaEndpoint(GStreamerPeerConnectionBackend& peerConnection)
+GStreamerMediaEndpoint::GStreamerMediaEndpoint(GStreamerPeerConnectionBackend& peerConnection, GStreamerWebRTCProvider& client)
     : m_peerConnectionBackend(peerConnection)
-    , m_statsCollector(GStreamerStatsCollector::create())
+    , m_statsTimestampConverter(StatsTimestampConverter::create())
+    , m_statsCollector(GStreamerStatsCollector::create(m_statsTimestampConverter.ptr()))
 #if !RELEASE_LOG_DISABLED
     , m_statsLogTimer(*this, &GStreamerMediaEndpoint::gatherStatsForLogging)
     , m_logger(peerConnection.logger())
     , m_logIdentifier(peerConnection.logIdentifier())
 #endif
     , m_ssrcGenerator(UniqueSSRCGenerator::create())
+    , m_webRTCProvider(client)
+    , m_peerConnectionIdentifier(reinterpret_cast<uintptr_t>(&m_peerConnectionBackend.connection()))
 {
     ensureGStreamerInitialized();
     registerWebKitGStreamerElements();
@@ -1791,10 +1795,16 @@ public:
         : m_stats(stats)
     { }
 
-    String toJSONString() const { return gstStructureToJSONString(m_stats); }
+    String toJSONString() const
+    {
+        if (m_jsonString.isNull())
+            m_jsonString = gstStructureToJSONString(m_stats);
+        return m_jsonString;
+    }
 
 private:
     const GstStructure* m_stats;
+    mutable String m_jsonString;
 };
 
 void GStreamerMediaEndpoint::processStats(const GValue* value)
@@ -1820,16 +1830,25 @@ void GStreamerMediaEndpoint::processStats(const GValue* value)
         }
     }
 
+    RTCStatsLogger statsLogger { structure };
+
+    if (m_webRTCProvider.isJSONLogStreamingEnabled()) {
+        GUniquePtr<GstStructure> structureCopy(gst_structure_copy(structure));
+        if (auto value = gstStructureGet<double>(structureCopy.get(), "timestamp"_s)) {
+            auto newTimestamp = m_statsTimestampConverter->convertFromMonotonicTime(Seconds::fromMilliseconds(*value));
+            gst_structure_set(structureCopy.get(), "timestamp", G_TYPE_DOUBLE, newTimestamp.microseconds(), nullptr);
+        }
+        m_webRTCProvider.emitJSONLogEvent(m_peerConnectionIdentifier, gstStructureToJSONString(structureCopy.get()));
+    }
+
+    if (m_isGatheringRTCLogs)
+        m_peerConnectionBackend.provideStatLogs(statsLogger.toJSONString());
+
     if (logger().willLog(logChannel(), WTFLogLevel::Debug)) {
         // Stats are very verbose, let's only display them in inspector console in verbose mode.
-        logger().debug(LogWebRTC,
-            Logger::LogSiteIdentifier("GStreamerMediaEndpoint"_s, "onStatsDelivered"_s, logIdentifier()),
-            RTCStatsLogger { structure });
-    } else {
-        logger().logAlways(LogWebRTCStats,
-            Logger::LogSiteIdentifier("GStreamerMediaEndpoint"_s, "onStatsDelivered"_s, logIdentifier()),
-            RTCStatsLogger { structure });
-    }
+        logger().debug(LogWebRTC, Logger::LogSiteIdentifier("GStreamerMediaEndpoint"_s, "OnStatsDelivered"_s, logIdentifier()), statsLogger);
+    } else
+        logger().logAlways(LogWebRTCStats, Logger::LogSiteIdentifier("GStreamerMediaEndpoint"_s, "OnStatsDelivered"_s, logIdentifier()), statsLogger);
 }
 
 void GStreamerMediaEndpoint::onStatsDelivered(const GstStructure* stats)
@@ -1865,6 +1884,9 @@ WTFLogChannel& GStreamerMediaEndpoint::logChannel() const
 
 Seconds GStreamerMediaEndpoint::statsLogInterval(Seconds reportTimestamp) const
 {
+    if (m_isGatheringRTCLogs)
+        return 1_s;
+
     if (logger().willLog(logChannel(), WTFLogLevel::Info))
         return 2_s;
 
@@ -1901,6 +1923,17 @@ std::optional<bool> GStreamerMediaEndpoint::canTrickleIceCandidates() const
             return true;
     }
     return false;
+}
+
+void GStreamerMediaEndpoint::startRTCLogs()
+{
+    m_isGatheringRTCLogs = true;
+    startLoggingStats();
+}
+
+void GStreamerMediaEndpoint::stopRTCLogs()
+{
+    m_isGatheringRTCLogs = false;
 }
 
 } // namespace WebCore

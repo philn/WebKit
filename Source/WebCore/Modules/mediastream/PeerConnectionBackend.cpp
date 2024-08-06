@@ -116,6 +116,7 @@ PeerConnectionBackend::PeerConnectionBackend(RTCPeerConnection& peerConnection)
     if (auto* page = document ? document->page() : nullptr)
         m_shouldFilterICECandidates = page->webRTCProvider().isSupportingMDNS();
 #endif
+    emitJSONLogEvent("PeerConnection created"_s);
 }
 
 PeerConnectionBackend::~PeerConnectionBackend() = default;
@@ -129,10 +130,28 @@ void PeerConnectionBackend::createOffer(RTCOfferOptions&& options, CreateCallbac
     doCreateOffer(WTFMove(options));
 }
 
+void PeerConnectionBackend::emitJSONLogEvent(String&& message, std::optional<String>&& payload)
+{
+    auto document = m_peerConnection.document();
+    if (!document)
+        return;
+
+    auto page = document->page();
+    if (!page)
+        return;
+
+    auto identifier = reinterpret_cast<uintptr_t>(&m_peerConnection);
+    std::optional<std::span<const uint8_t>> payloadValue;
+    if (payload)
+        payloadValue = payload->span8();
+    page->webRTCProvider().emitJSONLogEvent(identifier, WebRTCProvider::MessageLogEvent { WTFMove(message),  WTFMove(payloadValue) });
+}
+
 void PeerConnectionBackend::createOfferSucceeded(String&& sdp)
 {
     ASSERT(isMainThread());
     ALWAYS_LOG(LOGIDENTIFIER, "Create offer succeeded:\n", sdp);
+    emitJSONLogEvent("Create offer succeeded"_s, sdp);
 
     ASSERT(m_offerAnswerCallback);
     validateSDP(sdp);
@@ -144,7 +163,9 @@ void PeerConnectionBackend::createOfferSucceeded(String&& sdp)
 void PeerConnectionBackend::createOfferFailed(Exception&& exception)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Create offer failed:", exception.message());
+    auto event = makeString("Create offer failed:"_s, exception.message());
+    ALWAYS_LOG(LOGIDENTIFIER, event);
+    emitJSONLogEvent(WTFMove(event));
 
     ASSERT(m_offerAnswerCallback);
     m_peerConnection.queueTaskKeepingObjectAlive(m_peerConnection, TaskSource::Networking, [callback = WTFMove(m_offerAnswerCallback), exception = WTFMove(exception)]() mutable {
@@ -165,6 +186,7 @@ void PeerConnectionBackend::createAnswerSucceeded(String&& sdp)
 {
     ASSERT(isMainThread());
     ALWAYS_LOG(LOGIDENTIFIER, "Create answer succeeded:\n", sdp);
+    emitJSONLogEvent("Create answer succeeded"_s, sdp);
 
     ASSERT(m_offerAnswerCallback);
     m_peerConnection.queueTaskKeepingObjectAlive(m_peerConnection, TaskSource::Networking, [callback = WTFMove(m_offerAnswerCallback), sdp = WTFMove(sdp)]() mutable {
@@ -175,7 +197,9 @@ void PeerConnectionBackend::createAnswerSucceeded(String&& sdp)
 void PeerConnectionBackend::createAnswerFailed(Exception&& exception)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Create answer failed:", exception.message());
+    auto event = makeString("Create answer failed:"_s, exception.message());
+    ALWAYS_LOG(LOGIDENTIFIER, event);
+    emitJSONLogEvent(WTFMove(event));
 
     ASSERT(m_offerAnswerCallback);
     m_peerConnection.queueTaskKeepingObjectAlive(m_peerConnection, TaskSource::Networking, [callback = WTFMove(m_offerAnswerCallback), exception = WTFMove(exception)]() mutable {
@@ -239,6 +263,7 @@ void PeerConnectionBackend::setLocalDescriptionSucceeded(std::optional<Descripti
 {
     ASSERT(isMainThread());
     ALWAYS_LOG(LOGIDENTIFIER);
+    emitJSONLogEvent("Set local description succeeded"_s);
     if (transceiverStates)
         DEBUG_LOG(LOGIDENTIFIER, "Transceiver states: ", *transceiverStates);
     ASSERT(m_setDescriptionCallback);
@@ -302,7 +327,9 @@ void PeerConnectionBackend::setLocalDescriptionSucceeded(std::optional<Descripti
 void PeerConnectionBackend::setLocalDescriptionFailed(Exception&& exception)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Set local description failed:", exception.message());
+    auto event = makeString("Set local description failed:"_s, exception.message());
+    ALWAYS_LOG(LOGIDENTIFIER, event);
+    emitJSONLogEvent(WTFMove(event));
 
     ASSERT(m_setDescriptionCallback);
     m_peerConnection.queueTaskKeepingObjectAlive(m_peerConnection, TaskSource::Networking, [this, callback = WTFMove(m_setDescriptionCallback), exception = WTFMove(exception)]() mutable {
@@ -324,7 +351,10 @@ void PeerConnectionBackend::setRemoteDescription(const RTCSessionDescription& se
 void PeerConnectionBackend::setRemoteDescriptionSucceeded(std::optional<DescriptionStates>&& descriptionStates, std::optional<TransceiverStates>&& transceiverStates, std::unique_ptr<RTCSctpTransportBackend>&& sctpBackend, std::optional<double> maxMessageSize)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Set remote description succeeded");
+    auto event = "Set remote description succeeded"_s;
+    ALWAYS_LOG(LOGIDENTIFIER, event);
+    emitJSONLogEvent(WTFMove(event));
+
     if (transceiverStates)
         DEBUG_LOG(LOGIDENTIFIER, "Transceiver states: ", *transceiverStates);
     ASSERT(m_setDescriptionCallback);
@@ -411,6 +441,8 @@ void PeerConnectionBackend::setRemoteDescriptionSucceeded(std::optional<Descript
             DEBUG_LOG(LOGIDENTIFIER, "Dispatching ", trackEventList.size(), " track events");
             for (auto& event : trackEventList) {
                 RefPtr track = event->track();
+                auto logEvent = makeString("Dispatching track event for track "_s, track->id());
+                emitJSONLogEvent(WTFMove(logEvent));
                 m_peerConnection.dispatchEvent(event);
                 if (m_peerConnection.isClosed()) {
                     DEBUG_LOG(LOGIDENTIFIER, "PeerConnection closed while dispatching track events");
@@ -428,7 +460,9 @@ void PeerConnectionBackend::setRemoteDescriptionSucceeded(std::optional<Descript
 void PeerConnectionBackend::setRemoteDescriptionFailed(Exception&& exception)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Set remote description failed:", exception.message());
+    auto event = makeString("Set remote description failed:"_s, exception.message());
+    ALWAYS_LOG(LOGIDENTIFIER, event);
+    emitJSONLogEvent(WTFMove(event));
 
     ASSERT(m_setDescriptionCallback);
     m_peerConnection.queueTaskKeepingObjectAlive(m_peerConnection, TaskSource::Networking, [this, callback = WTFMove(m_setDescriptionCallback), exception = WTFMove(exception)]() mutable {
@@ -550,17 +584,21 @@ void PeerConnectionBackend::newICECandidate(String&& sdp, String&& mid, unsigned
 
         ASSERT(!m_shouldFilterICECandidates || sdp.contains(".local"_s) || sdp.contains(" srflx "_s) || sdp.contains(" relay "_s));
         auto candidate = RTCIceCandidate::create(WTFMove(sdp), WTFMove(mid), sdpMLineIndex);
+        auto logEvent = makeString("Dispatching ICE event for SDP "_s, candidate->candidate());
+        emitJSONLogEvent(WTFMove(logEvent));
         m_peerConnection.dispatchEvent(RTCPeerConnectionIceEvent::create(Event::CanBubble::No, Event::IsCancelable::No, WTFMove(candidate), WTFMove(serverURL)));
     });
 }
 
 void PeerConnectionBackend::newDataChannel(UniqueRef<RTCDataChannelHandler>&& channelHandler, String&& label, RTCDataChannelInit&& channelInit)
 {
-    m_peerConnection.queueTaskKeepingObjectAlive(m_peerConnection, TaskSource::Networking, [connection = Ref { m_peerConnection }, label = WTFMove(label), channelHandler = WTFMove(channelHandler), channelInit = WTFMove(channelInit)]() mutable {
+    m_peerConnection.queueTaskKeepingObjectAlive(m_peerConnection, TaskSource::Networking, [this, connection = Ref { m_peerConnection }, label = WTFMove(label), channelHandler = WTFMove(channelHandler), channelInit = WTFMove(channelInit)]() mutable {
         if (connection->isClosed())
             return;
 
         auto channel = RTCDataChannel::create(*connection->document(), channelHandler.moveToUniquePtr(), WTFMove(label), WTFMove(channelInit), RTCDataChannelState::Open);
+        auto logEvent = makeString("Dispatching data-channel event for channel "_s, channel->label());
+        emitJSONLogEvent(WTFMove(logEvent));
         connection->dispatchEvent(RTCDataChannelEvent::create(eventNames().datachannelEvent, Event::CanBubble::No, Event::IsCancelable::No, Ref { channel }));
         channel->fireOpenEventIfNeeded();
     });

@@ -252,6 +252,8 @@ protected:
     RTCPeerConnection& m_peerConnection;
 
 private:
+    void emitJSONLogEvent(String&&, std::optional<String>&& = { });
+
     CreateCallback m_offerAnswerCallback;
     Function<void(ExceptionOr<void>&&)> m_setDescriptionCallback;
 

@@ -77,6 +77,8 @@ LibWebRTCMediaEndpoint::LibWebRTCMediaEndpoint(LibWebRTCPeerConnectionBackend& p
     , m_logger(peerConnection.logger())
     , m_logIdentifier(peerConnection.logIdentifier())
 #endif
+    , m_webRTCProvider(client)
+    , m_peerConnectionIdentifier(reinterpret_cast<uintptr_t>(&m_peerConnectionBackend.connection()))
 {
     ASSERT(isMainThread());
     ASSERT(client.factory());
@@ -806,6 +808,10 @@ private:
 
 void LibWebRTCMediaEndpoint::OnStatsDelivered(const rtc::scoped_refptr<const webrtc::RTCStatsReport>& report)
 {
+    if (m_webRTCProvider.isJSONLogStreamingEnabled()) {
+        for (auto iterator = report->begin(); iterator != report->end(); ++iterator)
+            m_webRTCProvider.emitJSONLogEvent(m_peerConnectionIdentifier, String::fromLatin1(iterator->ToJson().c_str()));
+    }
 #if !RELEASE_LOG_DISABLED
     int64_t timestamp = report->timestamp().us_or(0);
     if (!m_statsFirstDeliveredTimestamp)
@@ -829,8 +835,6 @@ void LibWebRTCMediaEndpoint::OnStatsDelivered(const rtc::scoped_refptr<const web
                 logger().logAlways(LogWebRTCStats, Logger::LogSiteIdentifier("LibWebRTCMediaEndpoint"_s, "OnStatsDelivered"_s, logIdentifier()), statsLogger);
         }
     });
-#else
-    UNUSED_PARAM(report);
 #endif
 }
 

@@ -204,6 +204,9 @@ private:
     const void* m_logIdentifier;
 #endif
     bool m_isGatheringRTCLogs { false };
+
+    LibWebRTCProvider& m_webRTCProvider;
+    uintptr_t m_peerConnectionIdentifier;
 };
 
 } // namespace WebCore

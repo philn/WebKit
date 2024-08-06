@@ -55,7 +55,7 @@ class GStreamerMediaEndpoint : public ThreadSafeRefCountedAndCanMakeThreadSafeWe
 #endif
 {
 public:
-    static Ref<GStreamerMediaEndpoint> create(GStreamerPeerConnectionBackend& peerConnection) { return adoptRef(*new GStreamerMediaEndpoint(peerConnection)); }
+    static Ref<GStreamerMediaEndpoint> create(GStreamerPeerConnectionBackend& peerConnection, GStreamerWebRTCProvider& client) { return adoptRef(*new GStreamerMediaEndpoint(peerConnection, client)); }
     ~GStreamerMediaEndpoint();
 
     bool setConfiguration(MediaEndpointConfiguration&);
@@ -116,13 +116,16 @@ public:
 
     void connectIncomingTrack(WebRTCTrackData&);
 
+    void startRTCLogs();
+    void stopRTCLogs();
+
 protected:
 #if !RELEASE_LOG_DISABLED
     void onStatsDelivered(const GstStructure*);
 #endif
 
 private:
-    GStreamerMediaEndpoint(GStreamerPeerConnectionBackend&);
+    GStreamerMediaEndpoint(GStreamerPeerConnectionBackend&, GStreamerWebRTCProvider&);
 
     bool initializePipeline();
     void teardownPipeline();
@@ -187,6 +190,7 @@ private:
 
     HashMap<String, RefPtr<MediaStream>> m_remoteStreamsById;
 
+    Ref<StatsTimestampConverter> m_statsTimestampConverter;
     Ref<GStreamerStatsCollector> m_statsCollector;
 
     uint32_t m_negotiationNeededEventId { 0 };
@@ -207,7 +211,13 @@ private:
 
     HashMap<GRefPtr<GstWebRTCRTPTransceiver>, RefPtr<GStreamerIncomingTrackProcessor>> m_trackProcessors;
 
+
     Vector<String> m_pendingIncomingMediaStreamIDs;
+
+    bool m_isGatheringRTCLogs { false };
+
+    GStreamerWebRTCProvider& m_webRTCProvider;
+    uintptr_t m_peerConnectionIdentifier;
 };
 
 } // namespace WebCore

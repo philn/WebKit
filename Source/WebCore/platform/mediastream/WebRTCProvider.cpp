@@ -34,6 +34,7 @@
 
 #include <wtf/Function.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/text/Base64.h>
 
 namespace WebCore {
 
@@ -53,6 +54,22 @@ void WebRTCProvider::setH264HardwareEncoderAllowed(bool)
 }
 
 #endif
+
+WebRTCProvider::WebRTCProvider()
+{
+    auto path = String::fromUTF8(getenv("WEBKIT_WEBRTC_JSON_EVENTS_FILE"));
+    if (path.isEmpty())
+        return;
+
+    m_logFile = FilePrintStream::open(path.utf8().data(), "w");
+    if (!m_logFile)
+        return;
+
+    // Prefer unbuffered output, so that we get a full log upon crash or deadlock.
+    setvbuf(m_logFile->file(), nullptr, _IONBF, 0);
+
+    setJSONLogStreamingEnabled(true);
+}
 
 RefPtr<RTCDataChannelRemoteHandlerConnection> WebRTCProvider::createRTCDataChannelRemoteHandlerConnection()
 {
@@ -301,6 +318,29 @@ std::optional<MediaCapabilitiesDecodingInfo> WebRTCProvider::videoDecodingCapabi
 std::optional<MediaCapabilitiesEncodingInfo> WebRTCProvider::videoEncodingCapabilitiesOverride(const VideoConfiguration&)
 {
     return { };
+}
+
+void WebRTCProvider::emitJSONLogEvent(uintptr_t identifier, LogEvent&& logEvent)
+{
+    if (!m_isJSONLogStreamingEnabled)
+        return;
+
+    ASCIILiteral type;
+    String event;
+    WTF::switchOn(WTFMove(logEvent), [&](MessageLogEvent&& logEvent) {
+        type = "event"_s;
+        StringBuilder builder;
+        builder.append("{\"message\":\""_s, logEvent.message, "\",\"payload\":\""_s);
+        if (logEvent.payload)
+            builder.append(WTF::base64EncodeToString(*logEvent.payload));
+        builder.append("\"}"_s);
+        event = builder.toString();
+    }, [&](StatsLogEvent&& logEvent) {
+        type = "stats"_s;
+        event = WTFMove(logEvent);
+    });
+    auto timestamp = WTF::WallTime::now().secondsSinceEpoch().microseconds();
+    m_logFile->println(makeString("{\"peer-connection\":\""_s, hex(identifier), "\",\"timestamp\":"_s, timestamp, ",\"type\":\""_s, type, "\",\"event\":"_s, event, "}"_s));
 }
 
 } // namespace WebCore
