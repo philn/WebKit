@@ -287,6 +287,8 @@ imported/w3c/web-platform-tests/video-rvfc [ Skip ]
 fast/mediastream/getUserMedia-rvfc.html [ Skip ]
 webrtc/peerConnection-rvfc.html [ Skip ]
 
+http/wpt/webrtc/RTCPeerConnection-createOffer-offerToReceive.html [ Skip ]
+
 # Only Mac has a way to fail mock capture on device removal
 fast/mediastream/microphone-change-while-muted.html [ Skip ]
 

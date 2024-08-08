@@ -297,3 +297,166 @@ function setH264HighCodec(sdp)
         return (line.indexOf('a=fmtp') === -1 && line.indexOf('a=rtcp-fb') === -1 && line.indexOf('a=rtpmap') === -1) || line.indexOf(baselineNumber) !== -1;
     }).join('\r\n');
 }
+
+const audioLineRegex = /\r\nm=audio.+\r\n/g;
+const videoLineRegex = /\r\nm=video.+\r\n/g;
+const applicationLineRegex = /\r\nm=application.+\r\n/g;
+
+function countLine(sdp, regex) {
+    const matches = sdp.match(regex);
+    if(matches === null) {
+        return 0;
+    } else {
+        return matches.length;
+    }
+}
+
+function countAudioLine(sdp) {
+    return countLine(sdp, audioLineRegex);
+}
+
+function countVideoLine(sdp) {
+    return countLine(sdp, videoLineRegex);
+}
+
+function countApplicationLine(sdp) {
+    return countLine(sdp, applicationLineRegex);
+}
+
+
+// These media tracks will be continually updated with deterministic "noise" in
+// order to ensure UAs do not cease transmission in response to apparent
+// silence.
+//
+// > Many codecs and systems are capable of detecting "silence" and changing
+// > their behavior in this case by doing things such as not transmitting any
+// > media.
+//
+// Source: https://w3c.github.io/webrtc-pc/#offer-answer-options
+const trackFactories = {
+  // Share a single context between tests to avoid exceeding resource limits
+  // without requiring explicit destruction.
+  audioContext: null,
+
+  /**
+   * Given a set of requested media types, determine if the user agent is
+   * capable of procedurally generating a suitable media stream.
+   *
+   * @param {object} requested
+   * @param {boolean} [requested.audio] - flag indicating whether the desired
+   *                                      stream should include an audio track
+   * @param {boolean} [requested.video] - flag indicating whether the desired
+   *                                      stream should include a video track
+   *
+   * @returns {boolean}
+   */
+  canCreate(requested) {
+    const supported = {
+      audio: !!window.AudioContext && !!window.MediaStreamAudioDestinationNode,
+      video: !!HTMLCanvasElement.prototype.captureStream
+    };
+
+    return (!requested.audio || supported.audio) &&
+      (!requested.video || supported.video);
+  },
+
+  audio() {
+    const ctx = trackFactories.audioContext = trackFactories.audioContext ||
+      new AudioContext();
+    const oscillator = ctx.createOscillator();
+    const dst = oscillator.connect(ctx.createMediaStreamDestination());
+    oscillator.start();
+    return dst.stream.getAudioTracks()[0];
+  },
+
+  video({width = 640, height = 480, signal} = {}) {
+    const canvas = Object.assign(
+      document.createElement("canvas"), {width, height}
+    );
+    const ctx = canvas.getContext('2d');
+    const stream = canvas.captureStream();
+
+    let count = 0;
+    const interval = setInterval(() => {
+      ctx.fillStyle = `rgb(${count%255}, ${count*count%255}, ${count%255})`;
+      count += 1;
+      ctx.fillRect(0, 0, width, height);
+      // Add some bouncing boxes in contrast color to add a little more noise.
+      const contrast = count + 128;
+      ctx.fillStyle = `rgb(${contrast%255}, ${contrast*contrast%255}, ${contrast%255})`;
+      const xpos = count % (width - 20);
+      const ypos = count % (height - 20);
+      ctx.fillRect(xpos, ypos, xpos + 20, ypos + 20);
+      const xpos2 = (count + width / 2) % (width - 20);
+      const ypos2 = (count + height / 2) % (height - 20);
+      ctx.fillRect(xpos2, ypos2, xpos2 + 20, ypos2 + 20);
+      // If signal is set (0-255), add a constant-color box of that luminance to
+      // the video frame at coordinates 20 to 60 in both X and Y direction.
+      // (big enough to avoid color bleed from surrounding video in some codecs,
+      // for more stable tests).
+      if (signal != undefined) {
+        ctx.fillStyle = `rgb(${signal}, ${signal}, ${signal})`;
+        ctx.fillRect(20, 20, 40, 40);
+      }
+    }, 100);
+
+    if (document.body) {
+      document.body.appendChild(canvas);
+    } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.body.appendChild(canvas);
+      }, {once: true});
+    }
+
+    // Implement track.stop() for performance in some tests on some platforms
+    const track = stream.getVideoTracks()[0];
+    const nativeStop = track.stop;
+    track.stop = function stop() {
+      clearInterval(interval);
+      nativeStop.apply(this);
+      if (document.body && canvas.parentElement == document.body) {
+        document.body.removeChild(canvas);
+      }
+    };
+    return track;
+  }
+};
+
+
+// Generate a MediaStream bearing the specified tracks.
+//
+// @param {object} [caps]
+// @param {boolean} [caps.audio] - flag indicating whether the generated stream
+//                                 should include an audio track
+// @param {boolean} [caps.video] - flag indicating whether the generated stream
+//                                 should include a video track, or parameters for video
+async function getNoiseStream(caps = {}) {
+  if (!trackFactories.canCreate(caps)) {
+    return navigator.mediaDevices.getUserMedia(caps);
+  }
+  const tracks = [];
+
+  if (caps.audio) {
+    tracks.push(trackFactories.audio());
+  }
+
+  if (caps.video) {
+    tracks.push(trackFactories.video(caps.video));
+  }
+
+  return new MediaStream(tracks);
+}
+
+// Obtain a MediaStreamTrack of kind using procedurally-generated streams (and
+// falling back to `getUserMedia` when the user agent cannot generate the
+// requested streams).
+// Return Promise of pair of track and associated mediaStream.
+// Assumes that there is at least one available device
+// to generate the track.
+function getTrackFromUserMedia(kind) {
+  return getNoiseStream({ [kind]: true })
+  .then(mediaStream => {
+    const [track] = mediaStream.getTracks();
+    return [track, mediaStream];
+  });
+}
