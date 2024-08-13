@@ -22,6 +22,7 @@
 
 #include "GStreamerMediaEndpoint.h"
 #include "GStreamerWebRTCCommon.h"
+#include "RealtimeIncomingSourceGStreamer.h"
 #include <wtf/RefCounted.h>
 #include <wtf/TZoneMalloc.h>
 
@@ -56,6 +57,7 @@ private:
 
     GRefPtr<GstElement> incomingTrackProcessor();
     GRefPtr<GstElement> createParser();
+    void installRtpTransformProbe();
 
     void installRtpBufferPadProbe(GRefPtr<GstPad>&&);
 
@@ -74,6 +76,7 @@ private:
     GRefPtr<GstElement> m_sink;
     GUniquePtr<GstStructure> m_stats;
     bool m_isReady { false };
+    RefPtr<RealtimeIncomingSourceGStreamer::TransformCallback> m_transformCallback;
 };
 
 } // namespace WebCore

@@ -28,6 +28,7 @@
 #include "GStreamerStatsCollector.h"
 #include "GStreamerWebRTCCommon.h"
 #include "GUniquePtrGStreamer.h"
+#include "RealtimeIncomingSourceGStreamer.h"
 #include "RTCRtpReceiver.h"
 
 #define GST_USE_UNSTABLE_API
@@ -115,7 +116,7 @@ public:
     void processStatsItem(const GValue*);
 #endif
 
-    void connectIncomingTrack(WebRTCTrackData&);
+    RefPtr<RealtimeIncomingSourceGStreamer::TransformCallback> connectIncomingTrack(WebRTCTrackData&);
 
 protected:
 #if !RELEASE_LOG_DISABLED

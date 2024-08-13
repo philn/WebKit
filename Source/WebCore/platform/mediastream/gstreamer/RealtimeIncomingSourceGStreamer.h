@@ -45,6 +45,26 @@ public:
 
     void tearDown();
 
+    using TransformCallbackFunction = Function<GRefPtr<GstBuffer>(GRefPtr<GstBuffer>&&)>;
+    class TransformCallback : public RefCounted<TransformCallback> {
+        WTF_MAKE_NONCOPYABLE(TransformCallback);
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
+        static Ref<TransformCallback> create(TransformCallbackFunction&& function)
+        {
+            return adoptRef(*new TransformCallback(WTFMove(function)));
+        }
+        GRefPtr<GstBuffer> invoke(GRefPtr<GstBuffer>&& buffer) { return m_function(WTFMove(buffer)); }
+
+    private:
+        explicit TransformCallback(TransformCallbackFunction&& function)
+            : m_function(WTFMove(function))
+        { }
+        TransformCallbackFunction m_function;
+    };
+    void setTransformCallback(TransformCallbackFunction&& callback) { m_transformCallback = TransformCallback::create(WTFMove(callback)); }
+    RefPtr<TransformCallback> transformCallback() { return m_transformCallback; }
+
 protected:
     RealtimeIncomingSourceGStreamer(const CaptureDevice&);
 
@@ -60,6 +80,8 @@ private:
     GRefPtr<GstElement> m_sink;
     Lock m_clientLock;
     HashMap<int, GRefPtr<GstElement>> m_clients WTF_GUARDED_BY_LOCK(m_clientLock);
+
+    RefPtr<TransformCallback> m_transformCallback;
 };
 
 } // namespace WebCore

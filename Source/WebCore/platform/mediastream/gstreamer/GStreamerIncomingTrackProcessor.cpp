@@ -67,6 +67,8 @@ void GStreamerIncomingTrackProcessor::configure(ThreadSafeWeakPtr<GStreamerMedia
 
     g_object_get(m_pad.get(), "transceiver", &m_data.transceiver.outPtr(), nullptr);
 
+    installRtpTransformProbe();
+
     auto structure = gst_caps_get_structure(m_data.caps.get(), 0);
     if (auto ssrc = gstStructureGet<unsigned>(structure, "ssrc"_s)) {
         auto msIdAttributeName = makeString("ssrc-"_s, *ssrc, "-msid"_s);
@@ -170,10 +172,10 @@ GRefPtr<GstElement> GStreamerIncomingTrackProcessor::incomingTrackProcessor()
     if (m_data.type == RealtimeMediaSource::Type::Audio)
         return createParser();
 
-    if (m_data.type == RealtimeMediaSource::Type::Video) {
-        GST_DEBUG_OBJECT(m_bin.get(), "Requesting a key-frame");
-        gst_pad_send_event(m_pad.get(), gst_video_event_new_upstream_force_key_unit(GST_CLOCK_TIME_NONE, TRUE, 1));
-    }
+    // if (m_data.type == RealtimeMediaSource::Type::Video) {
+    //     GST_DEBUG_OBJECT(m_bin.get(), "Requesting a key-frame");
+    //     gst_pad_send_event(m_pad.get(), gst_video_event_new_upstream_force_key_unit(GST_CLOCK_TIME_NONE, TRUE, 1));
+    // }
 
     bool forceEarlyVideoDecoding = !g_strcmp0(g_getenv("WEBKIT_GST_WEBRTC_FORCE_EARLY_VIDEO_DECODING"), "1");
     GST_DEBUG_OBJECT(m_bin.get(), "Configuring for input caps: %" GST_PTR_FORMAT "%s", m_data.caps.get(), forceEarlyVideoDecoding ? " and early decoding" : "");
@@ -205,6 +207,9 @@ GRefPtr<GstElement> GStreamerIncomingTrackProcessor::incomingTrackProcessor()
         auto self = reinterpret_cast<GStreamerIncomingTrackProcessor*>(userData);
         auto pad = adoptGRef(gst_element_get_static_pad(element, "sink"));
         self->installRtpBufferPadProbe(WTFMove(pad));
+
+        // auto srcPad = adoptGRef(gst_element_get_static_pad(element, "src"));
+        // self->installRtpTransformProbe(WTFMove(srcPad));
     }), this);
 
     g_signal_connect(decodebin.get(), "element-added", G_CALLBACK(+[](GstBin*, GstElement* element, gpointer userData) {
@@ -254,6 +259,9 @@ GRefPtr<GstElement> GStreamerIncomingTrackProcessor::createParser()
         auto self = reinterpret_cast<GStreamerIncomingTrackProcessor*>(userData);
         auto pad = adoptGRef(gst_element_get_static_pad(element, "sink"));
         self->installRtpBufferPadProbe(WTFMove(pad));
+
+        // auto srcPad = adoptGRef(gst_element_get_static_pad(element, "src"));
+        // self->installRtpTransformProbe(WTFMove(srcPad));
     }), this);
 
     auto& quirksManager = GStreamerQuirksManager::singleton();
@@ -306,6 +314,32 @@ void GStreamerIncomingTrackProcessor::installRtpBufferPadProbe(GRefPtr<GstPad>&&
     }, gst_caps_new_empty_simple("timestamp/x-ntp"), reinterpret_cast<GDestroyNotify>(gst_caps_unref));
 }
 
+void GStreamerIncomingTrackProcessor::installRtpTransformProbe()
+{
+    // FIXME: Set m_transformCallback earlier (from main thread). In video-sframe.html the transform
+    // is set only after the track event was fired. So we should 1. fire track event earlier(?) 2.
+    // construct track processor?
+
+    gst_pad_add_probe(m_pad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+        auto self = reinterpret_cast<GStreamerIncomingTrackProcessor*>(userData);
+        GST_DEBUG("phil woo");
+        if (!self->m_transformCallback)
+            return GST_PAD_PROBE_OK;
+
+        auto writableBuffer = adoptGRef(gst_buffer_make_writable(GST_PAD_PROBE_INFO_BUFFER(info)));
+        auto pts = GST_BUFFER_PTS(writableBuffer.get());
+        auto dts = GST_BUFFER_DTS(writableBuffer.get());
+        auto duration = GST_BUFFER_DURATION(writableBuffer.get());
+        auto transformedBuffer = self->m_transformCallback->invoke(WTFMove(writableBuffer));
+        GST_BUFFER_PTS(transformedBuffer.get()) = pts;
+        GST_BUFFER_DTS(transformedBuffer.get()) = dts;
+        GST_BUFFER_DURATION(transformedBuffer.get()) = duration;
+        GST_DEBUG("phil duration %" GST_TIME_FORMAT, GST_TIME_ARGS(duration));
+        GST_PAD_PROBE_INFO_DATA(info) = transformedBuffer.leakRef();
+        return GST_PAD_PROBE_OK;
+    }, this, nullptr);
+}
+
 void GStreamerIncomingTrackProcessor::trackReady()
 {
     auto endPoint = m_endPoint.get();
@@ -315,9 +349,11 @@ void GStreamerIncomingTrackProcessor::trackReady()
     m_isReady = true;
     GST_DEBUG_OBJECT(m_bin.get(), "Track %s on pad %" GST_PTR_FORMAT " is ready", m_data.mediaStreamId.utf8().data(), m_pad.get());
     callOnMainThread([endPoint = Ref { *endPoint }, this] {
+        GST_DEBUG("phil yay");
         if (endPoint->isStopped())
             return;
-        endPoint->connectIncomingTrack(m_data);
+        GST_DEBUG("phil yay");
+        m_transformCallback = endPoint->connectIncomingTrack(m_data);
     });
 }
 

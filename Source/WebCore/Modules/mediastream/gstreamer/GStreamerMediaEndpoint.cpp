@@ -1133,7 +1133,7 @@ String GStreamerMediaEndpoint::trackIdFromSDPMedia(const GstSDPMedia& media)
     return String::fromUTF8(components[1].utf8().span());
 }
 
-void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
+RefPtr<RealtimeIncomingSourceGStreamer::TransformCallback> GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
 {
     ASSERT(isMainThread());
 
@@ -1150,7 +1150,7 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
         const auto media = gst_sdp_message_get_media(description->sdp, mLineIndex);
         if (UNLIKELY(!media)) {
             GST_WARNING_OBJECT(m_pipeline.get(), "SDP media for transceiver %u not found, skipping incoming track setup", mLineIndex);
-            return;
+            return nullptr;
         }
         transceiver = &m_peerConnectionBackend.newRemoteTransceiver(makeUnique<GStreamerRtpTransceiverBackend>(WTFMove(rtcTransceiver)), data.type, trackIdFromSDPMedia(*media));
     }
@@ -1158,14 +1158,16 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
     auto mediaStreamBin = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(m_pipeline.get()), data.mediaStreamBinName.ascii().data()));
     auto& track = transceiver->receiver().track();
     auto& source = track.privateTrack().source();
+    auto& incomingSource = reinterpret_cast<RealtimeIncomingSourceGStreamer&>(source);
+    auto transformCallback = incomingSource.transformCallback();
     if (source.isIncomingAudioSource()) {
         auto& audioSource = static_cast<RealtimeIncomingAudioSourceGStreamer&>(source);
         if (!audioSource.setBin(mediaStreamBin))
-            return;
+            return nullptr;
     } else if (source.isIncomingVideoSource()) {
         auto& videoSource = static_cast<RealtimeIncomingVideoSourceGStreamer&>(source);
         if (!videoSource.setBin(mediaStreamBin))
-            return;
+            return nullptr;
     }
 
     m_pendingIncomingMediaStreamIDs.append(data.mediaStreamId);
@@ -1181,7 +1183,7 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
     GST_DEBUG_OBJECT(m_pipeline.get(), "Expecting %u media tracks", totalExpectedMediaTracks);
     if (m_pendingIncomingMediaStreamIDs.size() < totalExpectedMediaTracks) {
         GST_DEBUG_OBJECT(m_pipeline.get(), "Only %zu track(s) received so far", m_pendingIncomingMediaStreamIDs.size());
-        return;
+        return nullptr;
     }
 
     for (auto& mediaStreamID : m_pendingIncomingMediaStreamIDs) {
@@ -1195,6 +1197,7 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
 
     m_pendingIncomingMediaStreamIDs.clear();
     gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
+    return transformCallback;
 }
 
 void GStreamerMediaEndpoint::connectPad(GstPad* pad)
