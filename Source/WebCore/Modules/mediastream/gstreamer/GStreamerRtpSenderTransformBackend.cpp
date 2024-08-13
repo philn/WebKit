@@ -41,18 +41,16 @@ GStreamerRtpSenderTransformBackend::GStreamerRtpSenderTransformBackend(const GRe
 {
 }
 
-GStreamerRtpSenderTransformBackend::~GStreamerRtpSenderTransformBackend()
-{
-}
+GStreamerRtpSenderTransformBackend::~GStreamerRtpSenderTransformBackend() = default;
 
 void GStreamerRtpSenderTransformBackend::setTransformableFrameCallback(Callback&& callback)
 {
     setInputCallback(WTFMove(callback));
-    notImplemented();
 }
 
 void GStreamerRtpSenderTransformBackend::requestKeyFrame()
 {
+    WTFLogAlways("phil requesting keyframe");
     ASSERT(mediaType() == MediaType::Video);
     notImplemented();
 }

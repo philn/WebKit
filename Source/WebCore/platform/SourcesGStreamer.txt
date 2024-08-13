@@ -32,6 +32,7 @@ Modules/mediastream/gstreamer/GStreamerRtpSenderBackend.cpp
 Modules/mediastream/gstreamer/GStreamerRtpSenderTransformBackend.cpp
 Modules/mediastream/gstreamer/GStreamerRtpTransceiverBackend.cpp
 Modules/mediastream/gstreamer/GStreamerRtpTransformBackend.cpp
+Modules/mediastream/gstreamer/GStreamerRtpTransformableFrame.cpp
 Modules/mediastream/gstreamer/GStreamerSctpTransportBackend.cpp
 Modules/mediastream/gstreamer/GStreamerStatsCollector.cpp
 Modules/mediastream/gstreamer/GStreamerWebRTCUtils.cpp

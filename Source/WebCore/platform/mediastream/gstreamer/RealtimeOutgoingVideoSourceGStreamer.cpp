@@ -183,6 +183,33 @@ bool RealtimeOutgoingVideoSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
         return false;
     }
 
+    // auto encoderElement = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(m_encoder.get()), "encoder"));
+    auto srcPad = adoptGRef(gst_element_get_static_pad(m_payloader.get(), "src"));
+    gst_pad_add_probe(srcPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+        auto& source = *reinterpret_cast<RealtimeOutgoingMediaSourceGStreamer*>(userData);
+        // auto writableBuffer = adoptGRef(gst_buffer_make_writable(GST_PAD_PROBE_INFO_BUFFER(info)));
+        // {
+        //     GstMappedBuffer mappedBuffer(writableBuffer.get(), GST_MAP_READ);
+        //     GST_MEMDUMP("Before:", mappedBuffer.data(), mappedBuffer.size());
+        // }
+        // GST_PAD_PROBE_INFO_DATA(info) = source.transform(WTFMove(writableBuffer)).leakRef();
+        // {
+        //     GstMappedBuffer mappedBuffer(GST_PAD_PROBE_INFO_BUFFER(info), GST_MAP_READ);
+        //     GST_MEMDUMP("After :", mappedBuffer.data(), mappedBuffer.size());
+        // }
+
+        auto writableBuffer = adoptGRef(gst_buffer_make_writable(GST_PAD_PROBE_INFO_BUFFER(info)));
+        auto pts = GST_BUFFER_PTS(writableBuffer.get());
+        auto dts = GST_BUFFER_DTS(writableBuffer.get());
+        auto duration = GST_BUFFER_DURATION(writableBuffer.get());
+        auto transformedBuffer = source.transform(WTFMove(writableBuffer));
+        GST_BUFFER_PTS(transformedBuffer.get()) = pts;
+        GST_BUFFER_DTS(transformedBuffer.get()) = dts;
+        GST_BUFFER_DURATION(transformedBuffer.get()) = duration;
+        GST_PAD_PROBE_INFO_DATA(info) = transformedBuffer.leakRef();
+        return GST_PAD_PROBE_OK;
+    }, this, nullptr);
+
     if (auto payloadType = gstStructureGet<int>(structure.get(), "payload"_s))
         g_object_set(m_payloader.get(), "pt", *payloadType, nullptr);
 

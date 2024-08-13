@@ -35,6 +35,18 @@ namespace WebCore {
 
 WTF_MAKE_TZONE_ALLOCATED_IMPL(GStreamerRtpReceiverBackend);
 
+GST_DEBUG_CATEGORY(webkit_webrtc_receiver_debug);
+#define GST_CAT_DEFAULT webkit_webrtc_receiver_debug
+
+GStreamerRtpReceiverBackend::GStreamerRtpReceiverBackend(GRefPtr<GstWebRTCRTPReceiver>&& rtcReceiver)
+    : m_rtcReceiver(WTFMove(rtcReceiver))
+{
+    static std::once_flag debugRegisteredFlag;
+    std::call_once(debugRegisteredFlag, [] {
+        GST_DEBUG_CATEGORY_INIT(webkit_webrtc_receiver_debug, "webkitwebrtcreceiver", 0, "WebKit WebRTC RTP Receiver");
+    });
+}
+
 RTCRtpParameters GStreamerRtpReceiverBackend::getParameters()
 {
     notImplemented();
@@ -55,16 +67,29 @@ Vector<RTCRtpSynchronizationSource> GStreamerRtpReceiverBackend::getSynchronizat
 
 Ref<RealtimeMediaSource> GStreamerRtpReceiverBackend::createSource(const String& trackKind, const String& trackId)
 {
-    if (trackKind == "video"_s)
-        return RealtimeIncomingVideoSourceGStreamer::create(AtomString { trackId });
+    // FIXME: This looks fishy, a single receiver can create multiple sources, so keeping track of m_incomingSource is odd.
+    if (trackKind == "video"_s) {
+        auto source = RealtimeIncomingVideoSourceGStreamer::create(AtomString { trackId });
+        m_incomingSource = &source.get();
+        return source;
+    }
 
     RELEASE_ASSERT(trackKind == "audio"_s);
-    return RealtimeIncomingAudioSourceGStreamer::create(AtomString { trackId });
+    auto source = RealtimeIncomingAudioSourceGStreamer::create(AtomString { trackId });
+    m_incomingSource = &source.get();
+    return source;
 }
 
 Ref<RTCRtpTransformBackend> GStreamerRtpReceiverBackend::rtcRtpTransformBackend()
 {
-    return GStreamerRtpReceiverTransformBackend::create(m_rtcReceiver);
+    GST_DEBUG("phil %s", __PRETTY_FUNCTION__);
+    // FIXME: Un-hardcode this Video enum.
+    auto backend = GStreamerRtpReceiverTransformBackend::create(m_rtcReceiver, GStreamerRtpReceiverTransformBackend::MediaType::Video);
+
+    m_incomingSource->setTransformCallback([backend = RefPtr { &backend.get() }](GRefPtr<GstBuffer>&& buffer) -> GRefPtr<GstBuffer> {
+        return backend->transform(WTFMove(buffer));
+    });
+    return backend;
 }
 
 std::unique_ptr<RTCDtlsTransportBackend> GStreamerRtpReceiverBackend::dtlsTransportBackend()
@@ -75,6 +100,8 @@ std::unique_ptr<RTCDtlsTransportBackend> GStreamerRtpReceiverBackend::dtlsTransp
         return nullptr;
     return makeUnique<GStreamerDtlsTransportBackend>(WTFMove(transport));
 }
+
+#undef GST_CAT_DEFAULT
 
 } // namespace WebCore
 

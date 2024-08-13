@@ -22,36 +22,25 @@
 
 #if ENABLE(WEB_RTC) && USE(GSTREAMER_WEBRTC)
 
-#include "NotImplemented.h"
-
 namespace WebCore {
 
-static inline GStreamerRtpReceiverTransformBackend::MediaType mediaTypeFromReceiver(const GstWebRTCRTPReceiver&)
-{
-    notImplemented();
-    return RTCRtpTransformBackend::MediaType::Video;
-}
-
-GStreamerRtpReceiverTransformBackend::GStreamerRtpReceiverTransformBackend(const GRefPtr<GstWebRTCRTPReceiver>& rtcReceiver)
-    : GStreamerRtpTransformBackend(mediaTypeFromReceiver(*rtcReceiver), Side::Receiver)
+GStreamerRtpReceiverTransformBackend::GStreamerRtpReceiverTransformBackend(const GRefPtr<GstWebRTCRTPReceiver>& rtcReceiver, GStreamerRtpReceiverTransformBackend::MediaType mediaType)
+    : GStreamerRtpTransformBackend(mediaType, Side::Receiver)
     , m_rtcReceiver(rtcReceiver)
 {
 }
 
-GStreamerRtpReceiverTransformBackend::~GStreamerRtpReceiverTransformBackend()
-{
-}
+GStreamerRtpReceiverTransformBackend::~GStreamerRtpReceiverTransformBackend() = default;
 
 void GStreamerRtpReceiverTransformBackend::setTransformableFrameCallback(Callback&& callback)
 {
     setInputCallback(WTFMove(callback));
-    notImplemented();
 }
 
 void GStreamerRtpReceiverTransformBackend::requestKeyFrame()
 {
     ASSERT(mediaType() == MediaType::Video);
-    notImplemented();
+    // FIXME
 }
 
 } // namespace WebCore

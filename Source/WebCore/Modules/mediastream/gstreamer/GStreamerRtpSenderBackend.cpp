@@ -272,7 +272,21 @@ std::unique_ptr<RTCDTMFSenderBackend> GStreamerRtpSenderBackend::createDTMFBacke
 
 Ref<RTCRtpTransformBackend> GStreamerRtpSenderBackend::rtcRtpTransformBackend()
 {
-    return GStreamerRtpSenderTransformBackend::create(m_rtcSender);
+    auto backend = GStreamerRtpSenderTransformBackend::create(m_rtcSender);
+    switchOn(m_source, [backend = backend.copyRef()](Ref<RealtimeOutgoingAudioSourceGStreamer>& source) {
+        auto transformCallback = [backend](GRefPtr<GstBuffer>&& buffer) -> GRefPtr<GstBuffer> {
+            return backend->transform(WTFMove(buffer));
+        };
+        source->setTransformCallback(WTFMove(transformCallback));
+    }, [backend = backend.copyRef()](Ref<RealtimeOutgoingVideoSourceGStreamer>& source) {
+        auto transformCallback = [backend](GRefPtr<GstBuffer>&& buffer) -> GRefPtr<GstBuffer> {
+            return backend->transform(WTFMove(buffer));
+        };
+        source->setTransformCallback(WTFMove(transformCallback));
+    }, [](std::nullptr_t&) {
+    });
+
+    return backend;
 }
 
 void GStreamerRtpSenderBackend::setMediaStreamIds(const FixedVector<String>&)

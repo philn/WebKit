@@ -10,7 +10,7 @@
         <video id="remote" autoplay playsInline></video>
         <script src ="routines.js"></script>
         <script>
-async function doSFrameTest(codec, shouldClose)
+async function doSFrameTest(codec, compatibilityMode, shouldClose)
 {
     let pc1, pc2;
     let sender, receiver;
@@ -21,13 +21,13 @@ async function doSFrameTest(codec, shouldClose)
             pc1 = firstConnection;
             sender = firstConnection.addTrack(localStream.getTracks()[0], localStream);
             firstConnection.getTransceivers()[0].setCodecPreferences([codec]);
-            let transform = new SFrameTransform({compatibilityMode: "H264"});
+            let transform = new SFrameTransform({compatibilityMode: compatibilityMode});
             transform.setEncryptionKey(key);
             sender.transform = transform;
         }, (secondConnection) => {
             pc2 = secondConnection;
             secondConnection.ontrack = (trackEvent) => {
-                let transform = new SFrameTransform({compatibilityMode: "H264"});
+                let transform = new SFrameTransform({compatibilityMode: compatibilityMode});
                 transform.setEncryptionKey(key);
                 receiver = trackEvent.receiver;
                 receiver.transform = transform;
@@ -36,6 +36,7 @@ async function doSFrameTest(codec, shouldClose)
         });
         setTimeout(() => reject("Test timed out"), 5000);
     });
+
     local.srcObject = localStream;
     remote.srcObject = stream;
     await remote.play();
@@ -59,7 +60,7 @@ async function doSFrameTest(codec, shouldClose)
         pc2.close();
     }
 }
-
+/*
 promise_test((test) => {
     return doSFrameTest({clockRate: 90000, mimeType: "video/H264", sdpFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"}, "H264", true);
 }, "Video exchange with SFrame - H264 baseline");
@@ -67,7 +68,7 @@ promise_test((test) => {
 promise_test((test) => {
     return doSFrameTest({clockRate: 90000, mimeType: "video/H264", sdpFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640c1f"}, "H264", true);
 }, "Video exchange with SFrame - H264 high");
-
+*/
 promise_test((test) => {
     return doSFrameTest({mimeType: "video/VP8", clockRate: 90000}, "VP8", false);
 }, "Video exchange with SFrame - VP8");

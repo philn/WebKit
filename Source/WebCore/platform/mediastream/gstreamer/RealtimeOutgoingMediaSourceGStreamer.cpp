@@ -18,6 +18,7 @@
  */
 
 #include "config.h"
+#include "GStreamerWebRTCUtils.h"
 #include "RealtimeOutgoingMediaSourceGStreamer.h"
 
 #if USE(GSTREAMER_WEBRTC)
@@ -382,6 +383,13 @@ void RealtimeOutgoingMediaSourceGStreamer::codecPreferencesChanged()
     gst_element_sync_state_with_parent(m_bin.get());
     GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN_CAST(m_bin.get()), GST_DEBUG_GRAPH_SHOW_ALL, "outgoing-media-new-codec-prefs");
     m_isStopped = false;
+}
+
+GRefPtr<GstBuffer> RealtimeOutgoingMediaSourceGStreamer::transform(GRefPtr<GstBuffer>&& buffer)
+{
+    if (!m_transformCallback)
+        return buffer;
+    return m_transformCallback(WTFMove(buffer));
 }
 
 #undef GST_CAT_DEFAULT

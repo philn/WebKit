@@ -167,13 +167,14 @@ bool GStreamerMediaEndpoint::initializePipeline()
         g_signal_connect_swapped(m_webrtcBin.get(), "prepare-data-channel", G_CALLBACK(+[](GStreamerMediaEndpoint* endPoint, GstWebRTCDataChannel* channel, gboolean isLocal) {
             endPoint->prepareDataChannel(channel, isLocal);
         }), this);
-
+#if 0
         g_signal_connect_swapped(m_webrtcBin.get(), "request-aux-sender", G_CALLBACK(+[](GStreamerMediaEndpoint* endPoint, GstWebRTCDTLSTransport*) -> GstElement* {
             // `sender` ownership is transferred to the signal caller.
             if (auto sender = endPoint->requestAuxiliarySender())
                 return sender;
             return nullptr;
         }), this);
+#endif
     }
 
     g_signal_connect_swapped(m_webrtcBin.get(), "on-data-channel", G_CALLBACK(+[](GStreamerMediaEndpoint* endPoint, GstWebRTCDataChannel* channel) {
