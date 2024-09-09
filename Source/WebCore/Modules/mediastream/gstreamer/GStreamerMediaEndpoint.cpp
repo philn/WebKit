@@ -441,7 +441,7 @@ static std::optional<GStreamerMediaEndpointTransceiverState> toGStreamerMediaEnd
     GUniqueOutPtr<char> mid;
     GstWebRTCRTPTransceiverDirection currentDirection;
     guint mLineIndex;
-    g_object_get(transceiver, "receiver", &receiver.outPtr(), "current-direction", &currentDirection, "mlineindex", &mLineIndex, "mid", &mid.outPtr(), nullptr);
+    g_object_get(transceiver, "receiver", &receiver.outPtr(), "direction", &currentDirection, "mlineindex", &mLineIndex, "mid", &mid.outPtr(), nullptr);
 #ifndef GST_DISABLE_GST_DEBUG
     GUniquePtr<char> desc(g_enum_to_string(GST_TYPE_WEBRTC_RTP_TRANSCEIVER_DIRECTION, currentDirection));
     GST_TRACE_OBJECT(webrtcBin, "Receiver = %" GST_PTR_FORMAT ", current-direction = %s, mlineindex = %u, mid = %s", receiver.get(), desc.get(), mLineIndex, GST_STR_NULL(mid.get()));
