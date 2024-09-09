@@ -66,6 +66,9 @@ public:
     explicit GStreamerPeerConnectionBackend(RTCPeerConnection&, GStreamerWebRTCProvider&);
     ~GStreamerPeerConnectionBackend();
 
+    GStreamerRtpSenderBackend& backendFromRTPSender(RTCRtpSender&);
+    RefPtr<RTCRtpSender> findExistingSender(const Vector<RefPtr<RTCRtpTransceiver>>&, GStreamerRtpSenderBackend&);
+
 private:
     void close() final;
     void doCreateOffer(RTCOfferOptions&&) final;
