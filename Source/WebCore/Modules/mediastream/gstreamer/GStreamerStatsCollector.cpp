@@ -43,8 +43,6 @@ RTCStatsReport::Stats::Stats(Type type, const GstStructure* structure)
     : type(type)
     , id(gstStructureGetString(structure, "id"_s).toString())
 {
-    if (auto value = gstStructureGet<double>(structure, "timestamp"_s))
-        timestamp = *value;
 }
 
 RTCStatsReport::RtpStreamStats::RtpStreamStats(Type type, const GstStructure* structure)
@@ -250,11 +248,19 @@ struct ReportHolder : public ThreadSafeRefCounted<ReportHolder> {
     WTF_MAKE_TZONE_ALLOCATED_INLINE(ReportHolder);
     WTF_MAKE_NONCOPYABLE(ReportHolder);
 public:
-    ReportHolder(DOMMapAdapter* adapter)
-        : adapter(adapter) { }
+    ReportHolder(DOMMapAdapter* adapter, RefPtr<StatsTimestampConverter>&& converter)
+        : adapter(adapter)
+        , statsTimestampConverter(WTFMove(converter)) { }
 
     DOMMapAdapter* adapter;
+    RefPtr<StatsTimestampConverter> statsTimestampConverter;
 };
+
+static void fixTimestamp(RTCStatsReport::Stats& stats, const GstStructure* structure, const StatsTimestampConverter& converter)
+{
+    auto value = gstStructureGet<double>(structure, "timestamp"_s).value_or(0);
+    stats.timestamp = converter.convertFromMonotonicTime(Seconds::fromMilliseconds(value)).milliseconds();
+}
 
 static gboolean fillReportCallback(GQuark, const GValue* value, gpointer userData)
 {
@@ -268,30 +274,36 @@ static gboolean fillReportCallback(GQuark, const GValue* value, gpointer userDat
 
     auto* reportHolder = reinterpret_cast<ReportHolder*>(userData);
     DOMMapAdapter& report = *reportHolder->adapter;
+    const auto& timestampConverter = *reportHolder->statsTimestampConverter;
 
     switch (statsType) {
     case GST_WEBRTC_STATS_CODEC: {
         RTCStatsReport::CodecStats stats(structure);
+        fixTimestamp(stats, structure, timestampConverter);
         report.set<IDLDOMString, IDLDictionary<RTCStatsReport::CodecStats>>(stats.id, WTFMove(stats));
         break;
     }
     case GST_WEBRTC_STATS_INBOUND_RTP: {
         RTCStatsReport::InboundRtpStreamStats stats(structure);
+        fixTimestamp(stats, structure, timestampConverter);
         report.set<IDLDOMString, IDLDictionary<RTCStatsReport::InboundRtpStreamStats>>(stats.id, WTFMove(stats));
         break;
     }
     case GST_WEBRTC_STATS_OUTBOUND_RTP: {
         RTCStatsReport::OutboundRtpStreamStats stats(structure);
+        fixTimestamp(stats, structure, timestampConverter);
         report.set<IDLDOMString, IDLDictionary<RTCStatsReport::OutboundRtpStreamStats>>(stats.id, WTFMove(stats));
         break;
     }
     case GST_WEBRTC_STATS_REMOTE_INBOUND_RTP: {
         RTCStatsReport::RemoteInboundRtpStreamStats stats(structure);
+        fixTimestamp(stats, structure, timestampConverter);
         report.set<IDLDOMString, IDLDictionary<RTCStatsReport::RemoteInboundRtpStreamStats>>(stats.id, WTFMove(stats));
         break;
     }
     case GST_WEBRTC_STATS_REMOTE_OUTBOUND_RTP: {
         RTCStatsReport::RemoteOutboundRtpStreamStats stats(structure);
+        fixTimestamp(stats, structure, timestampConverter);
         report.set<IDLDOMString, IDLDictionary<RTCStatsReport::RemoteOutboundRtpStreamStats>>(stats.id, WTFMove(stats));
         break;
     }
@@ -300,11 +312,13 @@ static gboolean fillReportCallback(GQuark, const GValue* value, gpointer userDat
         break;
     case GST_WEBRTC_STATS_PEER_CONNECTION: {
         RTCStatsReport::PeerConnectionStats stats(structure);
+        fixTimestamp(stats, structure, timestampConverter);
         report.set<IDLDOMString, IDLDictionary<RTCStatsReport::PeerConnectionStats>>(stats.id, WTFMove(stats));
         break;
     }
     case GST_WEBRTC_STATS_TRANSPORT: {
         RTCStatsReport::TransportStats stats(structure);
+        fixTimestamp(stats, structure, timestampConverter);
         report.set<IDLDOMString, IDLDictionary<RTCStatsReport::TransportStats>>(stats.id, WTFMove(stats));
         break;
     }
@@ -318,12 +332,14 @@ static gboolean fillReportCallback(GQuark, const GValue* value, gpointer userDat
     case GST_WEBRTC_STATS_REMOTE_CANDIDATE:
         if (webkitGstCheckVersion(1, 22, 0)) {
             RTCStatsReport::IceCandidateStats stats(statsType, structure);
+            fixTimestamp(stats, structure, timestampConverter);
             report.set<IDLDOMString, IDLDictionary<RTCStatsReport::IceCandidateStats>>(stats.id, WTFMove(stats));
         }
         break;
     case GST_WEBRTC_STATS_CANDIDATE_PAIR:
         if (webkitGstCheckVersion(1, 22, 0)) {
             RTCStatsReport::IceCandidatePairStats stats(structure);
+            fixTimestamp(stats, structure, timestampConverter);
             report.set<IDLDOMString, IDLDictionary<RTCStatsReport::IceCandidatePairStats>>(stats.id, WTFMove(stats));
         }
         break;
@@ -339,6 +355,7 @@ struct CallbackHolder {
     GStreamerStatsCollector::CollectorCallback callback;
     GStreamerStatsCollector::PreprocessCallback preprocessCallback;
     GRefPtr<GstPad> pad;
+    RefPtr<StatsTimestampConverter> timestampConverter;
 };
 
 WEBKIT_DEFINE_ASYNC_DATA_STRUCT(CallbackHolder)
@@ -354,6 +371,7 @@ void GStreamerStatsCollector::getStats(CollectorCallback&& callback, const GRefP
     holder->callback = WTFMove(callback);
     holder->preprocessCallback = WTFMove(preprocessCallback);
     holder->pad = pad;
+    holder->timestampConverter = m_statsTimestampConverter;
     g_signal_emit_by_name(m_webrtcBin.get(), "get-stats", pad.get(), gst_promise_new_with_change_func([](GstPromise* rawPromise, gpointer userData) mutable {
         auto promise = adoptGRef(rawPromise);
         auto* holder = static_cast<CallbackHolder*>(userData);
@@ -378,10 +396,10 @@ void GStreamerStatsCollector::getStats(CollectorCallback&& callback, const GRefP
 
         auto preprocessedStats = holder->preprocessCallback(holder->pad, stats);
         callOnMainThreadAndWait([promise = WTFMove(promise), holder, stats = WTFMove(preprocessedStats)]() mutable {
-            holder->callback(RTCStatsReport::create([preprocessedStats = WTFMove(stats)](auto& mapAdapter) mutable {
+            holder->callback(RTCStatsReport::create([preprocessedStats = WTFMove(stats), timestampConverter = WTFMove(holder->timestampConverter)](auto& mapAdapter) mutable {
                 if (!preprocessedStats)
                     return;
-                auto holder = adoptRef(*new ReportHolder(&mapAdapter));
+                auto holder = adoptRef(*new ReportHolder(&mapAdapter, WTFMove(timestampConverter)));
                 gst_structure_foreach(preprocessedStats.get(), fillReportCallback, holder.ptr());
             }));
         });

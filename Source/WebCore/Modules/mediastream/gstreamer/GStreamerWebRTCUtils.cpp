@@ -652,6 +652,21 @@ void setSsrcAudioLevelVadOn(GstStructure* structure)
     }
 }
 
+Seconds StatsTimestampConverter::convertFromMonotonicTime(Seconds value) const
+{
+#if 0 // GST_CHECK_VERSION(1, 25, 0)
+    static auto gstTimeOrigin = Seconds::fromMilliseconds(gst_webrtc_time_origin());
+    // static auto timeOriginOffset = gstTimeOrigin - m_epoch.secondsSinceEpoch();
+    auto monotonicValue = value - gstTimeOrigin;
+    auto newTimestamp = m_epoch.secondsSinceEpoch() + monotonicValue;
+    return Performance::reduceTimeResolution(newTimestamp);
+#else
+    auto monotonicOffset = value - m_initialMonotonicTime;
+    auto newTimestamp = m_epoch.secondsSinceEpoch() + monotonicOffset;
+    return Performance::reduceTimeResolution(newTimestamp.secondsSinceEpoch());
+#endif
+}
+
 #undef GST_CAT_DEFAULT
 
 } // namespace WebCore

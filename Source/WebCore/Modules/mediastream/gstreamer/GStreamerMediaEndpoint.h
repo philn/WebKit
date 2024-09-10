@@ -191,6 +191,7 @@ private:
 
     HashMap<String, RefPtr<MediaStream>> m_remoteStreamsById;
 
+    Ref<StatsTimestampConverter> m_statsTimestampConverter;
     Ref<GStreamerStatsCollector> m_statsCollector;
 
     uint32_t m_negotiationNeededEventId { 0 };

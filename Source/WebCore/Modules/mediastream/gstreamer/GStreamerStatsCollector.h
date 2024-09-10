@@ -22,6 +22,7 @@
 #if ENABLE(WEB_RTC) && USE(GSTREAMER_WEBRTC)
 
 #include "GRefPtrGStreamer.h"
+#include "GStreamerWebRTCUtils.h"
 
 #include <wtf/CompletionHandler.h>
 #include <wtf/RefPtr.h>
@@ -34,13 +35,18 @@ class RTCStatsReport;
 class GStreamerStatsCollector : public ThreadSafeRefCounted<GStreamerStatsCollector, WTF::DestructionThread::Main> {
 public:
     using CollectorCallback = CompletionHandler<void(RefPtr<RTCStatsReport>&&)>;
-    static Ref<GStreamerStatsCollector> create() { return adoptRef(*new GStreamerStatsCollector()); }
+    static Ref<GStreamerStatsCollector> create(RefPtr<StatsTimestampConverter>&& converter) { return adoptRef(*new GStreamerStatsCollector(WTFMove(converter))); }
 
     void setElement(GstElement* element) { m_webrtcBin = element; }
     using PreprocessCallback = Function<GUniquePtr<GstStructure>(const GRefPtr<GstPad>&, const GstStructure*)>;
     void getStats(CollectorCallback&&, const GRefPtr<GstPad>&, PreprocessCallback&&);
 
 private:
+    GStreamerStatsCollector(RefPtr<StatsTimestampConverter>&& converter)
+        : m_statsTimestampConverter(WTFMove(converter))
+    { }
+
+    RefPtr<StatsTimestampConverter> m_statsTimestampConverter;
     GRefPtr<GstElement> m_webrtcBin;
 };
 

@@ -68,7 +68,8 @@ namespace WebCore {
 
 GStreamerMediaEndpoint::GStreamerMediaEndpoint(GStreamerPeerConnectionBackend& peerConnection, GStreamerWebRTCProvider& client)
     : m_peerConnectionBackend(peerConnection)
-    , m_statsCollector(GStreamerStatsCollector::create())
+    , m_statsTimestampConverter(StatsTimestampConverter::create())
+    , m_statsCollector(GStreamerStatsCollector::create(m_statsTimestampConverter.ptr()))
 #if !RELEASE_LOG_DISABLED
     , m_statsLogTimer(*this, &GStreamerMediaEndpoint::gatherStatsForLogging)
     , m_logger(peerConnection.logger())
@@ -1931,6 +1932,10 @@ void GStreamerMediaEndpoint::processStatsItem(const GValue* value)
 
     if (m_webRTCProvider.isJSONLogStreamingEnabled()) {
         GUniquePtr<GstStructure> structureCopy(gst_structure_copy(structure));
+        if (auto value = gstStructureGet<double>(structureCopy.get(), "timestamp"_s)) {
+            auto newTimestamp = m_statsTimestampConverter->convertFromMonotonicTime(Seconds::fromMilliseconds(*value));
+            gst_structure_set(structureCopy.get(), "timestamp", G_TYPE_DOUBLE, newTimestamp.microseconds(), nullptr);
+        }
         m_webRTCProvider.emitJSONLogEvent(m_peerConnectionIdentifier, gstStructureToJSONString(structureCopy.get()));
     }
 
