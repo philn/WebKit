@@ -28,10 +28,13 @@
 #include "GStreamerRtpReceiverBackend.h"
 #include "GStreamerRtpSenderBackend.h"
 #include "GStreamerRtpTransceiverBackend.h"
+#include "GStreamerWebRTCProvider.h"
 #include "IceCandidate.h"
 #include "JSRTCStatsReport.h"
+#include "Logging.h"
 #include "MediaEndpointConfiguration.h"
 #include "NotImplemented.h"
+#include "Page.h"
 #include "RTCIceCandidate.h"
 #include "RTCPeerConnection.h"
 #include "RTCRtpCapabilities.h"
@@ -80,14 +83,25 @@ static std::unique_ptr<PeerConnectionBackend> createGStreamerPeerConnectionBacke
         WTFLogAlways("GstWebRTC plugin not found. Make sure to install gst-plugins-bad >= 1.20 with the webrtc plugin enabled.");
         return nullptr;
     }
-    return WTF::makeUnique<GStreamerPeerConnectionBackend>(peerConnection);
+
+    if (!GStreamerWebRTCProvider::webRTCAvailable()) {
+        RELEASE_LOG_ERROR(WebRTC, "GStreamerRTC is not available to create a backend");
+        return nullptr;
+    }
+
+    auto* page = downcast<Document>(*peerConnection.scriptExecutionContext()).page();
+    if (!page)
+        return nullptr;
+
+    auto& webRTCProvider = static_cast<GStreamerWebRTCProvider&>(page->webRTCProvider());
+    return WTF::makeUnique<GStreamerPeerConnectionBackend>(peerConnection, webRTCProvider);
 }
 
 CreatePeerConnectionBackend PeerConnectionBackend::create = createGStreamerPeerConnectionBackend;
 
-GStreamerPeerConnectionBackend::GStreamerPeerConnectionBackend(RTCPeerConnection& peerConnection)
+GStreamerPeerConnectionBackend::GStreamerPeerConnectionBackend(RTCPeerConnection& peerConnection, GStreamerWebRTCProvider& provider)
     : PeerConnectionBackend(peerConnection)
-    , m_endpoint(GStreamerMediaEndpoint::create(*this))
+    , m_endpoint(GStreamerMediaEndpoint::create(*this, provider))
 {
     disableICECandidateFiltering();
 
@@ -405,6 +419,27 @@ void GStreamerPeerConnectionBackend::tearDown()
         auto& backend = backendFromRTPTransceiver(*transceiver);
         backend.tearDown();
     }
+}
+
+void GStreamerPeerConnectionBackend::startGatheringStatLogs(Function<void(String&&)>&& callback)
+{
+    if (!m_rtcStatsLogCallback)
+        m_endpoint->startRTCLogs();
+    m_rtcStatsLogCallback = WTFMove(callback);
+}
+
+void GStreamerPeerConnectionBackend::stopGatheringStatLogs()
+{
+    if (m_rtcStatsLogCallback) {
+        m_endpoint->stopRTCLogs();
+        m_rtcStatsLogCallback = {};
+    }
+}
+
+void GStreamerPeerConnectionBackend::provideStatLogs(String&& stats)
+{
+    if (m_rtcStatsLogCallback)
+        m_rtcStatsLogCallback(WTFMove(stats));
 }
 
 #undef GST_CAT_DEFAULT
