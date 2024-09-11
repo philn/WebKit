@@ -537,16 +537,7 @@ class GnomeSDK(SDKBase):
         self.sdk = FlatpakPackage("org.gnome.Sdk", self.branch, self.sdk_repo, arch)
         self.repos = FlatpakRepos([self.sdk_repo, self.flathub_repo])
         self.packages = [self.runtime, self.sdk]
-        self.packages.append(FlatpakPackage('org.gnome.Sdk.Debug', self.branch,
-                                            self.sdk_repo, arch))
-        self.packages.append(FlatpakPackage("org.freedesktop.Sdk.Extension.llvm18", self.fdo_branch,
-                                            self.flathub_repo, arch))
-        self.packages.append(FlatpakPackage("org.freedesktop.Sdk.Extension.rust-stable", self.fdo_branch,
-                                            self.flathub_repo, arch))
-        # self.packages.append(FlatpakPackage("org.freedesktop.Platform.GL.default", f"{self.fdo_branch}-extra",
-        #                                     self.flathub_repo, arch))
-        # self.packages.append(FlatpakPackage("org.freedesktop.Platform.GL.Debug.default", f"{self.fdo_branch}-extra",
-        #                                     self.flathub_repo, arch))
+        self.packages.append(FlatpakPackage('org.gnome.Sdk.Debug', self.branch, self.sdk_repo, arch))
 
 SUPPORTED_SDKS = { 'webkit': WebKitSDK, 'gnome': GnomeSDK }
 
@@ -1293,8 +1284,8 @@ class WebkitFlatpak:
             compiler_mapping[compiler] = self.run_in_sandbox("/usr/bin/which", compiler, gather_output=True)
 
         relative_filename = None
-        with tempfile.NamedTemporaryFile() as tmpfile:
-            if self.sdk.ships_icecc:
+        if self.sdk.ships_icecc:
+            with tempfile.NamedTemporaryFile() as tmpfile:
                 command = ['icecc', '--build-native']
                 command.extend(compiler_mapping.values())
                 retcode = self.run_in_sandbox(*command, stdout=tmpfile, cwd=WEBKIT_SOURCE_DIR, skip_icc=True)
