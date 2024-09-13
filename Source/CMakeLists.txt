@@ -44,6 +44,12 @@ elseif (USE_SYSPROF_CAPTURE)
     add_subdirectory(ThirdParty/libsysprof-capture)
 endif ()
 
+if (USE_SYSTEM_UNIFDEF)
+    find_package(Unifdef REQUIRED)
+else ()
+    add_subdirectory(ThirdParty/unifdef)
+endif ()
+
 if (ENABLE_WEBINSPECTORUI)
     add_subdirectory(WebInspectorUI)
 endif ()
