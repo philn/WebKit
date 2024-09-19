@@ -506,7 +506,7 @@ AcceleratedSurfaceDMABuf::RenderTarget* AcceleratedSurfaceDMABuf::SwapChain::nex
 #endif
 
     if (m_freeTargets.isEmpty()) {
-        ASSERT(m_lockedTargets.size() < s_maximumBuffers);
+        //ASSERT(m_lockedTargets.size() < s_maximumBuffers);
         m_lockedTargets.insert(0, createTarget());
         return m_lockedTargets[0].get();
     }

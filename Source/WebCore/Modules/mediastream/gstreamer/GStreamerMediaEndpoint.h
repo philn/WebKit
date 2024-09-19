@@ -118,6 +118,8 @@ public:
 
     RefPtr<RealtimeIncomingSourceGStreamer::TransformCallback> connectIncomingTrack(WebRTCTrackData&);
 
+    RefPtr<RealtimeIncomingSourceGStreamer> incomingSourceForTransceiver(const GRefPtr<GstWebRTCRTPTransceiver>&);
+
 protected:
 #if !RELEASE_LOG_DISABLED
     void onStatsDelivered(GUniquePtr<GstStructure>&&);

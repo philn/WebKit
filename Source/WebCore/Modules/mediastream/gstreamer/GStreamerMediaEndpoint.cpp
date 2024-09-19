@@ -1133,6 +1133,33 @@ String GStreamerMediaEndpoint::trackIdFromSDPMedia(const GstSDPMedia& media)
     return String::fromUTF8(components[1].utf8().span());
 }
 
+RefPtr<RealtimeIncomingSourceGStreamer> GStreamerMediaEndpoint::incomingSourceForTransceiver(const GRefPtr<GstWebRTCRTPTransceiver>& rtcTransceiver)
+{
+    GUniqueOutPtr<GstWebRTCSessionDescription> description;
+    g_object_get(m_webrtcBin.get(), "remote-description", &description.outPtr(), nullptr);
+
+    //GRefPtr<GstWebRTCRTPTransceiver> rtcTransceiver(data.transceiver);
+    auto* transceiver = m_peerConnectionBackend.existingTransceiver([&](auto& transceiverBackend) {
+        return rtcTransceiver.get() == transceiverBackend.rtcTransceiver();
+    });
+    if (!transceiver) {
+        return nullptr;
+        // unsigned mLineIndex;
+        // g_object_get(rtcTransceiver.get(), "mlineindex", &mLineIndex, nullptr);
+        // const auto media = gst_sdp_message_get_media(description->sdp, mLineIndex);
+        // if (UNLIKELY(!media)) {
+        //     GST_WARNING_OBJECT(m_pipeline.get(), "SDP media for transceiver %u not found, skipping incoming track setup", mLineIndex);
+        //     return nullptr;
+        // }
+        // transceiver = &m_peerConnectionBackend.newRemoteTransceiver(makeUnique<GStreamerRtpTransceiverBackend>(WTFMove(rtcTransceiver)), data.type, trackIdFromSDPMedia(*media));
+    }
+
+    // auto mediaStreamBin = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(m_pipeline.get()), data.mediaStreamBinName.ascii().data()));
+    auto& track = transceiver->receiver().track();
+    auto& source = track.privateTrack().source();
+    return reinterpret_cast<RealtimeIncomingSourceGStreamer*>(&source);
+}
+
 RefPtr<RealtimeIncomingSourceGStreamer::TransformCallback> GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
 {
     ASSERT(isMainThread());
@@ -1159,13 +1186,15 @@ RefPtr<RealtimeIncomingSourceGStreamer::TransformCallback> GStreamerMediaEndpoin
     auto& track = transceiver->receiver().track();
     auto& source = track.privateTrack().source();
     auto& incomingSource = reinterpret_cast<RealtimeIncomingSourceGStreamer&>(source);
-    auto transformCallback = incomingSource.transformCallback();
+    RefPtr<RealtimeIncomingSourceGStreamer::TransformCallback> transformCallback;
     if (source.isIncomingAudioSource()) {
         auto& audioSource = static_cast<RealtimeIncomingAudioSourceGStreamer&>(source);
+        transformCallback = audioSource.transformCallback();
         if (!audioSource.setBin(mediaStreamBin))
             return nullptr;
     } else if (source.isIncomingVideoSource()) {
         auto& videoSource = static_cast<RealtimeIncomingVideoSourceGStreamer&>(source);
+        transformCallback = videoSource.transformCallback();
         if (!videoSource.setBin(mediaStreamBin))
             return nullptr;
     }

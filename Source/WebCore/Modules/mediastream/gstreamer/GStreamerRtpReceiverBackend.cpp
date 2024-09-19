@@ -83,10 +83,21 @@ Ref<RealtimeMediaSource> GStreamerRtpReceiverBackend::createSource(const String&
 Ref<RTCRtpTransformBackend> GStreamerRtpReceiverBackend::rtcRtpTransformBackend()
 {
     GST_DEBUG("phil %s", __PRETTY_FUNCTION__);
-    // FIXME: Un-hardcode this Video enum.
-    auto backend = GStreamerRtpReceiverTransformBackend::create(m_rtcReceiver, GStreamerRtpReceiverTransformBackend::MediaType::Video);
 
-    m_incomingSource->setTransformCallback([backend = RefPtr { &backend.get() }](GRefPtr<GstBuffer>&& buffer) -> GRefPtr<GstBuffer> {
+    if (m_incomingSource->isIncomingVideoSource()) {
+        auto backend = GStreamerRtpReceiverTransformBackend::create(m_rtcReceiver, GStreamerRtpReceiverTransformBackend::MediaType::Video);
+        auto& source = static_cast<RealtimeIncomingVideoSourceGStreamer&>(*m_incomingSource.get());
+
+        source.setTransformCallback([backend = RefPtr { &backend.get() }](GRefPtr<GstBuffer>&& buffer) -> GRefPtr<GstBuffer> {
+            return backend->transform(WTFMove(buffer));
+        });
+        return backend;
+    }
+
+    auto backend = GStreamerRtpReceiverTransformBackend::create(m_rtcReceiver, GStreamerRtpReceiverTransformBackend::MediaType::Audio);
+    auto& source = static_cast<RealtimeIncomingAudioSourceGStreamer&>(*m_incomingSource.get());
+
+    source.setTransformCallback([backend = RefPtr { &backend.get() }](GRefPtr<GstBuffer>&& buffer) -> GRefPtr<GstBuffer> {
         return backend->transform(WTFMove(buffer));
     });
     return backend;

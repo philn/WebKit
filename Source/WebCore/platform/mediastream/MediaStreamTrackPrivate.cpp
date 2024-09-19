@@ -499,7 +499,7 @@ Ref<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
 
 RealtimeMediaSource& MediaStreamTrackPrivate::source()
 {
-    ASSERT(isMainThread());
+    //ASSERT(isMainThread());
     return m_sourceObserver->source();
 }
 

@@ -198,6 +198,7 @@ bool RealtimeOutgoingVideoSourceGStreamer::setPayloadType(const GRefPtr<GstCaps>
         //     GST_MEMDUMP("After :", mappedBuffer.data(), mappedBuffer.size());
         // }
 
+        // FIXME(phil): Should we transform the whole buffer or only the RTP payload?
         auto writableBuffer = adoptGRef(gst_buffer_make_writable(GST_PAD_PROBE_INFO_BUFFER(info)));
         auto pts = GST_BUFFER_PTS(writableBuffer.get());
         auto dts = GST_BUFFER_DTS(writableBuffer.get());

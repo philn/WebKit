@@ -322,15 +322,24 @@ void GStreamerIncomingTrackProcessor::installRtpTransformProbe()
 
     gst_pad_add_probe(m_pad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
         auto self = reinterpret_cast<GStreamerIncomingTrackProcessor*>(userData);
+        auto endPoint = self->m_endPoint.get();
+        if (!endPoint || endPoint->isStopped())
+            return GST_PAD_PROBE_OK;
+
+        auto source = endPoint->incomingSourceForTransceiver(self->m_data.transceiver);
+        if (!source)
+            return GST_PAD_PROBE_OK;
+
+        auto transformCallback = source->transformCallback();
         GST_DEBUG("phil woo");
-        if (!self->m_transformCallback)
+        if (!transformCallback)
             return GST_PAD_PROBE_OK;
 
         auto writableBuffer = adoptGRef(gst_buffer_make_writable(GST_PAD_PROBE_INFO_BUFFER(info)));
         auto pts = GST_BUFFER_PTS(writableBuffer.get());
         auto dts = GST_BUFFER_DTS(writableBuffer.get());
         auto duration = GST_BUFFER_DURATION(writableBuffer.get());
-        auto transformedBuffer = self->m_transformCallback->invoke(WTFMove(writableBuffer));
+        auto transformedBuffer = transformCallback->invoke(WTFMove(writableBuffer));
         GST_BUFFER_PTS(transformedBuffer.get()) = pts;
         GST_BUFFER_DTS(transformedBuffer.get()) = dts;
         GST_BUFFER_DURATION(transformedBuffer.get()) = duration;

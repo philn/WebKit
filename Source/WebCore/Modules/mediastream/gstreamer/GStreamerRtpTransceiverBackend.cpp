@@ -39,18 +39,18 @@ WTF_MAKE_TZONE_ALLOCATED_IMPL(GStreamerRtpTransceiverBackend);
 GStreamerRtpTransceiverBackend::GStreamerRtpTransceiverBackend(GRefPtr<GstWebRTCRTPTransceiver>&& rtcTransceiver)
     : m_rtcTransceiver(WTFMove(rtcTransceiver))
 {
-    GstWebRTCKind kind;
-    g_object_get(m_rtcTransceiver.get(), "kind", &kind, nullptr);
+    // GstWebRTCKind kind;
+    // g_object_get(m_rtcTransceiver.get(), "kind", &kind, nullptr);
 
-    gst_util_set_object_arg(G_OBJECT(m_rtcTransceiver.get()), "fec-type", "ulp-red");
+    // gst_util_set_object_arg(G_OBJECT(m_rtcTransceiver.get()), "fec-type", "ulp-red");
 
-    // Enable nack only for video transceivers, so that RTX payloads are not signaled in SDP
-    // offer/answer. Those are confusing some media servers... Internally webrtcbin will always
-    // setup RTX, RED and FEC anyway.
-    if (kind != GST_WEBRTC_KIND_VIDEO)
-        return;
+    // // Enable nack only for video transceivers, so that RTX payloads are not signaled in SDP
+    // // offer/answer. Those are confusing some media servers... Internally webrtcbin will always
+    // // setup RTX, RED and FEC anyway.
+    // if (kind != GST_WEBRTC_KIND_VIDEO)
+    //     return;
 
-    g_object_set(m_rtcTransceiver.get(), "do-nack", TRUE, nullptr);
+    // g_object_set(m_rtcTransceiver.get(), "do-nack", TRUE, nullptr);
 }
 
 std::unique_ptr<GStreamerRtpReceiverBackend> GStreamerRtpTransceiverBackend::createReceiverBackend()

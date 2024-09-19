@@ -115,21 +115,26 @@ static inline std::optional<SFrameHeaderInfo> parseSFrameHeader(std::span<const 
 
     auto firstByte = data.front();
     data = data.subspan(1);
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     // Signature bit.
     if (hasSignature(firstByte))
         return { };
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     size_t counterLength = ((firstByte >> 4) & 0x07) + 1;
 
     if (data.size() < counterLength + 1)
         return { };
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (hasLongKeyLength(firstByte)) {
         size_t keyLength = (firstByte & 0x07) + 1;
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         if (data.size() < counterLength + keyLength + 1)
             return { };
 
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         keyId = readUInt64(data.first(keyLength));
         data = data.subspan(keyLength);
 
@@ -141,6 +146,7 @@ static inline std::optional<SFrameHeaderInfo> parseSFrameHeader(std::span<const 
         data = data.subspan(counterLength);
     }
     uint8_t headerSize = data.data() - start;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     return SFrameHeaderInfo { headerSize, keyId, counter };
 }
 
@@ -232,9 +238,11 @@ RTCRtpSFrameTransformer::TransformResult RTCRtpSFrameTransformer::decryptFrame(s
     Locker locker { m_keyLock };
 
     auto header = parseSFrameHeader(data);
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (!header)
         return makeUnexpected(ErrorInformation {Error::Syntax, "Invalid header"_s, 0 });
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (header->counter <= m_counter && m_counter)
         return makeUnexpected(ErrorInformation {Error::Syntax, "Invalid counter"_s, 0 });
@@ -242,17 +250,22 @@ RTCRtpSFrameTransformer::TransformResult RTCRtpSFrameTransformer::decryptFrame(s
 
     if (header->keyId != m_keyId) {
         auto position = m_keys.findIf([keyId = header->keyId](auto& item) { return item.keyId == keyId; });
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         if (position == notFound)
             return makeUnexpected(ErrorInformation { Error::KeyID,  "Key ID is unknown"_s, header->keyId });
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         auto result = updateEncryptionKey(m_keys[position].keyData, header->keyId, ShouldUpdateKeys::No);
         if (result.hasException())
             return makeUnexpected(ErrorInformation {Error::Other, result.exception().message(), 0 });
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     }
 
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     if (data.size() < (header->size + m_authenticationSize))
         return makeUnexpected(ErrorInformation { Error::Syntax, "Chunk is too small for authentication size"_s, 0 });
 
     auto iv = computeIV(m_counter, m_saltKey);
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     // Compute signature
     auto transmittedSignature = data.last(m_authenticationSize);
@@ -263,6 +276,7 @@ RTCRtpSFrameTransformer::TransformResult RTCRtpSFrameTransformer::decryptFrame(s
             return makeUnexpected(ErrorInformation { Error::Authentication, "Authentication failed"_s, 0 });
         }
     }
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     // Decrypt data
     auto dataSize = data.size() - header->size - m_authenticationSize;
@@ -270,6 +284,7 @@ RTCRtpSFrameTransformer::TransformResult RTCRtpSFrameTransformer::decryptFrame(s
 
     if (result.hasException())
         return makeUnexpected(ErrorInformation { Error::Other, result.exception().message(), 0 });
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     return result.releaseReturnValue();
 }

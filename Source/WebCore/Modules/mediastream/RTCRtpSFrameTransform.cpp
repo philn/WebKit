@@ -166,13 +166,16 @@ void RTCRtpSFrameTransform::initializeTransformer(RTCRtpTransformBackend& backen
 
     backend.setTransformableFrameCallback([transformer = m_transformer, identifier = context->identifier(), backend = Ref { backend }, weakThis = ThreadSafeWeakPtr { *this }](auto&& frame) {
         auto chunk = frame->data();
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         if (!chunk.data() || !chunk.size())
             return;
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         auto result = processFrame(chunk, transformer.get(), identifier, weakThis);
 
         if (!result)
             return;
 
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         frame->setData({ result.value().data(), result.value().size() });
 
         backend->processTransformedFrame(frame.get());
