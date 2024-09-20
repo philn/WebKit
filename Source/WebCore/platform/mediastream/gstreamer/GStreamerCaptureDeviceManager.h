@@ -111,6 +111,9 @@ public:
 
     static VideoCaptureFactory& videoFactory();
 
+    // FIXME: Implement this:
+    // void computeCaptureDevices(CompletionHandler<void()>&&) final;
+
 private:
     GStreamerVideoCaptureDeviceManager();
     RefPtr<PipeWireCaptureDeviceManager> m_pipewireCaptureDeviceManager;
