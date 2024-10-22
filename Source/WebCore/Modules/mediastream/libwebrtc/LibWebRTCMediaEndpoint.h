@@ -211,6 +211,9 @@ private:
 #endif
     bool m_isGatheringRTCLogs { false };
     bool m_shouldIgnoreNegotiationNeededSignal { false };
+
+    LibWebRTCProvider& m_webRTCProvider;
+    uintptr_t m_peerConnectionIdentifier;
 };
 
 } // namespace WebCore

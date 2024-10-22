@@ -89,6 +89,7 @@ class PeerConnectionBackend
     : public CanMakeWeakPtr<PeerConnectionBackend>
 #if !RELEASE_LOG_DISABLED
     , private LoggerHelper
+    , public Logger::Observer
 #endif
 {
 public:
@@ -168,6 +169,8 @@ public:
     uint64_t logIdentifier() const final { return m_logIdentifier; }
     ASCIILiteral logClassName() const override { return "PeerConnectionBackend"_s; }
     WTFLogChannel& logChannel() const final;
+    void didLogMessage(const WTFLogChannel&, WTFLogLevel, Vector<JSONLogValue>&&) final { }
+    bool handleLogMessage(const WTFLogChannel&, WTFLogLevel, Vector<JSONLogValue>&&) final;
 #endif
 
     virtual bool isLocalDescriptionSet() const = 0;

@@ -116,9 +116,19 @@ PeerConnectionBackend::PeerConnectionBackend(RTCPeerConnection& peerConnection)
     if (auto* page = document ? document->page() : nullptr)
         m_shouldFilterICECandidates = page->webRTCProvider().isSupportingMDNS();
 #endif
+#if !RELEASE_LOG_DISABLED
+    m_logger->addObserver(*this);
+    ALWAYS_LOG(LOGIDENTIFIER, "PeerConnection created"_s);
+#endif
 }
 
-PeerConnectionBackend::~PeerConnectionBackend() = default;
+PeerConnectionBackend::~PeerConnectionBackend()
+{
+#if !RELEASE_LOG_DISABLED
+    ALWAYS_LOG(LOGIDENTIFIER, "Disposing PeerConnection"_s);
+    m_logger->removeObserver(*this);
+#endif
+}
 
 void PeerConnectionBackend::createOffer(RTCOfferOptions&& options, CreateCallback&& callback)
 {
@@ -129,10 +139,47 @@ void PeerConnectionBackend::createOffer(RTCOfferOptions&& options, CreateCallbac
     doCreateOffer(WTFMove(options));
 }
 
+#if !RELEASE_LOG_DISABLED
+bool PeerConnectionBackend::handleLogMessage(const WTFLogChannel& channel, WTFLogLevel, Vector<JSONLogValue>&& values)
+{
+    auto name = StringView::fromLatin1(channel.name);
+    if (name != "WebRTC"_s)
+        return false;
+
+    // Ignore logs containing only the call site information or JSON logs.
+    if (values.size() < 2 || values[1].type == JSONLogValue::Type::JSON)
+        return false;
+
+    Ref peerConnection = m_peerConnection.get();
+    auto document = peerConnection->document();
+    if (!document)
+        return false;
+
+    auto page = document->page();
+    if (!page)
+        return false;
+
+    auto& webRTCProvider = page->webRTCProvider();
+    if (!webRTCProvider.isJSONLogStreamingEnabled())
+        return false;
+
+    auto identifier = reinterpret_cast<uintptr_t>(&m_peerConnection);
+
+    // Assume the third message is a multi-lines payload (such as SDP).
+    std::optional<std::span<const uint8_t>> payloadValue;
+    if (values.size() == 3)
+        payloadValue = values[2].value.span8();
+    RELEASE_ASSERT(!values[1].value.startsWith('{'));
+    auto event = webRTCProvider.generateJSONLogEvent(identifier, WebRTCProvider::MessageLogEvent { values[1].value, WTFMove(payloadValue) }, false);
+    webRTCProvider.emitJSONLogEvent(WTFMove(event));
+    return true;
+}
+#endif
+
 void PeerConnectionBackend::createOfferSucceeded(String&& sdp)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Create offer succeeded:\n", sdp);
+    ALWAYS_LOG(LOGIDENTIFIER, "Create offer succeeded:", sdp);
 
     ASSERT(m_offerAnswerCallback);
     validateSDP(sdp);
@@ -145,7 +192,7 @@ void PeerConnectionBackend::createOfferSucceeded(String&& sdp)
 void PeerConnectionBackend::createOfferFailed(Exception&& exception)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Create offer failed:", exception.message());
+    ALWAYS_LOG(LOGIDENTIFIER, makeString("Create offer failed:"_s, exception.message()));
 
     ASSERT(m_offerAnswerCallback);
     Ref peerConnection = m_peerConnection.get();
@@ -166,7 +213,7 @@ void PeerConnectionBackend::createAnswer(RTCAnswerOptions&& options, CreateCallb
 void PeerConnectionBackend::createAnswerSucceeded(String&& sdp)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Create answer succeeded:\n", sdp);
+    ALWAYS_LOG(LOGIDENTIFIER, "Create answer succeeded:", sdp);
 
     ASSERT(m_offerAnswerCallback);
     Ref peerConnection = m_peerConnection.get();
@@ -178,7 +225,7 @@ void PeerConnectionBackend::createAnswerSucceeded(String&& sdp)
 void PeerConnectionBackend::createAnswerFailed(Exception&& exception)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Create answer failed:", exception.message());
+    ALWAYS_LOG(LOGIDENTIFIER, makeString("Create answer failed:"_s, exception.message()));
 
     ASSERT(m_offerAnswerCallback);
     Ref peerConnection = m_peerConnection.get();
@@ -242,7 +289,8 @@ static void processRemoteTracks(RTCRtpTransceiver& transceiver, PeerConnectionBa
 void PeerConnectionBackend::setLocalDescriptionSucceeded(std::optional<DescriptionStates>&& descriptionStates, std::optional<TransceiverStates>&& transceiverStates, std::unique_ptr<RTCSctpTransportBackend>&& sctpBackend, std::optional<double> maxMessageSize)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER);
+    ALWAYS_LOG(LOGIDENTIFIER, "Set local description succeeded"_s);
+
     if (transceiverStates)
         DEBUG_LOG(LOGIDENTIFIER, "Transceiver states: ", *transceiverStates);
     ASSERT(m_setDescriptionCallback);
@@ -308,7 +356,7 @@ void PeerConnectionBackend::setLocalDescriptionSucceeded(std::optional<Descripti
 void PeerConnectionBackend::setLocalDescriptionFailed(Exception&& exception)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Set local description failed:", exception.message());
+    ALWAYS_LOG(LOGIDENTIFIER, makeString("Set local description failed:"_s, exception.message()));
 
     ASSERT(m_setDescriptionCallback);
     Ref peerConnection = m_peerConnection.get();
@@ -331,7 +379,8 @@ void PeerConnectionBackend::setRemoteDescription(const RTCSessionDescription& se
 void PeerConnectionBackend::setRemoteDescriptionSucceeded(std::optional<DescriptionStates>&& descriptionStates, std::optional<TransceiverStates>&& transceiverStates, std::unique_ptr<RTCSctpTransportBackend>&& sctpBackend, std::optional<double> maxMessageSize)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Set remote description succeeded");
+    ALWAYS_LOG(LOGIDENTIFIER, "Set remote description succeeded"_s);
+
     if (transceiverStates)
         DEBUG_LOG(LOGIDENTIFIER, "Transceiver states: ", *transceiverStates);
     ASSERT(m_setDescriptionCallback);
@@ -420,6 +469,7 @@ void PeerConnectionBackend::setRemoteDescriptionSucceeded(std::optional<Descript
             DEBUG_LOG(LOGIDENTIFIER, "Dispatching ", trackEventList.size(), " track events");
             for (auto& event : trackEventList) {
                 RefPtr track = event->track();
+                ALWAYS_LOG(LOGIDENTIFIER, makeString("Dispatching track event for track "_s, track->id()));
                 peerConnection->dispatchEvent(event);
                 if (peerConnection->isClosed()) {
                     DEBUG_LOG(LOGIDENTIFIER, "PeerConnection closed while dispatching track events");
@@ -437,7 +487,7 @@ void PeerConnectionBackend::setRemoteDescriptionSucceeded(std::optional<Descript
 void PeerConnectionBackend::setRemoteDescriptionFailed(Exception&& exception)
 {
     ASSERT(isMainThread());
-    ALWAYS_LOG(LOGIDENTIFIER, "Set remote description failed:", exception.message());
+    ALWAYS_LOG(LOGIDENTIFIER, makeString("Set remote description failed:"_s, exception.message()));
 
     ASSERT(m_setDescriptionCallback);
     Ref peerConnection = m_peerConnection.get();
@@ -568,6 +618,7 @@ void PeerConnectionBackend::newICECandidate(String&& sdp, String&& mid, unsigned
 
         ASSERT(!m_shouldFilterICECandidates || sdp.contains(".local"_s) || sdp.contains(" srflx "_s) || sdp.contains(" relay "_s));
         auto candidate = RTCIceCandidate::create(WTFMove(sdp), WTFMove(mid), sdpMLineIndex);
+        ALWAYS_LOG(logSiteIdentifier, makeString("Dispatching ICE event for SDP "_s, candidate->candidate()));
         peerConnection->dispatchEvent(RTCPeerConnectionIceEvent::create(Event::CanBubble::No, Event::IsCancelable::No, WTFMove(candidate), WTFMove(serverURL)));
     });
 }
@@ -575,11 +626,12 @@ void PeerConnectionBackend::newICECandidate(String&& sdp, String&& mid, unsigned
 void PeerConnectionBackend::newDataChannel(UniqueRef<RTCDataChannelHandler>&& channelHandler, String&& label, RTCDataChannelInit&& channelInit)
 {
     Ref peerConnection = m_peerConnection.get();
-    peerConnection->queueTaskKeepingObjectAlive(peerConnection.get(), TaskSource::Networking, [peerConnection, label = WTFMove(label), channelHandler = WTFMove(channelHandler), channelInit = WTFMove(channelInit)]() mutable {
+    peerConnection->queueTaskKeepingObjectAlive(peerConnection.get(), TaskSource::Networking, [peerConnection, label = WTFMove(label), channelHandler = WTFMove(channelHandler), channelInit = WTFMove(channelInit), this]() mutable {
         if (peerConnection->isClosed())
             return;
 
         auto channel = RTCDataChannel::create(*peerConnection->document(), channelHandler.moveToUniquePtr(), WTFMove(label), WTFMove(channelInit), RTCDataChannelState::Open);
+        ALWAYS_LOG(LOGIDENTIFIER, makeString("Dispatching data-channel event for channel "_s, channel->label()));
         peerConnection->dispatchEvent(RTCDataChannelEvent::create(eventNames().datachannelEvent, Event::CanBubble::No, Event::IsCancelable::No, Ref { channel }));
         channel->fireOpenEventIfNeeded();
     });
