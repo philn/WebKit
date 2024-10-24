@@ -62,8 +62,18 @@ void GStreamerVideoCapturer::setSinkVideoFrameCallback(SinkVideoFrameCallback&& 
 
     m_sinkVideoFrameCallback.second = WTFMove(callback);
     m_sinkVideoFrameCallback.first = g_signal_connect_swapped(sink(), "new-sample", G_CALLBACK(+[](GStreamerVideoCapturer* capturer, GstElement* sink) -> GstFlowReturn {
+        // TODO: pass some smart ptr to the signal callback?
         auto gstSample = adoptGRef(gst_app_sink_pull_sample(GST_APP_SINK(sink)));
-        capturer->m_sinkVideoFrameCallback.second(VideoFrameGStreamer::createWrappedSample(gstSample));
+        if (!gstSample)
+            return GST_FLOW_EOS;
+
+        callOnMainThread([weakThis = ThreadSafeWeakPtr { *capturer }, sample = WTFMove(gstSample)] {
+            auto capturer = weakThis.get();
+            if (!capturer)
+                return;
+
+            capturer->m_sinkVideoFrameCallback.second(VideoFrameGStreamer::createWrappedSample(sample));
+        });
         return GST_FLOW_OK;
     }), this);
 }

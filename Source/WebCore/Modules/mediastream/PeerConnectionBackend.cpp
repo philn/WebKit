@@ -142,6 +142,8 @@ void PeerConnectionBackend::createOffer(RTCOfferOptions&& options, CreateCallbac
 #if !RELEASE_LOG_DISABLED
 bool PeerConnectionBackend::handleLogMessage(const WTFLogChannel& channel, WTFLogLevel, Vector<JSONLogValue>&& values)
 {
+    ASSERT(isMainThread());
+
     auto name = StringView::fromLatin1(channel.name);
     if (name != "WebRTC"_s)
         return false;
@@ -169,7 +171,7 @@ bool PeerConnectionBackend::handleLogMessage(const WTFLogChannel& channel, WTFLo
     std::optional<std::span<const uint8_t>> payloadValue;
     if (values.size() == 3)
         payloadValue = values[2].value.span8();
-    RELEASE_ASSERT(!values[1].value.startsWith('{'));
+
     auto event = webRTCProvider.generateJSONLogEvent(identifier, WebRTCProvider::MessageLogEvent { values[1].value, WTFMove(payloadValue) }, false);
     webRTCProvider.emitJSONLogEvent(WTFMove(event));
     return true;
