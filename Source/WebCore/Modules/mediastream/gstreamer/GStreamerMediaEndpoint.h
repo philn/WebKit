@@ -117,6 +117,9 @@ public:
 
     void connectIncomingTrack(WebRTCTrackData&);
 
+    void startRTCLogs();
+    void stopRTCLogs();
+
 protected:
 #if !RELEASE_LOG_DISABLED
     void onStatsDelivered(GUniquePtr<GstStructure>&&);
@@ -211,6 +214,10 @@ private:
     Vector<String> m_pendingIncomingMediaStreamIDs;
 
     bool m_shouldIgnoreNegotiationNeededSignal { false };
+
+    bool m_isGatheringRTCLogs { false };
+
+    uintptr_t m_peerConnectionIdentifier;
 };
 
 } // namespace WebCore

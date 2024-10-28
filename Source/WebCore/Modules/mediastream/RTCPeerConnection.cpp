@@ -399,7 +399,7 @@ void RTCPeerConnection::setLocalDescription(std::optional<RTCLocalSessionDescrip
         return;
     }
 
-    ALWAYS_LOG(LOGIDENTIFIER, "Setting local description to:\n", localDescription ? localDescription->sdp : "''"_s);
+    ALWAYS_LOG(LOGIDENTIFIER, "Setting local description to:", localDescription ? localDescription->sdp : "''"_s);
     chainOperation(WTFMove(promise), [this, localDescription = WTFMove(localDescription)](Ref<DeferredPromise>&& promise) mutable {
         auto type = typeForSetLocalDescription(localDescription, m_signalingState);
         String sdp;
@@ -428,7 +428,7 @@ void RTCPeerConnection::setRemoteDescription(RTCSessionDescriptionInit&& remoteD
         return;
     }
 
-    ALWAYS_LOG(LOGIDENTIFIER, "Setting remote description to:\n", remoteDescription.sdp);
+    ALWAYS_LOG(LOGIDENTIFIER, "Setting remote description to:", remoteDescription.sdp);
     chainOperation(WTFMove(promise), [this, remoteDescription = WTFMove(remoteDescription)](Ref<DeferredPromise>&& promise) mutable {
         auto description = RTCSessionDescription::create(WTFMove(remoteDescription));
         if (description->type() == RTCSdpType::Offer && m_signalingState != RTCSignalingState::Stable && m_signalingState != RTCSignalingState::HaveRemoteOffer) {
@@ -470,7 +470,7 @@ void RTCPeerConnection::addIceCandidate(Candidate&& rtcCandidate, Ref<DeferredPr
         });
     }
 
-    ALWAYS_LOG(LOGIDENTIFIER, "Received ice candidate:\n", candidate ? candidate->candidate() : "null"_s);
+    ALWAYS_LOG(LOGIDENTIFIER, "Received ice candidate:", candidate ? candidate->candidate() : "null"_s);
 
     if (exception) {
         promise->reject(*exception);
@@ -974,7 +974,7 @@ void RTCPeerConnection::scheduleEvent(Ref<Event>&& event)
 
 void RTCPeerConnection::dispatchEvent(Event& event)
 {
-    INFO_LOG(LOGIDENTIFIER, "dispatching '", event.type(), "'");
+    INFO_LOG(LOGIDENTIFIER, makeString("dispatching '"_s, event.type(), '\''));
     EventTarget::dispatchEvent(event);
 }
 

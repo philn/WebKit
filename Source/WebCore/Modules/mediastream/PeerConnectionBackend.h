@@ -40,6 +40,7 @@
 #include "RTCRtpTransceiverDirection.h"
 #include "RTCSessionDescription.h"
 #include "RTCSignalingState.h"
+#include <wtf/FilePrintStream.h>
 #include <wtf/FixedVector.h>
 #include <wtf/LoggerHelper.h>
 #include <wtf/WeakPtr.h>
@@ -89,6 +90,7 @@ class PeerConnectionBackend
     : public CanMakeWeakPtr<PeerConnectionBackend>
 #if !RELEASE_LOG_DISABLED
     , private LoggerHelper
+    , public Logger::Observer
 #endif
 {
 public:
@@ -168,6 +170,8 @@ public:
     uint64_t logIdentifier() const final { return m_logIdentifier; }
     ASCIILiteral logClassName() const override { return "PeerConnectionBackend"_s; }
     WTFLogChannel& logChannel() const final;
+    void didLogMessage(const WTFLogChannel&, WTFLogLevel, Vector<JSONLogValue>&&) final { }
+    bool handleLogMessage(const WTFLogChannel&, WTFLogLevel, Vector<JSONLogValue>&&) final;
 #endif
 
     virtual bool isLocalDescriptionSet() const = 0;
@@ -240,6 +244,18 @@ protected:
 
     void validateSDP(const String&) const;
 
+    bool isJSONLogStreamingEnabled() const { return m_isJSONLogStreamingEnabled; }
+
+    struct MessageLogEvent {
+        String message;
+        std::optional<std::span<const uint8_t>> payload;
+    };
+    using StatsLogEvent = String;
+
+    using LogEvent = std::variant<MessageLogEvent, StatsLogEvent>;
+    String generateJSONLogEvent(uintptr_t, LogEvent&&, bool isForGatherLogs);
+    void emitJSONLogEvent(String&&);
+
 private:
     virtual void doCreateOffer(RTCOfferOptions&&) = 0;
     virtual void doCreateAnswer(RTCAnswerOptions&&) = 0;
@@ -247,6 +263,8 @@ private:
     virtual void doSetRemoteDescription(const RTCSessionDescription&) = 0;
     virtual void doAddIceCandidate(RTCIceCandidate&, AddIceCandidateCallback&&) = 0;
     virtual void doStop() = 0;
+
+    void setJSONLogStreamingEnabled(bool isEnabled) { m_isJSONLogStreamingEnabled = isEnabled; }
 
 protected:
     Ref<RTCPeerConnection> protectedPeerConnection() const;
@@ -264,6 +282,9 @@ private:
 #endif
     bool m_finishedGatheringCandidates { false };
     bool m_isProcessingLocalDescriptionAnswer { false };
+
+    bool m_isJSONLogStreamingEnabled { false };
+    std::unique_ptr<FilePrintStream> m_logFile;
 };
 
 inline PeerConnectionBackend::DescriptionStates PeerConnectionBackend::DescriptionStates::isolatedCopy() &&

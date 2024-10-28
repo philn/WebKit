@@ -1489,7 +1489,7 @@ void RealtimeMediaSource::setLogger(const Logger& newLogger, uint64_t newLogIden
 {
     m_logger = &newLogger;
     m_logIdentifier = newLogIdentifier;
-    ALWAYS_LOG(LOGIDENTIFIER, m_type, ", ", name(), ", ", m_hashedID, ", ", m_ephemeralHashedID);
+    ALWAYS_LOG(LOGIDENTIFIER, makeString(m_type, ", "_s, name(), ", "_s, m_hashedID, ", "_s, m_ephemeralHashedID));
 }
 
 WTFLogChannel& RealtimeMediaSource::logChannel() const
