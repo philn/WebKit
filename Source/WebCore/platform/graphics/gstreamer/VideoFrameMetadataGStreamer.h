@@ -22,11 +22,13 @@
 #if ENABLE(VIDEO) && USE(GSTREAMER)
 
 #include "GRefPtrGStreamer.h"
+#include "VideoFrame.h"
 #include "VideoFrameMetadata.h"
 #include "VideoFrameTimeMetadata.h"
 
-WARN_UNUSED_RETURN GRefPtr<GstBuffer> webkitGstBufferSetVideoFrameTimeMetadata(GRefPtr<GstBuffer>&&, std::optional<WebCore::VideoFrameTimeMetadata>&&);
+WARN_UNUSED_RETURN GRefPtr<GstBuffer> webkitGstBufferSetVideoFrameMetadata(GRefPtr<GstBuffer>&&, std::optional<WebCore::VideoFrameTimeMetadata>&&, WebCore::VideoFrame::Rotation, bool isMirrored);
 void webkitGstTraceProcessingTimeForElement(GstElement*);
 WebCore::VideoFrameMetadata webkitGstBufferGetVideoFrameMetadata(GstBuffer*);
+std::pair<WebCore::VideoFrame::Rotation, bool> webkitGstBufferGetVideoRotation(GstBuffer*);
 
 #endif // ENABLE(VIDEO) && USE(GSTREAMER)
