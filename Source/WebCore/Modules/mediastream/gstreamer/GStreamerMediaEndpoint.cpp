@@ -117,6 +117,42 @@ bool GStreamerMediaEndpoint::initializePipeline()
     // Lower default latency from 200ms to 40ms.
     g_object_set(m_webrtcBin.get(), "latency", 40, nullptr);
 
+    if (g_getenv("WEBKIT_WEBRTC_NETSIM_OPTIONS")) {
+        if (auto factory = adoptGRef(gst_element_factory_find("netsim"))) {
+            g_signal_connect(m_webrtcBin.get(), "deep-element-added", G_CALLBACK(+[](GstBin*, GstBin* bin, GstElement* element, gpointer) {
+                GUniquePtr<char> elementName(gst_element_get_name(element));
+                auto view = StringView::fromLatin1(elementName.get());
+                if (!view.startsWith("nicesrc"_s))
+                    return;
+
+                auto pad = adoptGRef(gst_element_get_static_pad(element, "src"));
+                auto peer = adoptGRef(gst_pad_get_peer(pad.get()));
+                if (UNLIKELY(!peer))
+                    return;
+
+                gst_pad_unlink(pad.get(), peer.get());
+
+                auto netsim = makeGStreamerElement("netsim", nullptr);
+                auto netSimOptions = StringView::fromLatin1(g_getenv("WEBKIT_WEBRTC_NETSIM_OPTIONS"));
+                for (auto it : netSimOptions.split(',')) {
+                    auto option = it.toStringWithoutCopying();
+                    auto keyValue = option.split('=');
+                    if (UNLIKELY(keyValue.size() < 2))
+                        continue;
+                    gst_util_set_object_arg(G_OBJECT(netsim), keyValue[0].ascii().data(), keyValue[1].ascii().data());
+                }
+
+                gst_bin_add(GST_BIN_CAST(bin), netsim);
+                gst_element_link(element, netsim);
+
+                auto srcPad = adoptGRef(gst_element_get_static_pad(netsim, "src"));
+                gst_pad_link(srcPad.get(), peer.get());
+                gst_element_sync_state_with_parent(netsim);
+            }), nullptr);
+        } else
+            WTFLogAlways("WEBKIT_WEBRTC_NETSIM_OPTIONS was set but the GStreamer netsim element is missing.");
+    }
+
     auto rtpBin = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(m_webrtcBin.get()), "rtpbin"));
     if (!rtpBin) {
         GST_ERROR_OBJECT(m_webrtcBin.get(), "rtpbin not found. Please check that your GStreamer installation has the rtp and rtpmanager plugins.");
