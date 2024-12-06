@@ -94,6 +94,55 @@ GStreamerMediaEndpoint::~GStreamerMediaEndpoint()
     teardownPipeline();
 }
 
+GStreamerMediaEndpoint::NetSimOptions GStreamerMediaEndpoint::netSimOptionsFromEnvironment(ASCIILiteral optionsEnvVarName)
+{
+    NetSimOptions options;
+    auto tokens = StringView::fromLatin1(g_getenv(optionsEnvVarName));
+    for (auto it : tokens.split(',')) {
+        auto option = it.toString();
+        auto keyValue = option.split('=');
+        if (UNLIKELY(keyValue.size() < 2))
+            continue;
+        options.add(keyValue[0], keyValue[1]);
+    }
+    return options;
+}
+
+void GStreamerMediaEndpoint::maybeInsertNetSimForElement(GstBin* bin, GstElement* element)
+{
+    bool isSource = GST_OBJECT_FLAG_IS_SET(element, GST_ELEMENT_FLAG_SOURCE);
+    const auto& options = isSource ? m_srcNetSimOptions : m_sinkNetSimOptions;
+    if (options.isEmpty())
+        return;
+
+    // Unlink the element, add a netsim element in bin and link it to the element to simulate varying network conditions.
+    const char* padName = isSource ? "src" : "sink";
+    auto pad = adoptGRef(gst_element_get_static_pad(element, padName));
+    auto peer = adoptGRef(gst_pad_get_peer(pad.get()));
+    if (UNLIKELY(!peer))
+        return;
+
+    gst_pad_unlink(pad.get(), peer.get());
+
+    auto netsim = makeGStreamerElement("netsim", nullptr);
+    gst_bin_add(GST_BIN_CAST(bin), netsim);
+
+    GST_DEBUG_OBJECT(m_pipeline.get(), "Configuring %" GST_PTR_FORMAT " for transport element %" GST_PTR_FORMAT, netsim, element);
+    for (auto& [key, value] : options)
+        gst_util_set_object_arg(G_OBJECT(netsim), key.ascii().data(), value.ascii().data());
+
+    pad = adoptGRef(gst_element_get_static_pad(netsim, padName));
+    if (isSource) {
+        gst_element_link(element, netsim);
+        gst_pad_link(pad.get(), peer.get());
+    } else {
+        gst_pad_link(peer.get(), pad.get());
+        gst_element_link(netsim, element);
+    }
+
+    gst_element_sync_state_with_parent(netsim);
+}
+
 bool GStreamerMediaEndpoint::initializePipeline()
 {
     static uint32_t nPipeline = 0;
@@ -117,6 +166,20 @@ bool GStreamerMediaEndpoint::initializePipeline()
 
     // Lower default latency from 200ms to 40ms.
     g_object_set(m_webrtcBin.get(), "latency", 40, nullptr);
+
+    m_srcNetSimOptions = netSimOptionsFromEnvironment("WEBKIT_WEBRTC_NETSIM_SRC_OPTIONS"_s);
+    m_sinkNetSimOptions = netSimOptionsFromEnvironment("WEBKIT_WEBRTC_NETSIM_SINK_OPTIONS"_s);
+    if (!m_srcNetSimOptions.isEmpty() || !m_sinkNetSimOptions.isEmpty()) {
+        if (auto factory = adoptGRef(gst_element_factory_find("netsim"))) {
+            g_signal_connect_swapped(m_webrtcBin.get(), "deep-element-added", G_CALLBACK(+[](GStreamerMediaEndpoint* self, GstBin* bin, GstElement* element) {
+                GUniquePtr<char> elementName(gst_element_get_name(element));
+                auto view = StringView::fromLatin1(elementName.get());
+                if (view.startsWith("nice"_s))
+                    self->maybeInsertNetSimForElement(bin, element);
+            }), this);
+        } else
+            WTFLogAlways("WEBKIT_WEBRTC_NETSIM_{SRC,SINK}_OPTIONS was/were set but the GStreamer netsim element is missing.");
+    }
 
     auto rtpBin = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(m_webrtcBin.get()), "rtpbin"));
     if (!rtpBin) {
