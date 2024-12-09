@@ -1458,7 +1458,7 @@ ExceptionOr<Ref<SourceBufferPrivate>> MediaSource::createSourceBufferPrivate(con
     RefPtr<SourceBufferPrivate> sourceBufferPrivate;
     MediaSourceConfiguration configuration = {
         DeprecatedGlobalSettings::webMParserEnabled(),
-        context->settingsValues().textTracksInMSEEnabled
+        scriptExecutionContext()->settingsValues().textTracksInMSEEnabled
     };
     switch (msp->addSourceBuffer(type, configuration, sourceBufferPrivate)) {
     case MediaSourcePrivate::AddStatus::Ok:
