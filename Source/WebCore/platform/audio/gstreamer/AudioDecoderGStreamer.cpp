@@ -221,20 +221,27 @@ GStreamerInternalAudioDecoder::GStreamerInternalAudioDecoder(const String& codec
 
     configureAudioDecoderForHarnessing(element);
 
-    GRefPtr<GstElement> harnessedElement;
-    bool isParserRequired = false;
+    bool isParserRequired = true;
     if (element) {
         auto* factory = gst_element_get_factory(element.get());
         isParserRequired = !gst_element_factory_can_sink_all_caps(factory, m_inputCaps.get());
     }
-    if (!g_strcmp0(parser, "rawaudioparse")) {
-        harnessedElement = makeGStreamerElement(parser, nullptr);
-        if (!harnessedElement) {
-            GST_WARNING_OBJECT(element.get(), "Required parser %s not found", parser);
-            m_inputCaps.clear();
-            return;
-        }
-    } else if (parser && isParserRequired) {
+
+    static Atomic<uint64_t> counter = 0;
+    auto binName = makeString("audio-decoder-"_s, element ? span(GST_OBJECT_NAME(element.get())) : StringView::fromLatin1(parser), '-', counter.exchangeAdd(1));
+
+    GRefPtr<GstElement> harnessedElement = gst_bin_new(binName.ascii().data());
+    auto audioconvert = gst_element_factory_make("audioconvert", nullptr);
+    auto outputCapsFilter = gst_element_factory_make("capsfilter", nullptr);
+    auto outputCaps = adoptGRef(gst_caps_new_simple("audio/x-raw", "format", G_TYPE_STRING, "F32LE", nullptr));
+    g_object_set(outputCapsFilter, "caps", outputCaps.get(), nullptr);
+    gst_bin_add_many(GST_BIN_CAST(harnessedElement.get()), audioconvert, outputCapsFilter, nullptr);
+
+    if (element)
+        gst_bin_add(GST_BIN_CAST(harnessedElement.get()), element.get());
+
+    GRefPtr<GstElement> head, tail;
+    if (parser && isParserRequired) {
         // The decoder won't accept the input caps, so put a parser in front.
         auto* parserElement = makeGStreamerElement(parser, nullptr);
         if (!parserElement) {
@@ -242,15 +249,25 @@ GStreamerInternalAudioDecoder::GStreamerInternalAudioDecoder(const String& codec
             m_inputCaps.clear();
             return;
         }
-        harnessedElement = gst_bin_new(nullptr);
-        gst_bin_add_many(GST_BIN_CAST(harnessedElement.get()), parserElement, element.get(), nullptr);
-        gst_element_link(parserElement, element.get());
-        auto sinkPad = adoptGRef(gst_element_get_static_pad(parserElement, "sink"));
-        gst_element_add_pad(harnessedElement.get(), gst_ghost_pad_new("sink", sinkPad.get()));
-        auto srcPad = adoptGRef(gst_element_get_static_pad(element.get(), "src"));
-        gst_element_add_pad(harnessedElement.get(), gst_ghost_pad_new("src", srcPad.get()));
-    } else
-        harnessedElement = WTFMove(element);
+        gst_bin_add(GST_BIN_CAST(harnessedElement.get()), parserElement);
+        if (element) {
+            gst_element_link(parserElement, element.get());
+            tail = element;
+            head = parserElement;
+        } else
+            tail = head = parserElement;
+    } else {
+        RELEASE_ASSERT(element);
+        tail = head = element;
+    }
+
+    gst_element_link_many(tail.get(), audioconvert, outputCapsFilter, nullptr);
+
+    auto pad = adoptGRef(gst_element_get_static_pad(head.get(), "sink"));
+    gst_element_add_pad(harnessedElement.get(), gst_ghost_pad_new("sink", pad.get()));
+
+    pad = adoptGRef(gst_element_get_static_pad(outputCapsFilter, "src"));
+    gst_element_add_pad(harnessedElement.get(), gst_ghost_pad_new("src", pad.get()));
 
     m_harness = GStreamerElementHarness::create(WTFMove(harnessedElement), [weakThis = ThreadSafeWeakPtr { *this }, this](auto&, GRefPtr<GstSample>&& outputSample) {
         RefPtr protectedThis = weakThis.get();
