@@ -219,7 +219,8 @@ GStreamerInternalAudioDecoder::GStreamerInternalAudioDecoder(const String& codec
     } else
         return;
 
-    configureAudioDecoderForHarnessing(element);
+    if (element)
+        configureAudioDecoderForHarnessing(element);
 
     bool isParserRequired = true;
     if (element) {
@@ -249,6 +250,10 @@ GStreamerInternalAudioDecoder::GStreamerInternalAudioDecoder(const String& codec
             m_inputCaps.clear();
             return;
         }
+
+        if (!g_strcmp0(parser, "rawaudioparse"))
+            g_object_set(parserElement, "use-sink-caps", TRUE, nullptr);
+
         gst_bin_add(GST_BIN_CAST(harnessedElement.get()), parserElement);
         if (element) {
             gst_element_link(parserElement, element.get());
