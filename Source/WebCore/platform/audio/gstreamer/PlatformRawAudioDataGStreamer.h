@@ -49,6 +49,8 @@ public:
     GstSample* sample() const { return m_sample.get(); }
     const GstAudioInfo* info() const { return &m_info; }
 
+    bool isInterleaved() const;
+
 private:
     PlatformRawAudioDataGStreamer(GRefPtr<GstSample>&&);
 

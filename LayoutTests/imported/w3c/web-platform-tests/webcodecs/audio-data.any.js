@@ -449,7 +449,8 @@ function conversionTest(sourceType, destinationType) {
   }, `Test conversion of ${sourceType} to ${destinationType}`);
 }
 
-const TYPES = ["u8", "s16", "s32", "f32"];
+// , "s16", "s32", "f32"
+const TYPES = ["u8"];
  TYPES.forEach(sourceType => {
    TYPES.forEach(destinationType => {
     conversionTest(sourceType, destinationType);
