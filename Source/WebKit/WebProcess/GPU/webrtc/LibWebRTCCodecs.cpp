@@ -518,7 +518,8 @@ void LibWebRTCCodecs::completedDecoding(VideoDecoderIdentifier decoderIdentifier
     if (!decoder->decodedImageCallback)
         return;
     auto& frame = remoteVideoFrame.leakRef(); // Balanced by the release callback of videoDecoderTaskComplete.
-    webrtc::videoDecoderTaskComplete(decoder->decodedImageCallback, timeStamp, timeStampNs / 1000, &frame,
+
+    webrtc::videoDecoderTaskComplete(decoder->decodedImageCallback, timeStamp, &frame,
         [](auto* pointer) { return static_cast<RemoteVideoFrameProxy*>(pointer)->pixelBuffer(); },
         [](auto* pointer) { static_cast<RemoteVideoFrameProxy*>(pointer)->deref(); },
         frame.size().width(), frame.size().height());
@@ -548,7 +549,7 @@ void LibWebRTCCodecs::completedDecodingCV(VideoDecoderIdentifier decoderIdentifi
     if (!decoder->decodedImageCallback)
         return;
 
-    webrtc::videoDecoderTaskComplete(decoder->decodedImageCallback, timeStamp, timeStampNs / 1000, pixelBuffer.get());
+    webrtc::videoDecoderTaskComplete(decoder->decodedImageCallback, timeStamp, pixelBuffer.get());
 }
 
 static inline webrtc::VideoCodecType toWebRTCCodecType(WebCore::VideoCodecType type)
