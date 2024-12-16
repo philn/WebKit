@@ -64,7 +64,7 @@ class ObjCVideoDecoder : public VideoDecoder {
               .set_timestamp_ms(0)
               .set_rotation((VideoRotation)frame.rotation)
               .build();
-      videoFrame.set_timestamp(frame.timeStamp);
+      videoFrame.set_timestamp_us(frame.timeStamp);
 
       callback->Decoded(videoFrame);
     }];

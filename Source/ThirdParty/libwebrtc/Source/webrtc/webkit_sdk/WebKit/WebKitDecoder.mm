@@ -217,7 +217,7 @@ void videoDecoderTaskComplete(void* callback, uint32_t timeStamp, uint32_t timeS
         .set_timestamp_ms(0)
         .set_rotation((VideoRotation)RTCVideoRotation_0)
         .build();
-    videoFrame.set_timestamp(timeStamp);
+    videoFrame.set_timestamp_us(timeStamp);
 
     static_cast<DecodedImageCallback*>(callback)->Decoded(videoFrame);
 }
@@ -229,7 +229,7 @@ void videoDecoderTaskComplete(void* callback, uint32_t timeStamp, uint32_t timeS
         .set_timestamp_ms(0)
         .set_rotation((VideoRotation)RTCVideoRotation_0)
         .build();
-    videoFrame.set_timestamp(timeStamp);
+    videoFrame.set_timestamp_us(timeStamp);
 
     static_cast<DecodedImageCallback*>(callback)->Decoded(videoFrame);
 }
