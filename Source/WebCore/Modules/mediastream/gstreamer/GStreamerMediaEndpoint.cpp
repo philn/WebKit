@@ -132,6 +132,8 @@ bool GStreamerMediaEndpoint::initializePipeline()
         // Workaround for https://gitlab.freedesktop.org/gstreamer/gst-plugins-good/-/issues/914
         g_object_set(element, "rtx-next-seqnum", FALSE, nullptr);
 
+        g_object_set(element, "faststart-min-packets", 1, nullptr);
+
         GST_DEBUG_OBJECT(endPoint->pipeline(), "Creating incoming track processor for SSRC %u", ssrc);
         endPoint->m_trackProcessors.ensure(ssrc, [] {
             return GStreamerIncomingTrackProcessor::create();
@@ -641,9 +643,11 @@ void GStreamerMediaEndpoint::doSetLocalDescription(const RTCSessionDescription* 
         }
     }
 
-    if (!m_unlinkedOutgoingSources.isEmpty())
-        GST_WARNING_OBJECT(m_pipeline.get(), "Unlinked outgoing sources lingering");
-    gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
+    if (!m_unlinkedOutgoingSources.isEmpty()) {
+        GST_DEBUG_OBJECT(m_pipeline.get(), "Unlinked outgoing sources lingering");
+        gst_element_set_state(m_pipeline.get(), GST_STATE_PAUSED);
+    } else
+        gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
 
     setDescription(initialDescription.get(), DescriptionType::Local, [protectedThis = Ref(*this), this, initialSDP = WTFMove(initialSDP), remoteDescriptionSdp = WTFMove(remoteDescriptionSdp), remoteDescriptionSdpType = WTFMove(remoteDescriptionSdpType)](const GstSDPMessage& message) {
         if (protectedThis->isStopped())
@@ -849,11 +853,6 @@ void GStreamerMediaEndpoint::setDescription(const RTCSessionDescription* descrip
     data->typeString = WTFMove(typeString);
     data->webrtcBin = m_webrtcBin;
     gst_sdp_message_copy(message.get(), &data->message.outPtr());
-
-#ifndef GST_DISABLE_GST_DEBUG
-    GUniquePtr<char> sdp(gst_sdp_message_as_text(data->message.get()));
-    GST_DEBUG_OBJECT(m_pipeline.get(), "SDP: %s", sdp.get());
-#endif
 
     GUniquePtr<GstWebRTCSessionDescription> sessionDescription(gst_webrtc_session_description_new(type, message.release()));
     g_signal_emit_by_name(m_webrtcBin.get(), signalName.ascii().data(), sessionDescription.get(), gst_promise_new_with_change_func([](GstPromise* rawPromise, gpointer userData) {
@@ -1743,7 +1742,7 @@ GstElement* GStreamerMediaEndpoint::requestAuxiliarySender()
     g_signal_connect(estimator, "notify::estimated-bitrate", G_CALLBACK(+[](GstElement* estimator, GParamSpec*, GStreamerMediaEndpoint* endPoint) {
         uint32_t estimatedBitrate;
         g_object_get(estimator, "estimated-bitrate", &estimatedBitrate, nullptr);
-        gst_element_send_event(endPoint->pipeline(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB, gst_structure_new("encoder-bitrate-change-request", "bitrate", G_TYPE_UINT, static_cast<uint32_t>(estimatedBitrate / 1000), nullptr)));
+        // gst_element_send_event(endPoint->pipeline(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB, gst_structure_new("encoder-bitrate-change-request", "bitrate", G_TYPE_UINT, static_cast<uint32_t>(estimatedBitrate / 1000), nullptr)));
     }), this);
 
     return estimator;
