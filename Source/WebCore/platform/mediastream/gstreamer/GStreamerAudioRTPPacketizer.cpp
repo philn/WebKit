@@ -75,7 +75,8 @@ RefPtr<GStreamerAudioRTPPacketizer> GStreamerAudioRTPPacketizer::create(RefPtr<U
 
         // FIXME: Enable dtx too?
         gst_util_set_object_arg(G_OBJECT(encoder.get()), "audio-type", "voice");
-        g_object_set(encoder.get(), "perfect-timestamp", TRUE, nullptr);
+        g_object_set(encoder.get(), "dtx", TRUE, nullptr);
+        // g_object_set(encoder.get(), "perfect-timestamp", TRUE, nullptr);
 
         if (auto useInbandFec = gstStructureGetString(structure.get(), "useinbandfec"_s)) {
             if (useInbandFec == "1"_s)
