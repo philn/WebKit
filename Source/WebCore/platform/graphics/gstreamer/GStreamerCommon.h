@@ -306,6 +306,8 @@ void fillVideoInfoColorimetryFromColorSpace(GstVideoInfo*, const PlatformVideoCo
 void configureAudioDecoderForHarnessing(const GRefPtr<GstElement>&);
 void configureVideoDecoderForHarnessing(const GRefPtr<GstElement>&);
 
+void configureMediaStreamAudioDecoder(GstElement*);
+
 void configureMediaStreamVideoDecoder(GstElement*);
 void configureVideoRTPDepayloader(GstElement*);
 
