@@ -730,7 +730,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
     Encoders::registerEncoder(X264, "x264enc"_s, "h264parse"_s, "video/x-h264"_s,
         "video/x-h264,alignment=au,stream-format=avc"_s,
         [](WebKitVideoEncoder* self) {
-            g_object_set(self->priv->encoder.get(), "key-int-max", 15, "threads", NUMBER_OF_THREADS, "b-adapt", FALSE, "vbv-buf-capacity", 120, nullptr);
+            g_object_set(self->priv->encoder.get(), "key-int-max", 120, "threads", NUMBER_OF_THREADS, "b-adapt", FALSE, "vbv-buf-capacity", 120, nullptr);
             g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
 
             const auto& encodedCaps = self->priv->encodedCaps;
@@ -746,10 +746,10 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
         }, "bitrate"_s, setBitrateKbitPerSec, "key-int-max"_s, [](GstElement* encoder, BitrateMode mode) {
             switch (mode) {
             case CONSTANT_BITRATE_MODE:
-                gst_util_set_object_arg(G_OBJECT(encoder), "pass", "cbr");
+                //gst_util_set_object_arg(G_OBJECT(encoder), "pass", "cbr");
                 break;
             case VARIABLE_BITRATE_MODE:
-                gst_util_set_object_arg(G_OBJECT(encoder), "pass", "pass1");
+                //gst_util_set_object_arg(G_OBJECT(encoder), "pass", "pass1");
                 break;
             };
         }, [](GstElement* encoder, LatencyMode mode) {
@@ -768,6 +768,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
     Encoders::registerEncoder(OpenH264, "openh264enc"_s, "h264parse"_s, "video/x-h264"_s,
         "video/x-h264,alignment=au,stream-format=avc"_s,
         [](WebKitVideoEncoder* self) {
+            g_object_set(self->priv->encoder.get(), "rate-control", 1, "complexity", 0, "background-detection", FALSE, "scene-change-detection", FALSE, nullptr);
             g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
             g_object_set(self->priv->outputCapsFilter.get(), "caps", self->priv->encodedCaps.get(), nullptr);
         }, "bitrate"_s, setBitrateBitPerSec, "gop-size"_s, [](GstElement*, BitrateMode) {
@@ -1030,7 +1031,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
                 options = "vbv-maxrate=0:vbv-bufsize=0"_s;
                 break;
             };
-            g_object_set(object, "option-string", options.ascii().data(), nullptr);
+            //g_object_set(object, "option-string", options.ascii().data(), nullptr);
         }, "key-int-max"_s, [](GstElement* encoder, BitrateMode mode) {
             g_object_set_qdata(G_OBJECT(encoder), x265BitrateQuark, GINT_TO_POINTER(mode));
         }, [](GstElement* encoder, LatencyMode mode) {
