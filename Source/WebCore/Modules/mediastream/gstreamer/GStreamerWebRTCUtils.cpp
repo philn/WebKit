@@ -611,8 +611,11 @@ GRefPtr<GstCaps> capsFromRtpCapabilities(const RTCRtpCapabilities& capabilities,
 
         if (!codec.sdpFmtpLine.isEmpty()) {
             for (auto& fmtp : codec.sdpFmtpLine.split(';')) {
-                auto fieldAndValue = fmtp.split('=');
-                gst_structure_set(codecStructure, fieldAndValue[0].ascii().data(), G_TYPE_STRING, fieldAndValue[1].ascii().data(), nullptr);
+                if (fmtp.contains('=')) {
+                    auto fieldAndValue = fmtp.split('=');
+                    gst_structure_set(codecStructure, fieldAndValue[0].ascii().data(), G_TYPE_STRING, fieldAndValue[1].ascii().data(), nullptr);
+                } else
+                    gst_structure_set(codecStructure, fmtp.ascii().data(), G_TYPE_STRING, "1", nullptr);
             }
         }
 

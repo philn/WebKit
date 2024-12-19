@@ -1064,8 +1064,10 @@ void GStreamerRegistryScanner::fillAudioRtpCapabilities(Configuration configurat
     }
 
     auto factories = ElementFactories({ codecElement, rtpElement });
-    if (factories.hasElementForMediaType(codecElement, "audio/x-opus"_s) && factories.hasElementForMediaType(rtpElement, "audio/x-opus"_s))
+    if (factories.hasElementForMediaType(codecElement, "audio/x-opus"_s) && factories.hasElementForMediaType(rtpElement, "audio/x-opus"_s)) {
         capabilities.codecs.append({ .mimeType = "audio/opus"_s, .clockRate = 48000, .channels = 2, .sdpFmtpLine = "minptime=10;useinbandfec=1"_s });
+        capabilities.codecs.append({ .mimeType = "audio/RED"_s, .clockRate = 48000, .channels = 2, .sdpFmtpLine = "111/111"_s });
+    }
 
     if (factories.hasElementForMediaType(codecElement, "audio/G722"_s) && factories.hasElementForMediaType(rtpElement, "audio/G722"_s))
         capabilities.codecs.append({ .mimeType = "audio/G722"_s, .clockRate = 8000, .channels = 1, .sdpFmtpLine = emptyString() });
