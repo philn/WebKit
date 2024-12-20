@@ -692,8 +692,8 @@ GRefPtr<GstCaps> capsFromSDPMedia(const GstSDPMedia* media)
 
             // Remove attributes unrelated with codec preferences, potentially leading to internal
             // webrtcbin confusions such as duplicated RTP direction attributes for instance.
-            gst_structure_remove_fields(structure, "a-setup", "a-ice-ufrag", "a-ice-pwd", "a-sendrecv", "a-inactive",
-                "a-sendonly", "a-recvonly", "a-end-of-candidates", nullptr);
+            // gst_structure_remove_fields(structure, "a-setup", "a-ice-ufrag", "a-ice-pwd", "a-sendrecv", "a-inactive",
+            //     "a-sendonly", "a-recvonly", "a-end-of-candidates", nullptr);
 
             if (auto name = gstStructureGetString(structure, "encoding-name"_s)) {
                 auto encodingName = name.convertToASCIIUppercase();
@@ -701,10 +701,10 @@ GRefPtr<GstCaps> capsFromSDPMedia(const GstSDPMedia* media)
             }
 
             // Remove ssrc- attributes that end up being accumulated in fmtp SDP media parameters.
-            gstStructureFilterAndMapInPlace(structure, [&](auto id, auto) -> bool {
-                auto fieldId = gstIdToString(id);
-                return !fieldId.startsWith("ssrc-"_s);
-            });
+            // gstStructureFilterAndMapInPlace(structure, [&](auto id, auto) -> bool {
+            //     auto fieldId = gstIdToString(id);
+            //     return !fieldId.startsWith("ssrc-"_s);
+            // });
             // Align with caps from RealtimeOutgoingAudioSourceGStreamer
             setSsrcAudioLevelVadOn(structure);
         }

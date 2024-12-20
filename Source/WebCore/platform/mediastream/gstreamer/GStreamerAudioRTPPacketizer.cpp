@@ -61,9 +61,21 @@ RefPtr<GStreamerAudioRTPPacketizer> GStreamerAudioRTPPacketizer::create(RefPtr<U
     auto inputCaps = adoptGRef(gst_caps_new_any());
     GUniquePtr<GstStructure> structure(gst_structure_copy(codecParameters));
 
-    auto ssrc = ssrcGenerator->generateSSRC();
-    if (ssrc != std::numeric_limits<uint32_t>::max())
-        gst_structure_set(structure.get(), "ssrc", G_TYPE_UINT, ssrc, nullptr);
+    // auto ssrc = ssrcGenerator->generateSSRC();
+    // if (ssrc != std::numeric_limits<uint32_t>::max()) {
+    //     gst_structure_set(structure.get(), "ssrc", G_TYPE_UINT, ssrc, nullptr);
+    //     g_object_set(payloader.get(), "ssrc", ssrc, nullptr);
+    // }
+    if (auto ssrcGroup = gstStructureGetString(codecParameters, "a-ssrc-group"_s)) {
+        // FID ssrc rtxssrc
+        const auto group = ssrcGroup.toStringWithoutCopying();
+        auto tokens = group.split(' ');
+        if (auto ssrc = parseIntegerAllowingTrailingJunk<uint32_t>(tokens[1])) {
+            g_object_set(payloader.get(), "ssrc", *ssrc, nullptr);
+            gst_structure_set(structure.get(), "ssrc", G_TYPE_UINT, *ssrc, nullptr);
+            gst_printerrln("-->>> audio ssrc: %u", *ssrc);
+        }
+    }
 
     GRefPtr<GstElement> encoder;
     if (encoding == "opus"_s) {

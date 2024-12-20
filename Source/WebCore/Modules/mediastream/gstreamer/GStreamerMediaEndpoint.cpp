@@ -1409,12 +1409,16 @@ ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::createTran
 
     int payloadType = pickAvailablePayloadType();
     auto msid = !mediaStreamId.isEmpty() && !trackId.isEmpty() ? makeString(mediaStreamId, ' ', trackId) : emptyString();
-    auto caps = capsFromRtpCapabilities({ .codecs = codecs, .headerExtensions = rtpExtensions }, [&payloadType, &msid](GstStructure* structure) {
+    auto caps = capsFromRtpCapabilities({ .codecs = codecs, .headerExtensions = rtpExtensions }, [this, &payloadType, &msid](GstStructure* structure) {
         if (!gst_structure_has_field(structure, "payload"))
             gst_structure_set(structure, "payload", G_TYPE_INT, payloadType++, nullptr);
-        if (msid.isEmpty())
-            return;
-        gst_structure_set(structure, "a-msid", G_TYPE_STRING, msid.utf8().data(), nullptr);
+        if (!msid.isEmpty())
+            gst_structure_set(structure, "a-msid", G_TYPE_STRING, msid.utf8().data(), nullptr);
+
+        auto ssrc = m_ssrcGenerator->generateSSRC();
+        if (ssrc != std::numeric_limits<uint32_t>::max()) {
+            gst_structure_set(structure, "ssrc", G_TYPE_UINT, ssrc, nullptr);
+        }
     });
 
 #ifndef GST_DISABLE_GST_DEBUG

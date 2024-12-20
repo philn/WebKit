@@ -126,11 +126,26 @@ RefPtr<GStreamerVideoRTPPacketizer> GStreamerVideoRTPPacketizer::create(RefPtr<U
         return nullptr;
     }
 
+    g_object_set(encoder.get(), "keyframe-interval", 256, nullptr);
+
     GUniquePtr<GstStructure> structure(gst_structure_copy(codecParameters));
 
-    auto ssrc = ssrcGenerator->generateSSRC();
-    if (ssrc != std::numeric_limits<uint32_t>::max())
-        gst_structure_set(structure.get(), "ssrc", G_TYPE_UINT, ssrc, nullptr);
+    // auto ssrc = ssrcGenerator->generateSSRC();
+    // if (ssrc != std::numeric_limits<uint32_t>::max()) {
+    //     gst_structure_set(structure.get(), "ssrc", G_TYPE_UINT, ssrc, nullptr);
+    //     g_object_set(payloader.get(), "ssrc", ssrc, nullptr);
+    // }
+
+    if (auto ssrcGroup = gstStructureGetString(codecParameters, "a-ssrc-group"_s)) {
+        // FID ssrc rtxssrc
+        const auto group = ssrcGroup.toStringWithoutCopying();
+        auto tokens = group.split(' ');
+        if (auto ssrc = parseIntegerAllowingTrailingJunk<uint32_t>(tokens[1])) {
+            g_object_set(payloader.get(), "ssrc", *ssrc, nullptr);
+            gst_structure_set(structure.get(), "ssrc", G_TYPE_UINT, *ssrc, nullptr);
+            gst_printerrln("-->>> video ssrc: %u", *ssrc);
+        }
+    }
 
     auto rtpCaps = adoptGRef(gst_caps_new_empty());
     gst_caps_append_structure(rtpCaps.get(), structure.release());
