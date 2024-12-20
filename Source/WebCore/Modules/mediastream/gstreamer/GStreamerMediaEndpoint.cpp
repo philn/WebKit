@@ -749,6 +749,11 @@ void GStreamerMediaEndpoint::doSetRemoteDescription(const RTCSessionDescription&
 
         GST_DEBUG_OBJECT(m_pipeline.get(), "Acking remote description");
         auto descriptions = descriptionsFromWebRTCBin(m_webrtcBin.get(), GatherSignalingState::Yes);
+        if (descriptions) {
+            // phil
+            // GUniquePtr<char> sdpString(gst_sdp_message_as_text());
+            GST_DEBUG_OBJECT(m_pipeline.get(), "philSDP: %s", descriptions->currentRemoteDescriptionSdp.utf8().data());
+        }
 
         // The initial description we pass to webrtcbin might actually be invalid or empty SDP, so
         // what we would get in return is an empty SDP message, without media line. When this
