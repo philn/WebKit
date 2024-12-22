@@ -148,7 +148,7 @@ private:
     void prepareDataChannel(GstWebRTCDataChannel*, gboolean isLocal);
     void onDataChannel(GstWebRTCDataChannel*);
 
-    WARN_UNUSED_RETURN GstElement* requestAuxiliarySender();
+    WARN_UNUSED_RETURN GstElement* requestAuxiliarySender(GRefPtr<GstWebRTCDTLSTransport>&&);
 
     MediaStream& mediaStreamFromRTCStream(String mediaStreamId);
 

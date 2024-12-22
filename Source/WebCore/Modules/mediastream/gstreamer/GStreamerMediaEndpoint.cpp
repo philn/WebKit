@@ -242,11 +242,9 @@ bool GStreamerMediaEndpoint::initializePipeline()
             endPoint->prepareDataChannel(channel, isLocal);
         }), this);
 
-        g_signal_connect_swapped(m_webrtcBin.get(), "request-aux-sender", G_CALLBACK(+[](GStreamerMediaEndpoint* endPoint, GstWebRTCDTLSTransport*) -> GstElement* {
+        g_signal_connect_swapped(m_webrtcBin.get(), "request-aux-sender", G_CALLBACK(+[](GStreamerMediaEndpoint* endPoint, GstWebRTCDTLSTransport* transport) -> GstElement* {
             // `sender` ownership is transferred to the signal caller.
-            if (auto sender = endPoint->requestAuxiliarySender())
-                return sender;
-            return nullptr;
+            return endPoint->requestAuxiliarySender(GRefPtr(transport));
         }), this);
     }
 
@@ -1790,7 +1788,13 @@ void GStreamerMediaEndpoint::onDataChannel(GstWebRTCDataChannel* dataChannel)
     });
 }
 
-GstElement* GStreamerMediaEndpoint::requestAuxiliarySender()
+struct AuxiliarySenderDataHolder {
+    ThreadSafeWeakPtr<GStreamerMediaEndpoint> endPoint;
+    GRefPtr<GstWebRTCDTLSTransport> transport;
+};
+WEBKIT_DEFINE_ASYNC_DATA_STRUCT(AuxiliarySenderDataHolder)
+
+GstElement* GStreamerMediaEndpoint::requestAuxiliarySender(GRefPtr<GstWebRTCDTLSTransport>&& transport)
 {
     // Don't use makeGStreamerElement() here because it would be called mutiple times and emit an
     // error every single time if the element is not found.
@@ -1803,11 +1807,23 @@ GstElement* GStreamerMediaEndpoint::requestAuxiliarySender()
         return nullptr;
     }
 
-    g_signal_connect(estimator, "notify::estimated-bitrate", G_CALLBACK(+[](GstElement* estimator, GParamSpec*, GStreamerMediaEndpoint* endPoint) {
+    auto holder = createAuxiliarySenderDataHolder();
+    holder->endPoint = this;
+    holder->transport = WTFMove(transport);
+
+    g_signal_connect_data(estimator, "notify::estimated-bitrate", G_CALLBACK(+[](GstElement* estimator, GParamSpec*, gpointer userData) {
+        auto holder = static_cast<AuxiliarySenderDataHolder*>(userData);
+        RefPtr endPoint = holder->endPoint.get();
+        if (!endPoint)
+            return;
+
         uint32_t estimatedBitrate;
         g_object_get(estimator, "estimated-bitrate", &estimatedBitrate, nullptr);
-        gst_element_send_event(endPoint->pipeline(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB, gst_structure_new("encoder-bitrate-change-request", "bitrate", G_TYPE_UINT, static_cast<uint32_t>(estimatedBitrate / 1000), nullptr)));
-    }), this);
+
+        endPoint->m_peerConnectionBackend.dispatchSenderBitrateRequest(holder->transport, estimatedBitrate);
+    }), holder, reinterpret_cast<GClosureNotify>(+[](gpointer data, GClosure*) {
+        destroyAuxiliarySenderDataHolder(static_cast<AuxiliarySenderDataHolder*>(data));
+    }), static_cast<GConnectFlags>(0));
 
     return estimator;
 }
