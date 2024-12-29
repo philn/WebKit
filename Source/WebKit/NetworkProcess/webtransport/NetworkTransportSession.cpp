@@ -38,7 +38,7 @@ namespace WebKit {
 
 WTF_MAKE_TZONE_ALLOCATED_IMPL(NetworkTransportSession);
 
-#if !PLATFORM(COCOA)
+#if !PLATFORM(COCOA) && !USE(QUINN)
 void NetworkTransportSession::initialize(NetworkConnectionToWebProcess&, URL&&, WebKit::WebPageProxyIdentifier&&, WebCore::ClientOrigin&&, CompletionHandler<void(RefPtr<NetworkTransportSession>&&)>&& completionHandler)
 {
     completionHandler(nullptr);
@@ -57,7 +57,7 @@ uint64_t NetworkTransportSession::messageSenderDestinationID() const
     return identifier().toUInt64();
 }
 
-#if !PLATFORM(COCOA)
+#if !PLATFORM(COCOA) && !USE(QUINN)
 void NetworkTransportSession::sendDatagram(std::span<const uint8_t>, CompletionHandler<void(std::optional<WebCore::Exception>&&)>&& completionHandler)
 {
     completionHandler(std::nullopt);
@@ -72,7 +72,7 @@ void NetworkTransportSession::streamSendBytes(WebCore::WebTransportStreamIdentif
         completionHandler(WebCore::Exception { WebCore::ExceptionCode::InvalidStateError });
 }
 
-#if !PLATFORM(COCOA)
+#if !PLATFORM(COCOA) && !USE(QUINN)
 void NetworkTransportSession::createOutgoingUnidirectionalStream(CompletionHandler<void(std::optional<WebCore::WebTransportStreamIdentifier>)>&& completionHandler)
 {
     completionHandler(std::nullopt);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 Apple Inc. All rights reserved.
+ * Copyright (C) 2025 Igalia S.L.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,40 +24,37 @@
  */
 
 #include "config.h"
-#include "NetworkTransportStream.h"
+#include "NetworkTransportSession.h"
 
-#include <WebCore/Exception.h>
+#if USE(QUINN)
+
+#include "webkit-web-transport/src/lib.rs.h"
+#include "rust/cxx.h"
 #include <wtf/CompletionHandler.h>
-#include <wtf/TZoneMallocInlines.h>
 
 namespace WebKit {
 
-WTF_MAKE_TZONE_ALLOCATED_IMPL(NetworkTransportStream);
-
-#if !PLATFORM(COCOA) && !USE(QUINN)
-NetworkTransportStream::NetworkTransportStream()
-    : m_identifier(WebCore::WebTransportStreamIdentifier::generate())
-    , m_streamType(NetworkTransportStreamType::Bidirectional)
-    , m_streamState(NetworkTransportStreamState::Ready)
+void NetworkTransportSession::initialize(NetworkConnectionToWebProcess& connectionToWebProcess, URL&& url, WebKit::WebPageProxyIdentifier&& pageID, WebCore::ClientOrigin&& clientOrigin, CompletionHandler<void(RefPtr<NetworkTransportSession>&&)>&& completionHandler)
 {
+    auto endPoint = org::webkit::create_endpoint();
+    completionHandler(nullptr);
 }
 
-void NetworkTransportStream::sendBytes(std::span<const uint8_t>, bool, CompletionHandler<void(std::optional<WebCore::Exception>&&)>&& completionHandler)
+void NetworkTransportSession::sendDatagram(std::span<const uint8_t>, CompletionHandler<void(std::optional<WebCore::Exception>&&)>&& completionHandler)
+{
+    completionHandler();
+}
+
+void NetworkTransportSession::createOutgoingUnidirectionalStream(CompletionHandler<void(std::optional<WebTransportStreamIdentifier>)>&& completionHandler)
 {
     completionHandler(std::nullopt);
 }
 
-void NetworkTransportStream::cancelReceive(std::optional<WebCore::WebTransportStreamErrorCode>)
+void NetworkTransportSession::createBidirectionalStream(CompletionHandler<void(std::optional<WebTransportStreamIdentifier>)>&& completionHandler)
 {
+    completionHandler(std::nullopt);
 }
 
-void NetworkTransportStream::cancelSend(std::optional<WebCore::WebTransportStreamErrorCode>)
-{
-}
+} // namespace WebKit
 
-void NetworkTransportStream::cancel(std::optional<WebCore::WebTransportStreamErrorCode>)
-{
-}
-#endif
-
-}
+#endif // USE(QUINN)

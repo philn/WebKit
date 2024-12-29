@@ -376,6 +376,25 @@ if (ENABLE_MEDIA_STREAM)
     )
 endif ()
 
+if (USE_QUINN)
+  include(FetchContent)
+
+  FetchContent_Declare(
+    Corrosion
+    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+    GIT_TAG v0.5 # Optionally specify a commit hash, version tag or branch here
+  )
+  FetchContent_MakeAvailable(Corrosion)
+
+  add_library_rust(PATH ../ThirdParty/webkit-web-transport NAMESPACE my)
+  list(APPEND WebKit_LIBRARIES my::webkit-web-transport)
+
+  list(APPEND WebKit_SOURCES
+    NetworkProcess/webtransport/quinn/NetworkTransportSessionQuinn.cpp
+    NetworkProcess/webtransport/quinn/NetworkTransportStreamQuinn.cpp
+  )
+endif ()
+
 if (GI_VERSION VERSION_GREATER_EQUAL 1.79.2)
     set(USE_GI_FINISH_FUNC_ANNOTATION 1)
 else ()
