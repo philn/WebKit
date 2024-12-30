@@ -28,16 +28,34 @@
 
 #if USE(QUINN)
 
-#include "webkit-web-transport/src/lib.rs.h"
+#include "CoroutineUtilities.h"
+#include "NetworkConnectionToWebProcess.h"
+#include "NetworkTransportStream.h"
 #include "rust/cxx.h"
+#include "webkit-web-transport/src/lib.rs.h"
 #include <wtf/CompletionHandler.h>
 
 namespace WebKit {
 
 void NetworkTransportSession::initialize(NetworkConnectionToWebProcess& connectionToWebProcess, URL&& url, WebKit::WebPageProxyIdentifier&& pageID, WebCore::ClientOrigin&& clientOrigin, CompletionHandler<void(RefPtr<NetworkTransportSession>&&)>&& completionHandler)
 {
-    auto endPoint = org::webkit::create_endpoint();
-    completionHandler(nullptr);
+
+    auto client = org::webkit::create_client();
+    client->create_session(url.string().utf8().data(), WTFMove(completionHandler));
+    // callCoroutine([url = WTFMove(url), connectionToWebProcess = Ref { connectionToWebProcess }, completionHandler = WTFMove(completionHandler)]() mutable -> Lazy<void> {
+    //     try {
+    //         auto session = client->create_session(url.string().utf8().data());
+    //         completionHandler(NetworkTransportSession::create(connectionToWebProcess, WTFMove(session)));
+    //     } catch (rust::cxxbridge1::Error exception) {
+    //         completionHandler(nullptr);
+    //     }
+    // });
+}
+
+NetworkTransportSession::NetworkTransportSession(NetworkConnectionToWebProcess&, rust::Box<org::webkit::WKQuinnSession>&& session)
+    : m_session(WTFMove(session))
+{
+
 }
 
 void NetworkTransportSession::sendDatagram(std::span<const uint8_t>, CompletionHandler<void(std::optional<WebCore::Exception>&&)>&& completionHandler)

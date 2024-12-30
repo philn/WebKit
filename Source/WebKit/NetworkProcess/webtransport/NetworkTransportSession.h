@@ -38,6 +38,11 @@
 #include <wtf/RetainPtr.h>
 #endif
 
+#if USE(QUINN)
+#include "rust/cxx.h"
+#include "webkit-web-transport/src/lib.rs.h"
+#endif
+
 namespace WebCore {
 class Exception;
 struct ClientOrigin;
@@ -92,6 +97,9 @@ private:
 #if PLATFORM(COCOA)
     NetworkTransportSession(NetworkConnectionToWebProcess&, nw_connection_group_t, nw_endpoint_t);
 #endif
+#if USE(QUINN)
+    NetworkTransportSession(NetworkConnectionToWebProcess&, rust::Box<org::webkit::WKQuinnSession>&&);
+#endif
 
     IPC::Connection* messageSenderConnection() const final;
     uint64_t messageSenderDestinationID() const final;
@@ -107,6 +115,9 @@ private:
     const RetainPtr<nw_connection_group_t> m_connectionGroup;
     const RetainPtr<nw_endpoint_t> m_endpoint;
     RetainPtr<nw_connection_t> m_datagramConnection;
+#endif
+#if USE(QUINN)
+    rust::Box<org::webkit::WKQuinnSession> m_session;
 #endif
 };
 
