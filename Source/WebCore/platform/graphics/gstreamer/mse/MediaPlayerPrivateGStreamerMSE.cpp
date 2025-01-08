@@ -405,7 +405,10 @@ void MediaPlayerPrivateGStreamerMSE::sourceSetup(GstElement* sourceElement)
 
     if (m_mediaSourcePrivate && m_mediaSourcePrivate->hasAllTracks()) {
         m_tracks = filterOutRepeatingTracks(m_tracks);
-        webKitMediaSrcEmitStreams(WEBKIT_MEDIA_SRC(m_source.get()), m_tracks);
+        auto source = WEBKIT_MEDIA_SRC(m_source.get());
+        gst_printerrln("%s", __PRETTY_FUNCTION__);
+        webKitMediaSrcSetTracks(source, m_tracks);
+        // webKitMediaSrcEmitStreams(source);
     }
 }
 
@@ -493,7 +496,10 @@ void MediaPlayerPrivateGStreamerMSE::setInitialVideoSize(const FloatSize& videoS
 void MediaPlayerPrivateGStreamerMSE::startSource(const Vector<RefPtr<MediaSourceTrackGStreamer>>& tracks)
 {
     m_tracks = filterOutRepeatingTracks(tracks);
-    webKitMediaSrcEmitStreams(WEBKIT_MEDIA_SRC(m_source.get()), m_tracks);
+    auto source = WEBKIT_MEDIA_SRC(m_source.get());
+    gst_printerrln("%s", __PRETTY_FUNCTION__);
+    webKitMediaSrcSetTracks(source, m_tracks);
+    // webKitMediaSrcEmitStreams(source);
 }
 
 void MediaPlayerPrivateGStreamerMSE::setEosWithNoBuffers(bool eosWithNoBuffers)

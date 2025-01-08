@@ -73,6 +73,8 @@ struct WebKitMediaSrcPrivate {
         return stream;
     }
 
+    bool asyncPending { false };
+
     // Used for stream-start events, shared by all streams.
     const unsigned groupId { gst_util_group_id_next() };
 
@@ -88,6 +90,8 @@ struct WebKitMediaSrcPrivate {
     GUniquePtr<char> uri;
 
     ThreadSafeWeakPtr<MediaPlayerPrivateGStreamerMSE> player;
+
+    Vector<RefPtr<WebCore::MediaSourceTrackGStreamer>> tracks;
 };
 
 static void webKitMediaSrcUriHandlerInit(gpointer, gpointer);
@@ -248,6 +252,23 @@ static const char* streamTypeToString(TrackPrivateBaseGStreamer::TrackType type)
 }
 #endif // GST_DISABLE_GST_DEBUG
 
+static void doAsyncStart(WebKitMediaSrc* src)
+{
+    // phil
+    GST_DEBUG_OBJECT(src, "Posting ASYNC_START message");
+    src->priv->asyncPending = true;
+    gst_element_post_message(GST_ELEMENT_CAST(src), gst_message_new_async_start(GST_OBJECT_CAST(src)));
+}
+
+static void doAsyncDone(WebKitMediaSrc* src)
+{
+    if (!src->priv->asyncPending)
+        return;
+    GST_DEBUG_OBJECT(src, "Posting ASYNC_DONE message");
+    gst_element_post_message(GST_ELEMENT_CAST(src), gst_message_new_async_done(GST_OBJECT_CAST(src), GST_CLOCK_TIME_NONE));
+    src->priv->asyncPending = false;
+}
+
 static gboolean webKitMediaSrcQuery(GstElement* element, GstQuery* query)
 {
 #if GST_CHECK_VERSION(1, 22, 0)
@@ -312,14 +333,19 @@ static void webKitMediaSrcConstructed(GObject* object)
     GST_OBJECT_FLAG_SET(object, GST_ELEMENT_FLAG_SOURCE);
 }
 
-void webKitMediaSrcEmitStreams(WebKitMediaSrc* source, const Vector<RefPtr<MediaSourceTrackGStreamer>>& tracks)
+static void webKitMediaSrcEmitStreams(WebKitMediaSrc* source)
 {
     ASSERT(isMainThread());
     ASSERT(!source->priv->isStarted());
+    if (source->priv->tracks.isEmpty())
+        return;
+
+    doAsyncDone(WEBKIT_MEDIA_SRC(source));
+
     GST_DEBUG_OBJECT(source, "Emitting STREAM_COLLECTION");
 
     source->priv->collection = adoptGRef(gst_stream_collection_new("WebKitMediaSrc"));
-    for (const auto& track : tracks) {
+    for (const auto& track : source->priv->tracks) {
 #ifndef GST_DISABLE_GST_DEBUG
         GST_DEBUG_OBJECT(source, "Adding stream with trackId '%" PRIu64 "' of type %s with caps %" GST_PTR_FORMAT, track->id(), streamTypeToString(track->type()), track->initialCaps().get());
 #endif // GST_DISABLE_GST_DEBUG
@@ -369,6 +395,14 @@ void webKitMediaSrcEmitStreams(WebKitMediaSrc* source, const Vector<RefPtr<Media
     GST_DEBUG_OBJECT(source, "All pads added");
 }
 
+void webKitMediaSrcSetTracks(WebKitMediaSrc* source, const Vector<RefPtr<WebCore::MediaSourceTrackGStreamer>>& tracks)
+{
+    source->priv->tracks = tracks;
+    GST_DEBUG_OBJECT(source, "Will emit stream collection containing %zu tracks", tracks.size());
+    if (GST_STATE(GST_ELEMENT_CAST(source)) >= GST_STATE_READY)
+        webKitMediaSrcEmitStreams(source);
+}
+
 static RefPtr<MediaPlayerPrivateGStreamerMSE> webKitMediaSrcPlayer(WebKitMediaSrc* source)
 {
     return source->priv->player.get();
@@ -398,17 +432,24 @@ static void webKitMediaSrcTearDownStream(WebKitMediaSrc* source, TrackID id)
     source->priv->streams.remove(id);
 }
 
-static gboolean webKitMediaSrcActivateMode(GstPad* pad, [[maybe_unused]] GstObject* source, GstPadMode mode, gboolean active)
+static gboolean webKitMediaSrcActivateMode(GstPad* pad, GstObject* source, GstPadMode mode, gboolean active)
 {
     if (mode != GST_PAD_MODE_PUSH) {
         GST_ERROR_OBJECT(source, "Unexpected pad mode in WebKitMediaSrc");
         return false;
     }
 
-    if (active)
+    RefPtr<Stream> stream(WEBKIT_MEDIA_SRC_PAD(pad)->priv->stream.get());
+    if (active) {
+        if (!stream)
+            return false;
+        {
+            DataMutexLocker streamingMembers { stream->streamingMembersDataMutex };
+            streamingMembers->wasStreamStartSent = false;
+        }
+
         gst_pad_start_task(pad, webKitMediaSrcLoop, pad, nullptr);
-    else {
-        RefPtr<Stream> stream(WEBKIT_MEDIA_SRC_PAD(pad)->priv->stream.get());
+    } else {
         if (!stream)
             return false;
 
@@ -475,7 +516,7 @@ static void webKitMediaSrcLoop(void* userData)
 
     // Since the pad can and will be added when the element is in PLAYING state, this task can start running
     // before the pad is linked. Wait for the pad to be linked to avoid buffers being lost to not-linked errors.
-    webKitMediaSrcWaitForPadLinkedOrFlush(pad, streamingMembers);
+    //webKitMediaSrcWaitForPadLinkedOrFlush(pad, streamingMembers);
     if (streamingMembers->isFlushing) {
         gst_pad_pause_task(pad);
         return;
@@ -500,6 +541,7 @@ static void webKitMediaSrcLoop(void* userData)
         ASSERT(wasStreamCollectionSent);
     }
 
+    gst_printerrln("wasStreamStartSent -> %d pad %" GST_PTR_FORMAT, streamingMembers->wasStreamStartSent, pad);
     if (!streamingMembers->wasStreamStartSent) {
         GUniquePtr<char> streamId { g_strdup_printf("mse/%" PRIu64 "", stream->track->id()) };
         GRefPtr<GstEvent> event = adoptGRef(gst_event_new_stream_start(streamId.get()));
@@ -736,9 +778,11 @@ static void webKitMediaSrcStreamFlush(Stream* stream, bool isSeekingFlush)
         {
             DataMutexLocker streamingMembers { stream->streamingMembersDataMutex };
             streamingMembers->hasPoppedFirstObject = false;
+            streamingMembers->wasStreamStartSent = false;
         }
 
         GST_DEBUG_OBJECT(stream->pad.get(), "Starting webKitMediaSrcLoop task and releasing the STREAM_LOCK.");
+        streamLock.unlockEarly();
         gst_pad_start_task(stream->pad.get(), webKitMediaSrcLoop, stream->pad.get(), nullptr);
     }
 
@@ -749,6 +793,9 @@ static void webKitMediaSrcStreamFlush(Stream* stream, bool isSeekingFlush)
 void webKitMediaSrcFlush(WebKitMediaSrc* source, TrackID streamId)
 {
     ASSERT(isMainThread());
+    if (GST_STATE(GST_ELEMENT_CAST(source)) < GST_STATE_READY)
+        return;
+
     GST_DEBUG_OBJECT(source, "Received non-seek flush request for stream '%" PRIu64 "'.", streamId);
     Stream* stream = source->priv->streamById(streamId);
 
@@ -796,21 +843,54 @@ static void webKitMediaSrcGetProperty(GObject* object, unsigned propId, GValue* 
 static GstStateChangeReturn webKitMediaSrcChangeState(GstElement* element, GstStateChange transition)
 {
     WebKitMediaSrc* source = WEBKIT_MEDIA_SRC(element);
+    GstStateChangeReturn result;
+    bool noPreroll = false;
+    bool isAsync = false;
+
+    GST_DEBUG_OBJECT(element, "%s", gst_state_change_get_name(transition));
+    switch (transition) {
+    case GST_STATE_CHANGE_READY_TO_PAUSED:
+        // if (source->priv->isStarted()) {
+        //     GST_FIXME_OBJECT(source, "Resuming state from READY -> PAUSED after a downgrade is not implemented. Expect failure.");
+        // }
+        if (!source->priv->tracks.isEmpty()) {
+            webKitMediaSrcEmitStreams(source);
+            noPreroll = true;
+        } else {
+            doAsyncStart(source);
+            isAsync = true;
+        }
+        break;
+    default:
+        break;
+    }
+
+    result = GST_ELEMENT_CLASS(webkit_media_src_parent_class)->change_state(element, transition);
+    if (result == GST_STATE_CHANGE_FAILURE) {
+        GST_DEBUG_OBJECT(element, "%s : %s", gst_state_change_get_name(transition), gst_element_state_change_return_get_name(result));
+        doAsyncDone(source);
+        return result;
+    }
+
     switch (transition) {
     case GST_STATE_CHANGE_PAUSED_TO_READY:
         GST_DEBUG_OBJECT(source, "Downgrading to READY state, tearing down all streams...");
         while (!source->priv->streams.isEmpty())
             webKitMediaSrcTearDownStream(source, source->priv->streams.begin()->key);
         break;
-    case GST_STATE_CHANGE_READY_TO_PAUSED:
-        if (source->priv->isStarted()) {
-            GST_FIXME_OBJECT(source, "Resuming state from READY -> PAUSED after a downgrade is not implemented. Expect failure.");
-        }
-        break;
     default:
         break;
     }
-    return GST_ELEMENT_CLASS(webkit_media_src_parent_class)->change_state(element, transition);
+
+    if (result == GST_STATE_CHANGE_SUCCESS) {
+        if (noPreroll)
+            result = GST_STATE_CHANGE_NO_PREROLL;
+        else if (isAsync)
+            result = GST_STATE_CHANGE_ASYNC;
+    }
+
+    GST_DEBUG_OBJECT(element, "%s : %s", gst_state_change_get_name(transition), gst_element_state_change_return_get_name(result));
+    return result;
 }
 
 static gboolean webKitMediaSrcSendEvent(GstElement* element, GstEvent* eventTransferFull)
@@ -818,18 +898,21 @@ static gboolean webKitMediaSrcSendEvent(GstElement* element, GstEvent* eventTran
     auto event = adoptGRef(eventTransferFull);
     switch (GST_EVENT_TYPE(event.get())) {
     case GST_EVENT_SEEK: {
-        double rate;
-        GstFormat format;
-        GstSeekType startType;
-        int64_t start;
-        gst_event_parse_seek(event.get(), &rate, &format, nullptr, &startType, &start, nullptr, nullptr);
-        if (format != GST_FORMAT_TIME || startType != GST_SEEK_TYPE_SET) {
-            GST_ERROR_OBJECT(element, "Rejecting unsupported seek event: %" GST_PTR_FORMAT, event.get());
-            return false;
+        if (GST_STATE(element) >= GST_STATE_READY) {
+            double rate;
+            GstFormat format;
+            GstSeekType startType;
+            int64_t start;
+            gst_event_parse_seek(event.get(), &rate, &format, nullptr, &startType, &start, nullptr, nullptr);
+            if (format != GST_FORMAT_TIME || startType != GST_SEEK_TYPE_SET) {
+                GST_ERROR_OBJECT(element, "Rejecting unsupported seek event: %" GST_PTR_FORMAT, event.get());
+                return false;
+            }
+            GST_DEBUG_OBJECT(element, "Handling seek event: %" GST_PTR_FORMAT, event.get());
+            webKitMediaSrcSeek(WEBKIT_MEDIA_SRC(element), start, rate);
+            return true;
         }
-        GST_DEBUG_OBJECT(element, "Handling seek event: %" GST_PTR_FORMAT, event.get());
-        webKitMediaSrcSeek(WEBKIT_MEDIA_SRC(element), start, rate);
-        return true;
+        FALLTHROUGH;
     }
     default:
         return GST_ELEMENT_CLASS(webkit_media_src_parent_class)->send_event(element, event.leakRef());
