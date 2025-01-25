@@ -123,17 +123,17 @@ AudioDestinationGStreamer::AudioDestinationGStreamer(AudioIOCallback& callback, 
     webkitWebAudioSourceSetBus(WEBKIT_WEB_AUDIO_SRC(m_src.get()), m_renderBus);
 
     auto& quirksManager = GStreamerQuirksManager::singleton();
-    GRefPtr<GstElement> audioSink = quirksManager.createWebAudioSink();
-    m_audioSinkAvailable = audioSink;
-    if (!audioSink) {
+    m_sink = quirksManager.createWebAudioSink();
+    m_audioSinkAvailable = m_sink;
+    if (!m_sink) {
         GST_ERROR("Failed to create GStreamer audio sink element");
         return;
     }
 
     // Probe platform early on for a working audio output device in autoaudiosink.
-    auto nameView = StringView::fromLatin1(GST_OBJECT_NAME(audioSink.get()));
+    auto nameView = StringView::fromLatin1(GST_OBJECT_NAME(m_sink.get()));
     if (nameView.startsWith("autoaudiosink"_s)) {
-        g_signal_connect(audioSink.get(), "child-added", G_CALLBACK(+[](GstChildProxy*, GObject* object, gchar*, gpointer) {
+        g_signal_connect(m_sink.get(), "child-added", G_CALLBACK(+[](GstChildProxy*, GObject* object, gchar*, gpointer) {
             if (GST_IS_AUDIO_BASE_SINK(object))
                 g_object_set(GST_AUDIO_BASE_SINK(object), "buffer-time", static_cast<gint64>(100000), nullptr);
         }), nullptr);
@@ -141,10 +141,10 @@ AudioDestinationGStreamer::AudioDestinationGStreamer(AudioIOCallback& callback, 
         // Autoaudiosink does the real sink detection in the GST_STATE_NULL->READY transition
         // so it's best to roll it to READY as soon as possible to ensure the underlying platform
         // audiosink was loaded correctly.
-        GstStateChangeReturn stateChangeReturn = gst_element_set_state(audioSink.get(), GST_STATE_READY);
+        GstStateChangeReturn stateChangeReturn = gst_element_set_state(m_sink.get(), GST_STATE_READY);
         if (stateChangeReturn == GST_STATE_CHANGE_FAILURE) {
             GST_ERROR("Failed to change autoaudiosink element state");
-            gst_element_set_state(audioSink.get(), GST_STATE_NULL);
+            gst_element_set_state(m_sink.get(), GST_STATE_NULL);
             m_audioSinkAvailable = false;
             return;
         }
@@ -156,7 +156,7 @@ AudioDestinationGStreamer::AudioDestinationGStreamer(AudioIOCallback& callback, 
     auto queue = gst_element_factory_make("queue", nullptr);
     g_object_set(queue, "max-size-buffers", 2, "max-size-bytes", 0, "max-size-time", 0, nullptr);
 
-    gst_bin_add_many(GST_BIN_CAST(m_pipeline.get()), m_src.get(), audioConvert, audioResample, queue, audioSink.get(), nullptr);
+    gst_bin_add_many(GST_BIN_CAST(m_pipeline.get()), m_src.get(), audioConvert, audioResample, queue, m_sink.get(), nullptr);
 
     // Link src pads from webkitAudioSrc to audioConvert ! audioResample ! [capsfilter !] queue ! autoaudiosink.
     gst_element_link_pads_full(m_src.get(), "src", audioConvert, "sink", GST_PAD_LINK_CHECK_NOTHING);
@@ -176,7 +176,7 @@ AudioDestinationGStreamer::AudioDestinationGStreamer(AudioIOCallback& callback, 
     } else
         gst_element_link_pads_full(audioResample, "src", queue, "sink", GST_PAD_LINK_CHECK_NOTHING);
 
-    gst_element_link_pads_full(queue, "src", audioSink.get(), "sink", GST_PAD_LINK_CHECK_NOTHING);
+    gst_element_link_pads_full(queue, "src", m_sink.get(), "sink", GST_PAD_LINK_CHECK_NOTHING);
 }
 
 AudioDestinationGStreamer::~AudioDestinationGStreamer()
@@ -193,6 +193,18 @@ AudioDestinationGStreamer::~AudioDestinationGStreamer()
 unsigned AudioDestinationGStreamer::framesPerBuffer() const
 {
     return AudioUtilities::renderQuantumSize;
+}
+
+MediaTime AudioDestinationGStreamer::outputLatency() const
+{
+    auto query = adoptGRef(gst_query_new_latency());
+    if (!gst_element_query(m_sink.get(), query.get()))
+        return MediaTime::zeroTime();
+
+    // XXX: We'd need some equivalent to pa_stream_get_latency()
+    GstClockTime minLatency, maxLatency;
+    gst_query_parse_latency(query.get(), nullptr, &minLatency, &maxLatency);
+    return fromGstClockTime(maxLatency);
 }
 
 bool AudioDestinationGStreamer::handleMessage(GstMessage* message)

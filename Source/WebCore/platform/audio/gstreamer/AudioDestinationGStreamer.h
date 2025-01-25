@@ -39,6 +39,7 @@ public:
 
     bool isPlaying() override { return m_isPlaying; }
     unsigned framesPerBuffer() const final;
+    MediaTime outputLatency() const final;
 
     bool handleMessage(GstMessage*);
     void notifyIsPlaying(bool);
@@ -57,6 +58,7 @@ private:
     bool m_audioSinkAvailable { false };
     GRefPtr<GstElement> m_pipeline;
     GRefPtr<GstElement> m_src;
+    GRefPtr<GstElement> m_sink;
     CompletionHandler<void(bool)> m_startupCompletionHandler;
     CompletionHandler<void(bool)> m_stopCompletionHandler;
 };
