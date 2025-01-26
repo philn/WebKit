@@ -109,21 +109,28 @@ const GstMetaInfo* videoFrameMetadataGetInfo()
     return metaInfo;
 }
 
-GRefPtr<GstBuffer> webkitGstBufferSetVideoFrameMetadata(GRefPtr<GstBuffer>&& buffer, std::optional<WebCore::VideoFrameTimeMetadata>&& metadata, VideoFrame::Rotation rotation, bool isMirrored)
+void webkitGstBufferAddVideoFrameMetadata(GstBuffer* buffer, std::optional<WebCore::VideoFrameTimeMetadata>&& metadata, VideoFrame::Rotation rotation, bool isMirrored)
 {
-IGNORE_WARNINGS_BEGIN("cast-align")
-    auto modifiedBuffer = adoptGRef(gst_buffer_make_writable(buffer.leakRef()));
-IGNORE_WARNINGS_END
-    auto meta = getInternalVideoFrameMetadata(modifiedBuffer.get());
+    RELEASE_ASSERT(gst_buffer_is_writable(buffer));
+
+    auto meta = getInternalVideoFrameMetadata(buffer);
     if (meta) {
         meta->priv->videoSampleMetadata = WTFMove(metadata);
-        return modifiedBuffer;
+        meta->priv->rotation = rotation;
+        meta->priv->isMirrored = isMirrored;
+        return;
     }
 
-    meta = VIDEO_FRAME_METADATA_CAST(gst_buffer_add_meta(modifiedBuffer.get(), videoFrameMetadataGetInfo(), nullptr));
+    meta = VIDEO_FRAME_METADATA_CAST(gst_buffer_add_meta(buffer, videoFrameMetadataGetInfo(), nullptr));
     meta->priv->videoSampleMetadata = WTFMove(metadata);
     meta->priv->rotation = rotation;
     meta->priv->isMirrored = isMirrored;
+}
+
+GRefPtr<GstBuffer> webkitGstBufferSetVideoFrameMetadata(GRefPtr<GstBuffer>&& buffer, std::optional<WebCore::VideoFrameTimeMetadata>&& metadata, VideoFrame::Rotation rotation, bool isMirrored)
+{
+    auto modifiedBuffer = adoptGRef(gst_buffer_make_writable(buffer.leakRef()));
+    webkitGstBufferAddVideoFrameMetadata(modifiedBuffer.get(), WTFMove(metadata), rotation, isMirrored);
     return modifiedBuffer;
 }
 

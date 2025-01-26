@@ -26,7 +26,12 @@
 #include "VideoFrameMetadata.h"
 #include "VideoFrameTimeMetadata.h"
 
+// Modifies the buffer in-place.
+void webkitGstBufferAddVideoFrameMetadata(GstBuffer* buffer, std::optional<WebCore::VideoFrameTimeMetadata>&& metadata, WebCore::VideoFrame::Rotation rotation, bool isMirrored);
+
+// Makes the buffer writable before modifying it.
 WARN_UNUSED_RETURN GRefPtr<GstBuffer> webkitGstBufferSetVideoFrameMetadata(GRefPtr<GstBuffer>&&, std::optional<WebCore::VideoFrameTimeMetadata>&&, WebCore::VideoFrame::Rotation, bool isMirrored);
+
 void webkitGstTraceProcessingTimeForElement(GstElement*);
 WebCore::VideoFrameMetadata webkitGstBufferGetVideoFrameMetadata(GstBuffer*);
 std::pair<WebCore::VideoFrame::Rotation, bool> webkitGstBufferGetVideoRotation(GstBuffer*);
