@@ -100,6 +100,7 @@ GstElement* GStreamerVideoCapturer::createConverter()
     if (isCapturingDisplay()) {
 #if USE(GBM)
         m_caps = buildDMABufCaps();
+        gst_caps_set_simple(m_caps.get(), "max-framerate", GST_TYPE_FRACTION, 30, 1, nullptr);
 #endif
         return nullptr;
     }
