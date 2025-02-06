@@ -147,9 +147,10 @@ GStreamerVideoRTPPacketizer::GStreamerVideoRTPPacketizer(GRefPtr<GstElement>&& e
 
     GST_DEBUG_OBJECT(m_bin.get(), "RTP encoding parameters: %" GST_PTR_FORMAT, m_encodingParameters.get());
 
-    m_videoRate = makeGStreamerElement("videorate"_s);
-    // https://gitlab.freedesktop.org/gstreamer/gst-plugins-base/issues/97#note_56575
-    g_object_set(m_videoRate.get(), "skip-to-first", TRUE, "drop-only", TRUE, "average-period", UINT64_C(1), nullptr);
+    m_videoRate = makeGStreamerElement("identity"_s);
+    // m_videoRate = makeGStreamerElement("videorate"_s);
+    // // https://gitlab.freedesktop.org/gstreamer/gst-plugins-base/issues/97#note_56575
+    // g_object_set(m_videoRate.get(), "skip-to-first", TRUE, "drop-only", TRUE, "average-period", UINT64_C(1), nullptr);
     m_frameRateCapsFilter = makeGStreamerElement("capsfilter"_s);
     gst_bin_add_many(GST_BIN_CAST(m_bin.get()), m_videoRate.get(), m_frameRateCapsFilter.get(), nullptr);
 
