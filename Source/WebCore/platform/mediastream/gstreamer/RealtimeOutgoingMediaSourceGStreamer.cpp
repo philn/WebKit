@@ -227,6 +227,9 @@ void RealtimeOutgoingMediaSourceGStreamer::setSinkPad(GRefPtr<GstPad>&& pad)
 
     g_object_get(m_webrtcSinkPad.get(), "transceiver", &m_transceiver.outPtr(), nullptr);
 
+    // if (auto rtpCaps = this->rtpCaps())
+    //     g_object_set(m_transceiver.get(), "codec-preferences", rtpCaps.get(), nullptr);
+
     g_signal_connect_swapped(m_transceiver.get(), "notify::codec-preferences", G_CALLBACK(+[](RealtimeOutgoingMediaSourceGStreamer* source) {
         source->codecPreferencesChanged();
     }), this);
@@ -551,6 +554,8 @@ bool RealtimeOutgoingMediaSourceGStreamer::configurePacketizers(GRefPtr<GstCaps>
 
     GST_DEBUG_OBJECT(m_bin.get(), "Setting RTP funnel caps to %" GST_PTR_FORMAT, rtpCaps.get());
     g_object_set(m_rtpCapsfilter.get(), "caps", rtpCaps.get(), nullptr);
+    if (m_transceiver)
+        g_object_set(m_transceiver.get(), "codec-preferences", rtpCaps.get(), nullptr);
     return true;
 }
 

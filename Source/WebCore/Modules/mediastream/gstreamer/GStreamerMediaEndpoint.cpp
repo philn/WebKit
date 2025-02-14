@@ -353,9 +353,10 @@ bool GStreamerMediaEndpoint::setConfiguration(MediaEndpointConfiguration& config
                 auto valid = makeStringByReplacingAll(url.string().isolatedCopy(), "turn:"_s, "turn://"_s);
                 valid = makeStringByReplacingAll(valid, "turns:"_s, "turns://"_s);
                 URL validURL(URL(), valid);
+                gst_printerrln("-> TURN: %s", validURL.string().ascii().data());
                 // FIXME: libnice currently doesn't seem to handle IPv6 addresses very well.
-                if (validURL.host().startsWith('['))
-                    continue;
+                // if (validURL.host().startsWith('['))
+                //     continue;
                 validURL.setUser(server.username);
                 validURL.setPassword(server.credential);
                 gboolean result = FALSE;
@@ -367,8 +368,9 @@ bool GStreamerMediaEndpoint::setConfiguration(MediaEndpointConfiguration& config
                 auto valid = makeStringByReplacingAll(url.string().isolatedCopy(), "stun:"_s, "stun://"_s);
                 URL validURL(URL(), valid);
                 // FIXME: libnice currently doesn't seem to handle IPv6 addresses very well.
-                if (validURL.host().startsWith('['))
-                    continue;
+                // if (validURL.host().startsWith('['))
+                //     continue;
+                gst_printerrln("-> STUN: %s", validURL.string().ascii().data());
                 g_object_set(m_webrtcBin.get(), "stun-server", validURL.string().utf8().data(), nullptr);
                 stunSet = true;
             }
