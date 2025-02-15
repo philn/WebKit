@@ -30,7 +30,10 @@
 #include "RTCCertificate.h"
 #include "RTCDtlsTransport.h"
 #include "RTCError.h"
+#include "RTCIceComponent.h"
+#include "RTCIceCandidate.h"
 #include "RTCIceConnectionState.h"
+#include "RTCIceProtocol.h"
 #include "RTCIceTransportPolicy.h"
 #include "RTCIceTransportState.h"
 #include "RTCRtpSendParameters.h"
@@ -48,6 +51,47 @@
 #include <wtf/ThreadSafeRefCounted.h>
 
 namespace WebCore {
+
+inline RTCIceComponent toRTCIceComponent(int component)
+{
+    return component == 1 ? RTCIceComponent::Rtp : RTCIceComponent::Rtcp;
+}
+
+inline std::optional<RTCIceProtocol> toRTCIceProtocol(const String& protocol)
+{
+    if (protocol.isEmpty())
+        return { };
+    if (protocol == "udp"_s)
+        return RTCIceProtocol::Udp;
+    ASSERT(protocol == "tcp"_s);
+    return RTCIceProtocol::Tcp;
+}
+
+inline std::optional<RTCIceTcpCandidateType> toRTCIceTcpCandidateType(const String& type)
+{
+    if (type.isEmpty())
+        return { };
+    if (type == "active"_s)
+        return RTCIceTcpCandidateType::Active;
+    if (type == "passive"_s)
+        return RTCIceTcpCandidateType::Passive;
+    ASSERT(type == "so"_s);
+    return RTCIceTcpCandidateType::So;
+}
+
+inline std::optional<RTCIceCandidateType> toRTCIceCandidateType(const String& type)
+{
+    if (type.isEmpty())
+        return { };
+    if (type == "host"_s)
+        return RTCIceCandidateType::Host;
+    if (type == "srflx"_s)
+        return RTCIceCandidateType::Srflx;
+    if (type == "prflx"_s)
+        return RTCIceCandidateType::Prflx;
+    ASSERT(type == "relay"_s);
+    return RTCIceCandidateType::Relay;
+}
 
 inline RTCRtpTransceiverDirection toRTCRtpTransceiverDirection(GstWebRTCRTPTransceiverDirection direction)
 {

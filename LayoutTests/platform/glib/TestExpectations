@@ -2529,7 +2529,7 @@ webrtc/video-replace-track.html [ Pass Failure Timeout Crash ]
 webkit.org/b/235885 webrtc/video.html [ Skip ]
 
 # webrtcbin emits no ICE candidate stats for a PeerConnection managing only one data-channel.
-webkit.org/b/235885 webrtc/candidate-stats.html [ Failure ]
+#webkit.org/b/235885 webrtc/candidate-stats.html [ Failure ]
 webkit.org/b/262989 imported/w3c/web-platform-tests/webrtc-stats/getStats-remote-candidate-address.html [ Failure ]
 
 # Pending investigation.
@@ -2602,6 +2602,7 @@ imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-addIceCandidate-timing.
 imported/w3c/web-platform-tests/webrtc/RTCRtpParameters-encodings.html [ Pass ]
 imported/w3c/web-platform-tests/webrtc/RTCRtpParameters-headerExtensions.html [ Pass ]
 imported/w3c/web-platform-tests/webrtc/RTCRtpParameters-rtcp.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCIceTransport.html [ Pass ]
 
 # The last promise test here fails because webrtcbin doesn't rely on a singleton signaling thread.
 # See also comments in:
@@ -2613,7 +2614,6 @@ imported/w3c/web-platform-tests/webrtc/RTCRtpParameters-transactionId.html [ Fai
 
 imported/w3c/web-platform-tests/webrtc/protocol/ [ Pass ]
 imported/w3c/web-platform-tests/webrtc/protocol/bundle.https.html [ Failure ]
-imported/w3c/web-platform-tests/webrtc/protocol/candidate-exchange.https.html [ Failure ]
 imported/w3c/web-platform-tests/webrtc/protocol/crypto-suite.https.html [ Failure ]
 imported/w3c/web-platform-tests/webrtc/protocol/dtls-fingerprint-validation.html [ Failure ]
 imported/w3c/web-platform-tests/webrtc/protocol/dtls-setup.https.html [ Failure ]
@@ -2628,6 +2628,11 @@ imported/w3c/web-platform-tests/webrtc/protocol/handover-datachannel.html [ Fail
 # https://gitlab.freedesktop.org/gstreamer/gstreamer/-/issues/3954
 imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-setRemoteDescription-tracks.https.html [ Skip ]
 imported/w3c/web-platform-tests/webrtc/protocol/msid-generate.html [ Failure ]
+
+# libnice doesn't notify prflx ICE candidates.
+imported/w3c/web-platform-tests/webrtc/protocol/candidate-exchange.https.html [ Failure ]
+
+webkit.org/b/286481 imported/w3c/web-platform-tests/webrtc/protocol/rtp-demuxing.html [ Crash ]
 
 imported/w3c/web-platform-tests/webrtc/protocol/additional-codecs.html [ Failure ]
 imported/w3c/web-platform-tests/webrtc/protocol/codecs-subsequent-offer.https.html [ Failure ]
