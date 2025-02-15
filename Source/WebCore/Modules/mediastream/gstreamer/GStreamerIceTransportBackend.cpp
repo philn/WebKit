@@ -150,11 +150,75 @@ void GStreamerIceTransportBackend::gatheringStateChanged() const
     });
 }
 
+#if GST_CHECK_VERSION(1, 25, 0)
+static Ref<RTCIceCandidate> candidateFromGstStructure(const GstStructure* s)
+{
+    RTCIceCandidate::Fields fields;
+
+    auto foundation = gstStructureGetString(s, "foundation"_s);
+    fields.foundation = foundation.toString();
+
+    if (auto component = gstStructureGet<int>(s, "component"_s))
+        fields.component = toRTCIceComponent(*component);
+
+    fields.priority = gstStructureGet<unsigned>(s, "priority"_s);
+
+    auto address = gstStructureGetString(s, "address"_s);
+    fields.address = address.toString();
+
+    if (auto protocol = gstStructureGetString(s, "protocol"_s))
+        fields.protocol = toRTCIceProtocol(protocol.toStringWithoutCopying());
+
+    fields.port = gstStructureGet<unsigned>(s, "port"_s);
+
+    if (auto type = gstStructureGetString(s, "type"_s))
+        fields.type = toRTCIceCandidateType(type.toStringWithoutCopying());
+
+    auto usernameFragment = gstStructureGetString(s, "usernameFragment"_s);
+    fields.usernameFragment = usernameFragment.toString();
+
+    auto tcpType = gstStructureGetString(s, "tcpType"_s);
+    if (!tcpType.isNull())
+        fields.tcpType = toRTCIceTcpCandidateType(tcpType.toStringWithoutCopying());
+
+    auto url = gstStructureGetString(s, "url"_s);
+    if (!url.isNull())
+        fields.address = url.toString();
+
+    auto relatedAddress = gstStructureGetString(s, "relatedAddress"_s);
+    if (!relatedAddress.isNull())
+        fields.relatedAddress = relatedAddress.toString();
+
+    fields.relatedPort = gstStructureGet<unsigned>(s, "relatedPort"_s);
+
+    // FIXME: relayProtocol is not exposed yet.
+
+    auto sdpMid = emptyString();
+    auto candidate = gstStructureGetString(s, "candidate"_s);
+    return RTCIceCandidate::create(candidate.toStringWithoutCopying(), sdpMid, WTFMove(fields));
+}
+#endif
+
 void GStreamerIceTransportBackend::selectedCandidatePairChanged()
 {
-    // FIXME: call m_client->onSelectedCandidatePairChanged(). See also
-    // https://github.com/WebKit/WebKit/commit/0692fae10c8e53deba214fd080a35f7c54bd6985
-    notImplemented();
+    // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/8484
+#if GST_CHECK_VERSION(1, 25, 0)
+    GUniquePtr<GstStructure> selectedPair(gst_webrtc_ice_transport_get_selected_candidate_pair(m_iceTransport.get()));
+    if (!selectedPair)
+        return;
+
+    GUniqueOutPtr<GstStructure> localCandidateData, remoteCandidateData;
+    if (!gst_structure_get(selectedPair.get(), "local", GST_TYPE_STRUCTURE, &localCandidateData.outPtr(), "remote", GST_TYPE_STRUCTURE, &remoteCandidateData.outPtr(), nullptr))
+        return;
+
+    auto localCandidate = candidateFromGstStructure(localCandidateData.get());
+    auto remoteCandidate = candidateFromGstStructure(remoteCandidateData.get());
+    WTF::callOnMainThreadAndWait([weakThis = WeakPtr { *this }, localCandidate = WTFMove(localCandidate), remoteCandidate = WTFMove(remoteCandidate)] mutable {
+        if (!weakThis || !weakThis->m_client)
+            return;
+        weakThis->m_client->onSelectedCandidatePairChanged(WTFMove(localCandidate), WTFMove(remoteCandidate));
+    });
+#endif
 }
 
 #undef GST_CAT_DEFAULT
