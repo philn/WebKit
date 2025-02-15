@@ -189,6 +189,12 @@ ExceptionOr<void> GStreamerRtpTransceiverBackend::setCodecPreferences(const Vect
         }
         gst_caps_append(gstCodecs.get(), codecCaps.leakRef());
     }
+
+    if (gst_caps_is_empty(gstCodecs.get())) {
+        GST_DEBUG_OBJECT(m_rtcTransceiver.get(), "Codec preferences are empty");
+        return { };
+    }
+
     GST_DEBUG_OBJECT(m_rtcTransceiver.get(), "Setting codec preferences to %" GST_PTR_FORMAT, gstCodecs.get());
     g_object_set(m_rtcTransceiver.get(), "codec-preferences", gstCodecs.get(), nullptr);
     return { };
