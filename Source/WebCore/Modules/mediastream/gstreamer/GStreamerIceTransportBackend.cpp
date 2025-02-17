@@ -150,69 +150,60 @@ void GStreamerIceTransportBackend::gatheringStateChanged() const
     });
 }
 
-#if GST_CHECK_VERSION(1, 25, 0)
-static Ref<RTCIceCandidate> candidateFromGstStructure(const GstStructure* s)
+#if 1 // GST_CHECK_VERSION(1, 25, 0)
+static Ref<RTCIceCandidate> candidateFromGstWebRTC(const GstWebRTCICECandidate* c)
 {
     RTCIceCandidate::Fields fields;
 
-    auto foundation = gstStructureGetString(s, "foundation"_s);
-    fields.foundation = foundation.toString();
+    fields.foundation = String::fromUTF8(c->foundation);
 
-    if (auto component = gstStructureGet<int>(s, "component"_s))
-        fields.component = toRTCIceComponent(*component);
+    fields.component = toRTCIceComponent(c->component);
 
-    fields.priority = gstStructureGet<unsigned>(s, "priority"_s);
+    fields.priority = c->priority;
 
-    auto address = gstStructureGetString(s, "address"_s);
-    fields.address = address.toString();
+    fields.address = String::fromUTF8(c->address);
 
-    if (auto protocol = gstStructureGetString(s, "protocol"_s))
-        fields.protocol = toRTCIceProtocol(protocol.toStringWithoutCopying());
+    auto protocol = StringView::fromLatin1(c->protocol);
+    fields.protocol = toRTCIceProtocol(protocol.toStringWithoutCopying());
 
-    fields.port = gstStructureGet<unsigned>(s, "port"_s);
+    fields.port = c->port;
 
-    if (auto type = gstStructureGetString(s, "type"_s))
-        fields.type = toRTCIceCandidateType(type.toStringWithoutCopying());
+    auto type = StringView::fromLatin1(c->type);
+    fields.type = toRTCIceCandidateType(type.toStringWithoutCopying());
 
-    auto usernameFragment = gstStructureGetString(s, "usernameFragment"_s);
-    fields.usernameFragment = usernameFragment.toString();
+    fields.usernameFragment = String::fromUTF8(c->username_fragment);
 
-    auto tcpType = gstStructureGetString(s, "tcpType"_s);
+    auto tcpType = StringView::fromLatin1(c->tcp_type);
     if (!tcpType.isNull())
         fields.tcpType = toRTCIceTcpCandidateType(tcpType.toStringWithoutCopying());
 
-    auto url = gstStructureGetString(s, "url"_s);
-    if (!url.isNull())
-        fields.address = url.toString();
+    fields.address = String::fromUTF8(c->address);
 
-    auto relatedAddress = gstStructureGetString(s, "relatedAddress"_s);
+    auto relatedAddress = StringView::fromLatin1(c->related_address);
     if (!relatedAddress.isNull())
         fields.relatedAddress = relatedAddress.toString();
 
-    fields.relatedPort = gstStructureGet<unsigned>(s, "relatedPort"_s);
+    if (c->related_port != -1)
+        fields.relatedPort = c->related_port;
 
     // FIXME: relayProtocol is not exposed yet.
 
     auto sdpMid = emptyString();
-    auto candidate = gstStructureGetString(s, "candidate"_s);
-    return RTCIceCandidate::create(candidate.toStringWithoutCopying(), sdpMid, WTFMove(fields));
+    auto candidate = String::fromUTF8(c->candidate);
+    return RTCIceCandidate::create(candidate, sdpMid, WTFMove(fields));
 }
 #endif
 
 void GStreamerIceTransportBackend::selectedCandidatePairChanged()
 {
     // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/8484
-#if GST_CHECK_VERSION(1, 25, 0)
-    GUniquePtr<GstStructure> selectedPair(gst_webrtc_ice_transport_get_selected_candidate_pair(m_iceTransport.get()));
+#if 1 //  GST_CHECK_VERSION(1, 25, 0)
+    GUniquePtr<GstWebRTCICECandidatePair> selectedPair(gst_webrtc_ice_transport_get_selected_candidate_pair(m_iceTransport.get()));
     if (!selectedPair)
         return;
 
-    GUniqueOutPtr<GstStructure> localCandidateData, remoteCandidateData;
-    if (!gst_structure_get(selectedPair.get(), "local", GST_TYPE_STRUCTURE, &localCandidateData.outPtr(), "remote", GST_TYPE_STRUCTURE, &remoteCandidateData.outPtr(), nullptr))
-        return;
-
-    auto localCandidate = candidateFromGstStructure(localCandidateData.get());
-    auto remoteCandidate = candidateFromGstStructure(remoteCandidateData.get());
+    auto localCandidate = candidateFromGstWebRTC(selectedPair->local);
+    auto remoteCandidate = candidateFromGstWebRTC(selectedPair->remote);
     WTF::callOnMainThreadAndWait([weakThis = WeakPtr { *this }, localCandidate = WTFMove(localCandidate), remoteCandidate = WTFMove(remoteCandidate)] mutable {
         if (!weakThis || !weakThis->m_client)
             return;
