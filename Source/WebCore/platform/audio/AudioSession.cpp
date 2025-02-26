@@ -42,6 +42,10 @@
 #include "AudioSessionIOS.h"
 #endif
 
+#if USE(PIPEWIRE)
+#include "AudioSessionPipeWire.h"
+#endif
+
 namespace WebCore {
 
 WTF_MAKE_TZONE_ALLOCATED_IMPL(AudioSession);
@@ -92,9 +96,12 @@ Ref<AudioSession> AudioSession::create()
     return AudioSessionMac::create();
 #elif PLATFORM(IOS_FAMILY)
     return AudioSessionIOS::create();
-#else
-    return AudioSession::create();
+#elif USE(PIPEWIRE)
+    if (AudioSessionPipeWire::isPipeWireRunning())
+        return AudioSessionPipeWire::create();
 #endif
+
+    return AudioSession::create();
 }
 
 AudioSession::AudioSession() = default;

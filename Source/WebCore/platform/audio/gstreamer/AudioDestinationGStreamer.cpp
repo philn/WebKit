@@ -35,6 +35,10 @@
 #include <wtf/glib/RunLoopSourcePriority.h>
 #include <wtf/text/MakeString.h>
 
+#if USE(AUDIO_SESSION)
+#include "AudioSession.h"
+#endif
+
 namespace WebCore {
 
 GST_DEBUG_CATEGORY(webkit_audio_destination_debug);
@@ -51,6 +55,7 @@ static void initializeAudioDestinationDebugCategory()
     });
 }
 
+#if !USE(AUDIO_SESSION)
 static unsigned long maximumNumberOfOutputChannels()
 {
     initializeAudioDestinationDebugCategory();
@@ -83,6 +88,7 @@ static unsigned long maximumNumberOfOutputChannels()
 
     return count;
 }
+#endif
 
 Ref<AudioDestination> AudioDestination::create(AudioIOCallback& callback, const String&, unsigned numberOfInputChannels, unsigned numberOfOutputChannels, float sampleRate)
 {
@@ -98,12 +104,19 @@ Ref<AudioDestination> AudioDestination::create(AudioIOCallback& callback, const 
 
 float AudioDestination::hardwareSampleRate()
 {
+#if USE(AUDIO_SESSION)
+    return AudioSession::sharedSession().sampleRate();
+#endif
     return 44100;
 }
 
 unsigned long AudioDestination::maxChannelCount()
 {
+#if USE(AUDIO_SESSION)
+    return AudioSession::sharedSession().maximumNumberOfOutputChannels();
+#else
     return maximumNumberOfOutputChannels();
+#endif
 }
 
 AudioDestinationGStreamer::AudioDestinationGStreamer(AudioIOCallback& callback, unsigned long numberOfOutputChannels, float sampleRate)

@@ -169,8 +169,10 @@ public:
     static bool shouldManageAudioSessionCategory();
     static void setShouldManageAudioSessionCategory(bool);
 
+#if PLATFORM(COCOA)
     virtual void setHostProcessAttribution(audit_token_t) { };
     virtual void setPresentingProcesses(Vector<audit_token_t>&&) { };
+#endif
 
     bool isInterrupted() const { return m_isInterrupted; }
 

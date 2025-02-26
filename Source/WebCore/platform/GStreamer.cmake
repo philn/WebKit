@@ -97,6 +97,16 @@ if (ENABLE_VIDEO)
         )
     endif ()
 
+    if (USE_AUDIO_SESSION AND USE_PIPEWIRE)
+        list(APPEND WebCore_LIBRARIES PipeWire::PipeWire)
+        list(APPEND WebCore_PRIVATE_INCLUDE_DIRECTORIES
+            "${WEBCORE_DIR}/platform/pipewire"
+        )
+        list(APPEND WebCore_SOURCES
+            platform/pipewire/AudioSessionPipeWire.cpp
+        )
+    endif ()
+
     if (USE_LIBWEBRTC)
         list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
             ${GSTREAMER_CODECPARSERS_INCLUDE_DIRS}
