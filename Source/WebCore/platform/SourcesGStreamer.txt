@@ -67,6 +67,7 @@ platform/graphics/gstreamer/ImageDecoderGStreamer.cpp
 platform/graphics/gstreamer/ImageGStreamerSkia.cpp
 platform/graphics/gstreamer/InbandTextTrackPrivateGStreamer.cpp
 platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+platform/graphics/gstreamer/MediaPlayerPrivateGStreamerHarness.cpp
 platform/graphics/gstreamer/MediaSampleGStreamer.cpp
 platform/graphics/gstreamer/PlatformDisplayGStreamer.cpp
 platform/graphics/gstreamer/PlatformMediaEngineConfigurationFactoryGStreamer.cpp
