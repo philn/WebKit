@@ -219,6 +219,12 @@ String VideoTrackPrivateGStreamer::language() const
     return m_data->m_language;
 }
 
+FloatSize VideoTrackPrivateGStreamer::size() const
+{
+    auto caps = gst_stream_get_caps(m_data->m_stream.get());
+    return getVideoResolutionFromCaps(caps).value_or(FloatSize { });
+}
+
 #undef GST_CAT_DEFAULT
 
 } // namespace WebCore

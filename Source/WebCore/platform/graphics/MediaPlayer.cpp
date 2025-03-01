@@ -78,6 +78,7 @@
 #if USE(GSTREAMER)
 #include "CoordinatedPlatformLayerBufferProxy.h"
 #include "MediaPlayerPrivateGStreamer.h"
+#include "MediaPlayerPrivateGStreamerHarness.h"
 #if ENABLE(MEDIA_SOURCE)
 #include "MediaPlayerPrivateGStreamerMSE.h"
 #endif
@@ -344,6 +345,7 @@ static void buildMediaEnginesVector() WTF_REQUIRES_LOCK(mediaEngineVectorLock)
 
 #if USE(GSTREAMER)
     if (DeprecatedGlobalSettings::isGStreamerEnabled()) {
+        MediaPlayerPrivateGStreamerHarness::registerMediaEngine(addMediaEngine);
         MediaPlayerPrivateGStreamer::registerMediaEngine(addMediaEngine);
 #if ENABLE(MEDIA_SOURCE)
         MediaPlayerPrivateGStreamerMSE::registerMediaEngine(addMediaEngine);

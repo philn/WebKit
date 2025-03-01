@@ -30,6 +30,9 @@
 #if USE(AVFOUNDATION)
 #include "AudioVideoRendererAVFObjC.h"
 #endif
+#if USE(GSTREAMER)
+#include "AudioVideoRendererGStreamer.h"
+#endif
 #include "MediaPlayer.h"
 #include <wtf/TZoneMallocInlines.h>
 

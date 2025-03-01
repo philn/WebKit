@@ -492,7 +492,26 @@ private:
     PadProbeCallback m_callback;
 };
 
+
 bool enableMSEAdditionalPipelineDumps();
+
+// GstClockID is defined as a gpointer alias, not a real type, so GRefPtr cannot be used for it.
+class GstClockIDPtr {
+public:
+    GstClockIDPtr(GstClockID /* (transfer full) */ id)
+        : m_id(id)
+    {
+    }
+    ~GstClockIDPtr()
+    {
+        gst_clock_id_unref(m_id);
+    }
+
+    GstClockID get() const { return m_id; }
+
+private:
+    GstClockID m_id;
+};
 
 } // namespace WebCore
 

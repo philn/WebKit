@@ -69,6 +69,8 @@ public:
 
     void updateConfigurationFromCaps(GRefPtr<GstCaps>&&) final;
 
+    FloatSize size() const;
+
 protected:
     void updateConfigurationFromTags(GRefPtr<GstTagList>&&) final;
 

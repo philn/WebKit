@@ -80,4 +80,8 @@ private:
 
 } // namespace WebCore
 
+// SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::AudioTrackPrivate)
+// static bool isType(const WebCore::AudioTrackPrivate& track) { return track.isGStreamer(); }
+// SPECIALIZE_TYPE_TRAITS_END()
+
 #endif // ENABLE(VIDEO) && USE(GSTREAMER)

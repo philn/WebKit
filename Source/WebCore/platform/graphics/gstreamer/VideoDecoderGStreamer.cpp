@@ -100,6 +100,20 @@ void GStreamerVideoDecoder::create(const String& codecName, const Config& config
         return;
     }
 
+    auto createResult = create(codecName, config, WTF::move(outputCallback));
+    if (!createResult) {
+        callback(makeUnexpected(WTF::move(createResult.error())));
+        return;
+    }
+
+    gstDecoderWorkQueue().dispatch([callback = WTF::move(callback), decoder = WTF::move(*createResult)]() mutable {
+        GST_DEBUG_OBJECT(decoder->m_internalDecoder->harnessedElement(), "Video decoder created");
+        callback(Ref<VideoDecoder> { WTF::move(decoder) });
+    });
+}
+
+Expected<Ref<GStreamerVideoDecoder>, String> GStreamerVideoDecoder::create(const String& codecName, const Config& config, OutputCallback&& outputCallback)
+{
     static std::once_flag debugRegisteredFlag;
     std::call_once(debugRegisteredFlag, [] {
         GST_DEBUG_CATEGORY_INIT(webkit_video_decoder_debug, "webkitvideodecoder", 0, "WebKit WebCodecs Video Decoder");
@@ -115,30 +129,23 @@ void GStreamerVideoDecoder::create(const String& codecName, const Config& config
 
     if (!lookupResult) {
         GST_WARNING("No decoder found for codec %s", codecName.utf8());
-        callback(makeUnexpected(makeString("No decoder found for codec "_s, codecName)));
-        return;
+        return makeUnexpected(makeString("No decoder found for codec "_s, codecName));
     }
 
     GRefPtr<GstElement> element = gst_element_factory_create(lookupResult.factory.get(), nullptr);
     if (!element) {
         GST_WARNING("Unable to create decoder for codec %s", codecName.utf8());
-        callback(makeUnexpected(makeString("Unable to create decoder for codec "_s, codecName)));
-        return;
+        return makeUnexpected(makeString("Unable to create decoder for codec "_s, codecName));
     }
 
     Ref decoder = adoptRef(*new GStreamerVideoDecoder(codecName, config, WTF::move(outputCallback), WTF::move(element)));
     Ref internalDecoder = decoder->m_internalDecoder;
     if (!internalDecoder->isConfigured()) {
         GST_WARNING("Internal video decoder failed to configure for codec %s", codecName.utf8());
-        callback(makeUnexpected(makeString("Internal video decoder failed to configure for codec "_s, codecName)));
-        return;
+        return makeUnexpected(makeString("Internal video decoder failed to configure for codec "_s, codecName));
     }
 
-    gstDecoderWorkQueue().dispatch([callback = WTF::move(callback), decoder = WTF::move(decoder)]() mutable {
-        auto internalDecoder = decoder->m_internalDecoder;
-        GST_DEBUG_OBJECT(decoder->m_internalDecoder->harnessedElement(), "Video decoder created");
-        callback(Ref<VideoDecoder> { WTF::move(decoder) });
-    });
+    return { WTF::move(decoder) };
 }
 
 GStreamerVideoDecoder::GStreamerVideoDecoder(const String& codecName, const Config& config, OutputCallback&& outputCallback, GRefPtr<GstElement>&& element)

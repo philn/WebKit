@@ -560,7 +560,7 @@ void registerWebKitGStreamerElements()
             // The Thunder parser is auto-plugged by parsebin and its internal parsebin can
             // auto-plug the Thunder decryptor.
             gst_element_register(nullptr, "webkitthunder", GST_RANK_PRIMARY + 100, WEBKIT_TYPE_MEDIA_THUNDER_DECRYPT);
-            gst_element_register(nullptr, "webkitthunderparser", GST_RANK_PRIMARY + 101, WEBKIT_TYPE_MEDIA_THUNDER_PARSER);
+            // gst_element_register(nullptr, "webkitthunderparser", GST_RANK_PRIMARY + 101, WEBKIT_TYPE_MEDIA_THUNDER_PARSER);
         }
 #endif
 

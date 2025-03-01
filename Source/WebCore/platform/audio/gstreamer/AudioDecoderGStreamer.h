@@ -34,14 +34,16 @@ class GStreamerAudioDecoder final : public AudioDecoder {
 
 public:
     static void create(const String& codecName, const Config&, CreateCallback&&, OutputCallback&&);
+    static Expected<Ref<GStreamerAudioDecoder>, String> create(const String& codecName, const Config&, OutputCallback&&);
 
     ~GStreamerAudioDecoder();
+
+    Ref<DecodePromise> decode(AudioEncodedData&&) final;
+    Ref<GenericPromise> flush() final;
 
 private:
     GStreamerAudioDecoder(const String& codecName, const Config&, OutputCallback&&, GRefPtr<GstElement>&&);
 
-    Ref<DecodePromise> decode(AudioEncodedData&&) final;
-    Ref<GenericPromise> flush() final;
     void reset() final;
     void close() final;
 

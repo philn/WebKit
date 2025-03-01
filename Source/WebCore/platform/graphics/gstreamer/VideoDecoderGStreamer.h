@@ -35,13 +35,17 @@ class GStreamerVideoDecoder final : public VideoDecoder {
 
 public:
     static void create(const String& codecName, const Config&, CreateCallback&&, OutputCallback&&);
+    static Expected<Ref<GStreamerVideoDecoder>, String> create(const String& codecName, const Config&, OutputCallback&&);
 
     GStreamerVideoDecoder(const String& codecName, const Config&, OutputCallback&&, GRefPtr<GstElement>&&);
     ~GStreamerVideoDecoder();
 
-private:
     Ref<DecodePromise> decode(VideoEncodedData&&) final;
+
+private:
     Ref<GenericPromise> flush() final;
+
+private:
     void reset() final;
     void close() final;
 
