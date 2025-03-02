@@ -93,6 +93,70 @@ TEST_F(GStreamerTest, harnessBasic)
     ASSERT_NULL(stream->pullEvent());
 }
 
+TEST_F(GStreamerTest, harnessSource)
+{
+    GRefPtr<GstElement> element = gst_element_factory_make("fakesrc", nullptr);
+    g_object_set(element.get(), "num-buffers", 3, nullptr);
+    auto harness = WebCore::GStreamerElementHarness::create(WTFMove(element), [](auto&, auto&&) { });
+
+    // The fakesrc element has a single source pad. Fetch the corresponding stream.
+    ASSERT_FALSE(harness->outputStreams().isEmpty());
+    auto& stream = harness->outputStreams().first();
+
+    // Harness has not started processing data yet.
+    // ASSERT_NULL(stream->pullSample());
+    // ASSERT_NULL(stream->pullEvent());
+
+    // Push a sample and expect initial events and an output buffer.
+    // auto buffer = adoptGRef(gst_buffer_new_allocate(nullptr, 64, nullptr));
+    // gst_buffer_memset(buffer.get(), 0, 2, 64);
+    // GstMappedBuffer mappedInputBuffer(buffer.get(), GST_MAP_READ);
+    // ASSERT_TRUE(mappedInputBuffer);
+    // EXPECT_EQ(mappedInputBuffer.size(), 64);
+    // auto caps = adoptGRef(gst_caps_new_empty_simple("foo"));
+    // auto sample = adoptGRef(gst_sample_new(buffer.get(), caps.get(), nullptr, nullptr));
+    // EXPECT_TRUE(harness->pushSample(WTFMove(sample)));
+
+    // auto event = stream->pullEvent();
+    // ASSERT_NOT_NULL(event.get());
+    // EXPECT_STREQ(GST_EVENT_TYPE_NAME(event.get()), "stream-start");
+
+    // event = stream->pullEvent();
+    // ASSERT_NOT_NULL(event.get());
+    // EXPECT_STREQ(GST_EVENT_TYPE_NAME(event.get()), "caps");
+    // GstCaps* eventCaps;
+    // gst_event_parse_caps(event.get(), &eventCaps);
+    // // ASSERT_TRUE(gst_caps_is_equal(eventCaps, caps.get()));
+
+    // event = stream->pullEvent();
+    // ASSERT_NOT_NULL(event.get());
+    // EXPECT_STREQ(GST_EVENT_TYPE_NAME(event.get()), "segment");
+
+    // ASSERT_TRUE(gst_caps_is_equal(stream->outputCaps().get(), eventCaps));
+
+    for (unsigned i = 0; i < 4; i++) {
+        auto outputSample = stream->pullSample();
+    }
+
+    // harness->processOutputSamples();
+    auto event = stream->pullEvent();
+    ASSERT_NOT_NULL(event.get());
+    EXPECT_STREQ(GST_EVENT_TYPE_NAME(event.get()), "eos");
+
+    // The harnessed element is identity, so output buffers should be the same as input buffers.
+    // auto outputSample = stream->pullSample();
+    // auto outputBuffer = gst_sample_get_buffer(outputSample.get());
+    // GstMappedBuffer mappedOutputBuffer(outputBuffer, GST_MAP_READ);
+    // ASSERT_TRUE(mappedOutputBuffer);
+    // EXPECT_EQ(mappedOutputBuffer.size(), 64);
+    // EXPECT_EQ(memcmp(mappedInputBuffer.data(), mappedOutputBuffer.data(), 64), 0);
+
+    // Harness is now empty.
+    ASSERT_NULL(stream->pullSample());
+    ASSERT_NULL(stream->pullEvent());
+}
+
+
 TEST_F(GStreamerTest, harnessManualStart)
 {
     GRefPtr<GstElement> element = gst_element_factory_make("identity", nullptr);
