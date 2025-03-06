@@ -305,9 +305,6 @@ void GStreamerCaptureDeviceManager::updateDevice(GRefPtr<GstDevice>&& gstDevice,
 
 void GStreamerCaptureDeviceManager::refreshCaptureDevices()
 {
-    if (deviceType() != CaptureDevice::DeviceType::Microphone)
-        return;
-
     GST_DEBUG_OBJECT(m_deviceMonitor.get(), "Refreshing capture devices");
     m_devices.clear();
     m_gstreamerDevices.clear();

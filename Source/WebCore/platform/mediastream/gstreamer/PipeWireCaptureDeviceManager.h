@@ -36,13 +36,13 @@ namespace WebCore {
 class PipeWireCaptureDeviceManager : public RefCounted<PipeWireCaptureDeviceManager> {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static RefPtr<PipeWireCaptureDeviceManager> create(CaptureDevice::DeviceType);
-    PipeWireCaptureDeviceManager(CaptureDevice::DeviceType);
+    static RefPtr<PipeWireCaptureDeviceManager> create(OptionSet<CaptureDevice::DeviceType>);
+    PipeWireCaptureDeviceManager(OptionSet<CaptureDevice::DeviceType>);
 
     CaptureSourceOrError createCaptureSource(const CaptureDevice&, MediaDeviceHashSalts&&, const MediaConstraints*);
 
 private:
-    CaptureDevice::DeviceType m_deviceType;
+    OptionSet<CaptureDevice::DeviceType> m_deviceTypes;
     RefPtr<DesktopPortalCamera> m_portal;
     GRefPtr<GstDeviceProvider> m_pipewireDeviceProvider;
 };

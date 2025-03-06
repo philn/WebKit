@@ -31,13 +31,13 @@ namespace WebCore {
 GST_DEBUG_CATEGORY(webkit_pipewire_capture_device_manager_debug);
 #define GST_CAT_DEFAULT webkit_pipewire_capture_device_manager_debug
 
-RefPtr<PipeWireCaptureDeviceManager> PipeWireCaptureDeviceManager::create(CaptureDevice::DeviceType deviceType)
+RefPtr<PipeWireCaptureDeviceManager> PipeWireCaptureDeviceManager::create(OptionSet<CaptureDevice::DeviceType> deviceTypes)
 {
-    return adoptRef(*new PipeWireCaptureDeviceManager(deviceType));
+    return adoptRef(*new PipeWireCaptureDeviceManager(deviceTypes));
 }
 
-PipeWireCaptureDeviceManager::PipeWireCaptureDeviceManager(CaptureDevice::DeviceType deviceType)
-    : m_deviceType(deviceType)
+PipeWireCaptureDeviceManager::PipeWireCaptureDeviceManager(OptionSet<CaptureDevice::DeviceType> deviceTypes)
+    : m_deviceTypes(deviceTypes)
     , m_pipewireDeviceProvider(adoptGRef(gst_device_provider_factory_get_by_name("pipewiredeviceprovider")))
 {
     static std::once_flag onceFlag;
@@ -53,7 +53,8 @@ CaptureSourceOrError PipeWireCaptureDeviceManager::createCaptureSource(const Cap
         return GStreamerVideoCaptureSource::create(String { device.persistentId() }, WTFMove(hashSalts), constraints);
 
     // We don't support audio capture yet.
-    RELEASE_ASSERT(m_deviceType == CaptureDevice::DeviceType::Camera);
+    if (!m_deviceTypes.contains(CaptureDevice::DeviceType::Camera))
+        return CaptureSourceOrError({ { }, MediaAccessDenialReason::PermissionDenied });
 
     if (!m_pipewireDeviceProvider || !gstObjectHasProperty(GST_OBJECT_CAST(m_pipewireDeviceProvider.get()), "fd")) {
         GST_WARNING("PipeWire Device Provider is missing or too old. Please install PipeWire >= 0.3.64.");

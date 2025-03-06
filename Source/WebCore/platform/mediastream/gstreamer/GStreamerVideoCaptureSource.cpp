@@ -62,7 +62,7 @@ private:
 GStreamerVideoCaptureDeviceManager::GStreamerVideoCaptureDeviceManager()
     : GStreamerCaptureDeviceManager()
 {
-    m_pipewireCaptureDeviceManager = PipeWireCaptureDeviceManager::create(deviceType());
+    m_pipewireCaptureDeviceManager = PipeWireCaptureDeviceManager::create(deviceTypes());
 }
 
 CaptureSourceOrError GStreamerVideoCaptureDeviceManager::createVideoCaptureSource(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)
