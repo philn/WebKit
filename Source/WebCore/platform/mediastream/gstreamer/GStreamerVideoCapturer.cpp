@@ -96,7 +96,7 @@ void GStreamerVideoCapturer::setupPipeline()
 
 GstElement* GStreamerVideoCapturer::createConverter()
 {
-    if (isCapturingDisplay()) {
+    if (1) {
 #if USE(GBM)
         m_caps = buildDMABufCaps();
 #endif
@@ -141,7 +141,7 @@ GstElement* GStreamerVideoCapturer::createConverter()
 
 bool GStreamerVideoCapturer::setSize(const IntSize& size)
 {
-    if (isCapturingDisplay()) {
+    if (1) {
         // Pipewiresrc doesn't seem to support caps re-negotiation and framerate configuration properly.
         GST_FIXME_OBJECT(m_pipeline.get(), "Resizing disabled on display capture source");
         return true;
