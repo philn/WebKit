@@ -2315,7 +2315,7 @@ webrtc/video-replace-track.html [ Pass Failure Timeout Crash ]
 webkit.org/b/235885 webrtc/video.html [ Skip ]
 
 # webrtcbin emits no ICE candidate stats for a PeerConnection managing only one data-channel.
-webkit.org/b/235885 webrtc/candidate-stats.html [ Failure ]
+#webkit.org/b/235885 webrtc/candidate-stats.html [ Failure ]
 webkit.org/b/262989 imported/w3c/web-platform-tests/webrtc-stats/getStats-remote-candidate-address.html [ Failure ]
 
 # Pending investigation.

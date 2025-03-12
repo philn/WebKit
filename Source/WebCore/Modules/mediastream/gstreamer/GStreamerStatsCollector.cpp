@@ -217,7 +217,7 @@ static inline RTCIceCandidateType iceCandidateType(StringView type)
 RTCStatsReport::IceCandidateStats::IceCandidateStats(GstWebRTCStatsType statsType, const GstStructure* structure)
     : Stats(statsType == GST_WEBRTC_STATS_REMOTE_CANDIDATE ? Type::RemoteCandidate : Type::LocalCandidate, structure)
     , transportId(gstStructureGetString(structure, "transport-id"_s).toString())
-    , address(gstStructureGetString(structure, "address"_s).toString())
+    // , address(gstStructureGetString(structure, "address"_s).toString())
     , protocol(gstStructureGetString(structure, "protocol"_s).toString())
     , url(gstStructureGetString(structure, "url"_s).toString())
 {
