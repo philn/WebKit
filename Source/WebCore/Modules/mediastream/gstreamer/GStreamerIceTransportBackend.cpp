@@ -150,7 +150,7 @@ void GStreamerIceTransportBackend::gatheringStateChanged() const
     });
 }
 
-#if 1 // GST_CHECK_VERSION(1, 25, 0)
+#if 1 // GST_CHECK_VERSION(1, 27, 0)
 static Ref<RTCIceCandidate> candidateFromGstWebRTC(const GstWebRTCICECandidate* c)
 {
     RTCIceCandidate::Fields fields;
@@ -197,7 +197,7 @@ static Ref<RTCIceCandidate> candidateFromGstWebRTC(const GstWebRTCICECandidate* 
 void GStreamerIceTransportBackend::selectedCandidatePairChanged()
 {
     // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/8484
-#if 1 //  GST_CHECK_VERSION(1, 25, 0)
+#if 1 //  GST_CHECK_VERSION(1, 27, 0)
     GUniquePtr<GstWebRTCICECandidatePair> selectedPair(gst_webrtc_ice_transport_get_selected_candidate_pair(m_iceTransport.get()));
     if (!selectedPair)
         return;

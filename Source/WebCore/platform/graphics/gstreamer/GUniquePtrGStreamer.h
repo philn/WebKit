@@ -54,10 +54,10 @@ WTF_DEFINE_GPTR_DELETER(GstFFTF32, gst_fft_f32_free)
 WTF_DEFINE_GPTR_DELETER(GstWebRTCSessionDescription, gst_webrtc_session_description_free)
 WTF_DEFINE_GPTR_DELETER(GstSDPMessage, gst_sdp_message_free)
 
-#if 1 // GST_CHECK_VERSION(1, 25, 0)
+#if 1 // GST_CHECK_VERSION(1, 27, 0)
 WTF_DEFINE_GPTR_DELETER(GstWebRTCICECandidate, gst_webrtc_ice_candidate_free)
 WTF_DEFINE_GPTR_DELETER(GstWebRTCICECandidatePair, gst_webrtc_ice_candidate_pair_free)
-#endif // GST_CHECK_VERSION(1, 25, 0)
+#endif // GST_CHECK_VERSION(1, 27, 0)
 #endif
 }
 
