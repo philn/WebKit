@@ -20,14 +20,14 @@
 #include "config.h"
 #include "AudioFileReader.h"
 
-#if ENABLE(WEB_AUDIO)
+#if ENABLE(WEB_AUDIO) && USE(GSTREAMER)
 
 #include "AudioBus.h"
+#include "AudioSampleFormat.h"
 #include "GStreamerCommon.h"
 #include "GStreamerElementHarness.h"
 #include "GStreamerQuirks.h"
 #include "GStreamerRegistryScanner.h"
-#include <gst/audio/audio-info.h>
 #include <gst/base/gsttypefindhelper.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PrintStream.h>
@@ -50,38 +50,19 @@ public:
 
 private:
     RefPtr<GStreamerElementHarness> m_decoderHarness;
-    RefPtr<GStreamerElementHarness> m_deinterleaveHarness;
-    Vector<RefPtr<GStreamerElementHarness>> m_deinterleavedHarnesses;
 
     std::span<const uint8_t> m_data;
     bool m_error { false };
-    std::optional<bool> m_isInterleaved;
     float m_sampleRate { 0 };
     int m_channels { 0 };
-    UncheckedKeyHashMap<int, GRefPtr<GstBufferList>> m_buffers;
-    std::optional<int> m_firstChannelType;
-    unsigned m_channelSize { 0 };
+    size_t m_channelSize { 0 };
+    HashMap<int, std::span<float>, WTF::IntHash<int>, WTF::UnsignedWithZeroKeyHashTraits<int>> m_channelData;
 };
 
-static void copyGstreamerBuffersToAudioChannel(const GRefPtr<GstBufferList>& buffers, AudioChannel* audioChannel)
-{
-    auto destination = audioChannel->mutableSpan();
-    unsigned bufferCount = gst_buffer_list_length(buffers.get());
-    uint64_t offset = 0;
-    for (unsigned i = 0; i < bufferCount; ++i) {
-        GstMappedBuffer buffer(gst_buffer_list_get(buffers.get(), i), GST_MAP_READ);
-        auto count = buffer.size() / sizeof(float);
-        memcpySpan(destination.subspan(offset, count), buffer.span<float>());
-        offset += count;
-    }
-}
-
-static inline std::optional<int> channelTypeFromCaps(GstCaps* caps)
+static inline std::optional<int> channelTypeFromGStreamerPosition(int position)
 {
     int channelId = 0;
-    GstAudioInfo info;
-    gst_audio_info_from_caps(&info, caps);
-    switch (GST_AUDIO_INFO_POSITION(&info, 0)) {
+    switch (position) {
     case GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT:
     case GST_AUDIO_CHANNEL_POSITION_MONO:
         channelId = AudioBus::ChannelLeft;
@@ -104,7 +85,7 @@ static inline std::optional<int> channelTypeFromCaps(GstCaps* caps)
         channelId = AudioBus::ChannelSurroundRight;
         break;
     default:
-        GST_WARNING("Unhandled channel: %d", GST_AUDIO_INFO_POSITION(&info, 0));
+        GST_WARNING("Unhandled channel: %d", position);
         return { };
     };
     return channelId;
@@ -131,95 +112,60 @@ AudioFileReader::AudioFileReader(std::span<const uint8_t> data)
         return;
     }
 
-    GRefPtr deInterleave = makeGStreamerElement("deinterleave"_s, "deinterleave"_s);
-    g_object_set(deInterleave.get(), "keep-positions", TRUE, nullptr);
-
-    m_deinterleaveHarness = GStreamerElementHarness::create(WTFMove(deInterleave), [](auto&, auto&&) {}, [protectedThis = ThreadSafeWeakPtr { *this }, this](const auto& pad) -> RefPtr<GStreamerElementHarness> {
-        RefPtr self = protectedThis.get();
-        if (!self)
-            return nullptr;
-
-        if (!m_firstChannelType) {
-            auto caps = adoptGRef(gst_pad_query_caps(pad.get(), nullptr));
-            auto channelType = channelTypeFromCaps(caps.get());
-            if (channelType)
-                m_firstChannelType = WTFMove(channelType);
-        }
-        m_channels++;
-
-        GRefPtr<GstElement> element = gst_element_factory_make("identity", nullptr);
-        auto harness = GStreamerElementHarness::create(WTFMove(element), [protectedThis = ThreadSafeWeakPtr { *this }, this](auto&, auto&& sample) {
-            RefPtr self = protectedThis.get();
-            if (!self)
-                return;
-
-            auto buffer = gst_sample_get_buffer(sample.get());
-            if (!buffer)
-                return;
-
-            auto caps = gst_sample_get_caps(sample.get());
-            if (!caps)
-                return;
-
-            auto channelType = channelTypeFromCaps(caps);
-            if (!channelType)
-                return;
-
-            if (!m_firstChannelType) {
-                ASSERT_NOT_REACHED();
-                return;
-            }
-
-            if (*channelType == *m_firstChannelType) {
-                GstAudioInfo info;
-                gst_audio_info_from_caps(&info, caps);
-                m_channelSize += gst_buffer_get_size(buffer) / info.bpf;
-            }
-
-            // Shift hash table key values by one, otherwise we would hit an ASSERT here when channelType is
-            // 0 (Left), which is also KeyTraits::emptyValue() which is not allowed.
-            int keyId = *channelType + 1;
-            auto result = m_buffers.ensure(keyId, [] {
-                return adoptGRef(gst_buffer_list_new());
-            });
-            auto& bufferList = result.iterator->value;
-            ASSERT(gst_buffer_list_is_writable(bufferList.get()));
-            gst_buffer_list_add(bufferList.get(), gst_buffer_ref(buffer));
-        });
-        m_deinterleavedHarnesses.append(harness.ptr());
-        return harness;
-    });
-
     GRefPtr<GstElement> element = gst_element_factory_create(lookupResult.factory.get(), nullptr);
     configureAudioDecoderForHarnessing(element);
     m_decoderHarness = GStreamerElementHarness::create(WTFMove(element), [this](auto&, auto&& sample) {
-        if (!m_isInterleaved) {
-            auto caps = gst_sample_get_caps(sample.get());
-            GstAudioInfo info;
-            gst_audio_info_from_caps(&info, caps);
-            auto layout = GST_AUDIO_INFO_LAYOUT(&info);
-            m_isInterleaved = layout == GST_AUDIO_LAYOUT_INTERLEAVED;
-        }
-        if (*m_isInterleaved) {
-            m_deinterleaveHarness->pushSample(WTFMove(sample));
-            return;
-        }
-
         GstMappedAudioBuffer mappedBuffer(sample, GST_MAP_READ);
         if (!mappedBuffer)
             return;
 
+        m_channels = GST_AUDIO_BUFFER_CHANNELS(mappedBuffer.get());
+        m_channelSize += gst_buffer_get_size(gst_sample_get_buffer(sample.get())) / GST_AUDIO_BUFFER_BPF(mappedBuffer.get());
+
+#define CONVERT_SAMPLES(samples)                                        \
+        for (size_t channel = 0; channel < samples.size(); channel++) { \
+            auto channelData = samples[channel];                        \
+            for (size_t i = 0; i < channelData.size(); i++)             \
+                convertedData[channel][i] = convertAudioSample<float>(channelData[i]); \
+        }
+
+        Vector<std::span<float>> convertedData;
+        switch (GST_AUDIO_BUFFER_FORMAT(mappedBuffer.get())) {
+        case GST_AUDIO_FORMAT_U8: {
+            auto samples = mappedBuffer.samples<uint8_t>(0);
+            CONVERT_SAMPLES(samples);
+            break;
+        }
+        case GST_AUDIO_FORMAT_S16: {
+            auto samples = mappedBuffer.samples<int16_t>(0);
+            CONVERT_SAMPLES(samples);
+            break;
+        }
+        case GST_AUDIO_FORMAT_S32: {
+            auto samples = mappedBuffer.samples<int32_t>(0);
+            CONVERT_SAMPLES(samples);
+            break;
+        }
+        case GST_AUDIO_FORMAT_F32:
+            convertedData = mappedBuffer.samples<float>(0);
+            break;
+        default:
+            break;
+        };
+#undef CONVERT_SAMPLES
+
+        for (size_t channel = 0; channel < convertedData.size(); channel++) {
+            auto channelType = channelTypeFromGStreamerPosition(channel);
+            if (!channelType)
+                continue;
+            m_channelData.add(*channelType, convertedData[channel]);
+        }
     });
 
     if (!m_decoderHarness->pushSample(adoptGRef(gst_sample_new(buffer.get(), caps.get(), nullptr, nullptr)))) {
         GST_WARNING_OBJECT(m_decoderHarness->element(), "Parser or downstream decoder failed to process data");
         m_error = true;
         return;
-    }
-
-    for (auto& stream : m_decoderHarness->outputStreams()) {
-        while (auto event = stream->pullEvent())
-            m_deinterleaveHarness->pushEvent(WTFMove(event));
     }
 
     m_decoderHarness->reset();
@@ -233,14 +179,12 @@ RefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono)
     GST_DEBUG("sampleRate: %f, mixToMono: %s", sampleRate, boolForPrinting(mixToMono));
     m_sampleRate = sampleRate;
 
-    GST_DEBUG("Transfering data to audio bus containing %d channels, each with %u frames", m_channels, m_channelSize);
-    auto audioBus = AudioBus::create(m_channels, m_channelSize, true);
+    GST_DEBUG("Transfering data to audio bus containing %d channels, each with %zu bytes", m_channels, m_channelSize);
+    auto audioBus = AudioBus::create(m_channels, m_channelSize, false);
     audioBus->setSampleRate(m_sampleRate);
 
-    for (auto& [key, buffer] : m_buffers)
-        copyGstreamerBuffersToAudioChannel(buffer, audioBus->channelByType(key - 1));
-
-    m_buffers.clear();
+    for (auto& [index, storage] : m_channelData)
+        audioBus->setChannelMemory(index, storage);
 
     if (mixToMono)
         return AudioBus::createByMixingToMono(audioBus.get());
@@ -256,11 +200,12 @@ RefPtr<AudioBus> createBusFromInMemoryAudioFile(std::span<const uint8_t> data, b
     });
 
     GST_DEBUG("Creating bus from in-memory audio data (%zu bytes)", data.size());
-    return AudioFileReader(data).createBus(sampleRate, mixToMono);
+    auto reader = AudioFileReader(data);
+    return reader.createBus(sampleRate, mixToMono);
 }
 
 #undef GST_CAT_DEFAULT
 
-} // WebCore
+} // namespace WebCore
 
-#endif // ENABLE(WEB_AUDIO)
+#endif // ENABLE(WEB_AUDIO) && USE(GSTREAMER)
