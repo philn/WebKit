@@ -913,20 +913,27 @@ bool GStreamerRegistryScanner::areAllCodecsSupported(Configuration configuration
     return true;
 }
 
-GStreamerRegistryScanner::CodecLookupResult GStreamerRegistryScanner::areCapsSupported(Configuration configuration, const GRefPtr<GstCaps>& caps, bool shouldCheckForHardwareUse) const
+GStreamerRegistryScanner::CodecLookupResult GStreamerRegistryScanner::areCapsSupported(Configuration configuration, const GRefPtr<GstCaps>& caps, bool shouldCheckForHardwareUse, std::optional<Vector<String>> disallowedList) const
 {
+    auto isVideo = doCapsHaveType(caps.get(), GST_VIDEO_CAPS_TYPE_PREFIX);
     OptionSet<ElementFactories::Type> factoryTypes;
     switch (configuration) {
     case Configuration::Decoding:
-        factoryTypes.add(ElementFactories::Type::VideoDecoder);
+        if (isVideo)
+             factoryTypes.add(ElementFactories::Type::VideoDecoder);
+        else
+            factoryTypes.add(ElementFactories::Type::AudioDecoder);
         break;
     case Configuration::Encoding:
-        factoryTypes.add(ElementFactories::Type::VideoEncoder);
+        if (isVideo)
+            factoryTypes.add(ElementFactories::Type::VideoEncoder);
+        else
+            factoryTypes.add(ElementFactories::Type::AudioEncoder);
         break;
     }
-    auto lookupResult = ElementFactories(factoryTypes).hasElementForCaps(factoryTypes.toSingleValue().value(), caps, ElementFactories::CheckHardwareClassifier::Yes);
+    auto lookupResult = ElementFactories(factoryTypes).hasElementForCaps(factoryTypes.toSingleValue().value(), caps, ElementFactories::CheckHardwareClassifier::Yes, disallowedList);
     bool supported = lookupResult && (shouldCheckForHardwareUse ? lookupResult.isUsingHardware : true);
-    GST_DEBUG("%s decoding supported for caps %" GST_PTR_FORMAT ": %s", shouldCheckForHardwareUse ? "Hardware" : "Software", caps.get(), boolForPrinting(supported));
+    GST_DEBUG("%s %s supported for caps %" GST_PTR_FORMAT ": %s", shouldCheckForHardwareUse ? "Hardware" : "Software", configuration == Configuration::Decoding ? "decoding" : "encoding", caps.get(), boolForPrinting(supported));
     return { supported, supported ? lookupResult.factory : nullptr };
 }
 

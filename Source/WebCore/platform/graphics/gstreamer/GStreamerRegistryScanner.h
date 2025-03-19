@@ -107,7 +107,7 @@ public:
     MediaPlayerEnums::SupportsType isContentTypeSupported(Configuration, const ContentType&, const Vector<ContentType>& contentTypesRequiringHardwareSupport, CaseSensitiveCodecName = CaseSensitiveCodecName::Yes) const;
     bool areAllCodecsSupported(Configuration, const Vector<String>& codecs, bool shouldCheckForHardwareUse = false) const;
 
-    CodecLookupResult areCapsSupported(Configuration, const GRefPtr<GstCaps>&, bool shouldCheckForHardwareUse) const;
+    CodecLookupResult areCapsSupported(Configuration, const GRefPtr<GstCaps>&, bool shouldCheckForHardwareUse, std::optional<Vector<String>> disallowedList = std::nullopt) const;
 
 #if USE(GSTREAMER_WEBRTC)
     RTCRtpCapabilities audioRtpCapabilities(Configuration);
