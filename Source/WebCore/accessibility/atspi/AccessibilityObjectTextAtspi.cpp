@@ -39,6 +39,7 @@
 #include "VisibleUnits.h"
 #include <gio/gio.h>
 #include <wtf/Assertions.h>
+#include <wtf/StringPrintStream.h>
 #include <wtf/unicode/CharacterNames.h>
 
 namespace WebCore {
@@ -277,9 +278,13 @@ String AccessibilityObjectAtspi::text() const
 
     if (m_coreObject->roleValue() == AccessibilityRole::ColorWell) {
         auto color = convertColor<SRGBA<float>>(m_coreObject->colorValue()).resolved();
-        const char* alphaFormat = (color.alpha == 1.0f) ? "1" : g_strdup_printf("%7.5f", color.alpha);
-        GUniquePtr<char> colorString(g_strdup_printf("rgb %7.5f %7.5f %7.5f %s", color.red, color.green, color.blue, alphaFormat));
-        return String::fromUTF8(colorString.get());
+        StringPrintStream colorStringBuilder;
+        colorStringBuilder.print("rgb %7.5f %7.5f %7.5f ", color.red, color.green, color.blue);
+        if (color.alpha == 1.0f)
+            colorStringBuilder.print("1");
+        else
+            colorStringBuilder.print("%7.5f", color.alpha);
+        return colorStringBuilder.toString();
     }
 
     if (m_coreObject->isTextControl())
