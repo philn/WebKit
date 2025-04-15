@@ -668,6 +668,7 @@ private:
     TrackIDHashMap<String> m_codecs WTF_GUARDED_BY_LOCK(m_codecsLock);
 
     bool isSeamlessSeekingEnabled() const { return m_seekFlags & GST_SEEK_FLAG_SEGMENT; }
+    std::optional<bool> m_isSegmentSeekingSupported { };
 
     Ref<PlatformMediaResourceLoader> m_loader;
 
