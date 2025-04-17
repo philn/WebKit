@@ -332,10 +332,14 @@ const RealtimeMediaSourceSettings& MockRealtimeVideoSource::settings()
 
     settings.setFrameRate(frameRate());
     auto size = this->size();
+
+    // GStreamer ports handle orientation using metadata, so the size doesn't need to be adapted.
+#if !USE(GSTREAMER)
     if (mockCamera()) {
         if (m_deviceOrientation == VideoFrame::Rotation::Left || m_deviceOrientation == VideoFrame::Rotation::Right)
             size = size.transposedSize();
     }
+#endif
     settings.setWidth(size.width());
     settings.setHeight(size.height());
 

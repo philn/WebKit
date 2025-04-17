@@ -635,8 +635,8 @@ private:
 
         VideoFrameTimeMetadata metadata;
         metadata.captureTime = MonotonicTime::now().secondsSinceEpoch();
-        auto emptyBuffer = adoptGRef(gst_buffer_new_allocate(nullptr, GST_VIDEO_INFO_SIZE(&info), nullptr));
-        auto buffer = webkitGstBufferSetVideoFrameMetadata(WTFMove(emptyBuffer), metadata, m_videoRotation, m_videoMirrored);
+        auto buffer = adoptGRef(gst_buffer_new_allocate(nullptr, GST_VIDEO_INFO_SIZE(&info), nullptr));
+        webkitGstBufferAddVideoFrameMetadata(buffer.get(), WTFMove(metadata), m_videoRotation, m_videoMirrored);
         {
             GstMappedBuffer data(buffer, GST_MAP_WRITE);
             WTF_ALLOW_UNSAFE_BUFFER_USAGE_BEGIN; // GLib port
