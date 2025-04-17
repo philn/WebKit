@@ -448,9 +448,6 @@ VideoFrameGStreamer::VideoFrameGStreamer(GRefPtr<GstSample>&& sample, std::optio
 
     setMemoryTypeFromCaps();
 
-    if (!metadata)
-        return;
-
     GRefPtr buffer = gst_sample_get_buffer(m_sample.get());
     RELEASE_ASSERT(buffer);
     auto modifiedBuffer = webkitGstBufferSetVideoFrameMetadata(WTFMove(buffer), WTFMove(metadata), videoRotation, videoMirrored);
