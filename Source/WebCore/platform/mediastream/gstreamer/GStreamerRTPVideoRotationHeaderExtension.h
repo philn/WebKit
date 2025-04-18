@@ -1,6 +1,6 @@
 /*
- *  Copyright (C) 2024 Igalia S.L. All rights reserved.
- *  Copyright (C) 2024 Metrological Group B.V.
+ *  Copyright (C) 2025 Igalia S.L. All rights reserved.
+ *  Copyright (C) 2025 Metrological Group B.V.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public

@@ -129,7 +129,9 @@ void webkitGstBufferAddVideoFrameMetadata(GstBuffer* buffer, std::optional<WebCo
 
 GRefPtr<GstBuffer> webkitGstBufferSetVideoFrameMetadata(GRefPtr<GstBuffer>&& buffer, std::optional<WebCore::VideoFrameTimeMetadata>&& metadata, VideoFrame::Rotation rotation, bool isMirrored)
 {
+    IGNORE_WARNINGS_BEGIN("cast-align");
     auto modifiedBuffer = adoptGRef(gst_buffer_make_writable(buffer.leakRef()));
+    IGNORE_WARNINGS_END;
     webkitGstBufferAddVideoFrameMetadata(modifiedBuffer.get(), WTFMove(metadata), rotation, isMirrored);
     return modifiedBuffer;
 }

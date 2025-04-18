@@ -1,6 +1,6 @@
 /*
- *  Copyright (C) 2024 Igalia S.L. All rights reserved.
- *  Copyright (C) 2024 Metrological Group B.V.
+ *  Copyright (C) 2025 Igalia S.L. All rights reserved.
+ *  Copyright (C) 2025 Metrological Group B.V.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -41,22 +41,22 @@ typedef struct _RTPVideoRotationHeaderExtensionClass {
     GstRTPHeaderExtensionClass parentClass;
 } RTPVideoRotationHeaderExtensionClass;
 
-GST_DEBUG_CATEGORY_STATIC(webkitGstRTPVideoRotationHeaderExtensionDebug);
-#define GST_CAT_DEFAULT webkitGstRTPVideoRotationHeaderExtensionDebug
+GST_DEBUG_CATEGORY_STATIC(extensionDebug);
+#define GST_CAT_DEFAULT extensionDebug
 
-WEBKIT_DEFINE_TYPE_WITH_CODE(RTPVideoRotationHeaderExtension, webkit_gst_rtp_video_rotation_header_extension, GST_TYPE_RTP_HEADER_EXTENSION, GST_DEBUG_CATEGORY_INIT(webkitGstRTPVideoRotationHeaderExtensionDebug, "webkitrtpvideorotationheaderextension", 0, "RTP Video Header Extension"))
+WEBKIT_DEFINE_TYPE_WITH_CODE(RTPVideoRotationHeaderExtension, webkit_gst_rtp_video_rotation_header_extension, GST_TYPE_RTP_HEADER_EXTENSION, GST_DEBUG_CATEGORY_INIT(extensionDebug, "webkitrtpvideorotation", 0, "RTP Video Header Extension"))
 
-static GstRTPHeaderExtensionFlags webkitGstRTPVideoRotationHeaderExtensionGetSupportedFlags(GstRTPHeaderExtension*)
+static GstRTPHeaderExtensionFlags extensionGetSupportedFlags(GstRTPHeaderExtension*)
 {
     return static_cast<GstRTPHeaderExtensionFlags>(GST_RTP_HEADER_EXTENSION_ONE_BYTE | GST_RTP_HEADER_EXTENSION_TWO_BYTE);
 }
 
-static gsize webkitGstRTPVideoRotationHeaderExtensionGetMaxSize(GstRTPHeaderExtension*, const GstBuffer*)
+static gsize extensionGetMaxSize(GstRTPHeaderExtension*, const GstBuffer*)
 {
     return 1;
 }
 
-static gssize webkitGstRTPVideoRotationHeaderExtensionWrite(GstRTPHeaderExtension* extension, const GstBuffer* inputBuffer, GstRTPHeaderExtensionFlags, GstBuffer*, guint8* data, gsize)
+static gssize extensionWrite(GstRTPHeaderExtension* extension, const GstBuffer* inputBuffer, GstRTPHeaderExtensionFlags, GstBuffer*, guint8* data, gsize)
 {
     auto [rotation, isMirrored] = webkitGstBufferGetVideoRotation(const_cast<GstBuffer*>(inputBuffer));
     gssize written = 1;
@@ -83,7 +83,7 @@ static gssize webkitGstRTPVideoRotationHeaderExtensionWrite(GstRTPHeaderExtensio
     return written;
 }
 
-static gboolean webkitGstRTPVideoRotationHeaderExtensionRead(GstRTPHeaderExtension* extension, GstRTPHeaderExtensionFlags, const guint8* data, gsize, GstBuffer* buffer)
+static gboolean extensionRead(GstRTPHeaderExtension* extension, GstRTPHeaderExtensionFlags, const guint8* data, gsize, GstBuffer* buffer)
 {
     VideoFrame::Rotation rotation = VideoFrame::Rotation::None;
     uint8_t firstByte = data[0];
@@ -114,10 +114,10 @@ static void webkit_gst_rtp_video_rotation_header_extension_class_init(RTPVideoRo
 {
     auto rtpHeaderExtensionClass = GST_RTP_HEADER_EXTENSION_CLASS(klass);
 
-    rtpHeaderExtensionClass->get_supported_flags = webkitGstRTPVideoRotationHeaderExtensionGetSupportedFlags;
-    rtpHeaderExtensionClass->get_max_size = webkitGstRTPVideoRotationHeaderExtensionGetMaxSize;
-    rtpHeaderExtensionClass->write = webkitGstRTPVideoRotationHeaderExtensionWrite;
-    rtpHeaderExtensionClass->read = webkitGstRTPVideoRotationHeaderExtensionRead;
+    rtpHeaderExtensionClass->get_supported_flags = extensionGetSupportedFlags;
+    rtpHeaderExtensionClass->get_max_size = extensionGetMaxSize;
+    rtpHeaderExtensionClass->write = extensionWrite;
+    rtpHeaderExtensionClass->read = extensionRead;
 
     gst_element_class_set_static_metadata(GST_ELEMENT_CLASS(klass), "3GPP Orientation RTP Header Extension", GST_RTP_HDREXT_ELEMENT_CLASS,
         "Read/write 3GPP Orientation from/to RTP packets", "Philippe Normand <philn@igalia.com>");
