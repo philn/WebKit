@@ -933,8 +933,9 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
     if (webkitGstCheckVersion(1, 22, 0)) {
         Encoders::registerEncoder(Av1, "av1enc"_s, "av1parse"_s, "video/x-av1"_s, nullptr,
             [](WebKitVideoEncoder* self) {
-                g_object_set(self->priv->encoder.get(), "threads", NUMBER_OF_THREADS, nullptr);
-                gst_util_set_object_arg(G_OBJECT(self->priv->encoder.get()), "keyframe-mode", "disabled");
+                g_object_set(self->priv->encoder.get(), "threads", NUMBER_OF_THREADS, "lag-in-frames", 0,
+                    "overshoot-pct", 10, "row-mt", TRUE, "tile-columns", 2, "tile-rows", 2, nullptr);
+                //gst_util_set_object_arg(G_OBJECT(self->priv->encoder.get()), "keyframe-mode", "disabled");
             }, "target-bitrate"_s, setBitrateKbitPerSec, "keyframe-max-dist"_s, [](GstElement* encoder, BitrateMode mode) {
                 switch (mode) {
                 case CONSTANT_BITRATE_MODE:
