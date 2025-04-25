@@ -140,6 +140,10 @@ SharedAudioDestinationAdapter::SharedAudioDestinationAdapter(const CreationOptio
 #if PLATFORM(IOS_FAMILY)
         , options.sceneIdentifier.isNull() ? emptyString() : options.sceneIdentifier
 #endif
+#if USE(GSTREAMER) && ENABLE(WPE_PLATFORM)
+        , options.audioSinkSocketPath
+        , options.audioSinkStarted
+#endif
         }) }
     , m_workBus { AudioBus::create(options.numberOfOutputChannels, AudioUtilities::renderQuantumSize).releaseNonNull() }
     , m_ensureFunction { WTFMove(ensureFunction) }

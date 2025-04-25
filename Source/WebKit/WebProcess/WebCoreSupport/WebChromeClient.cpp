@@ -2055,4 +2055,16 @@ void WebChromeClient::setNeedsFixedContainerEdgesUpdate()
     m_page->setNeedsFixedContainerEdgesUpdate();
 }
 
+#if ENABLE(WPE_PLATFORM)
+String WebChromeClient::requestAudioSinkSocket()
+{
+    return protectedPage()->requestAudioSinkSocket();
+}
+
+void WebChromeClient::audioSinkStarted(const String& path)
+{
+    protectedPage()->audioSinkStarted(path);
+}
+#endif
+
 } // namespace WebKit

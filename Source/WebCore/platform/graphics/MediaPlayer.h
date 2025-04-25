@@ -358,6 +358,11 @@ public:
 #if PLATFORM(IOS_FAMILY)
     virtual bool canShowWhileLocked() const { return false; }
 #endif
+
+#if USE(GSTREAMER) && ENABLE(WPE_PLATFORM)
+    virtual String requestAudioSinkSocket() { return emptyString(); }
+    virtual void audioSinkStarted(const String &) { }
+#endif
 };
 
 class WEBCORE_EXPORT MediaPlayer : public MediaPlayerEnums, public ThreadSafeRefCountedAndCanMakeThreadSafeWeakPtr<MediaPlayer, WTF::DestructionThread::Main> {
@@ -672,6 +677,11 @@ public:
 #if USE(GSTREAMER)
     void simulateAudioInterruption();
     bool isGStreamerHolePunchingEnabled();
+#endif
+
+#if USE(GSTREAMER) && ENABLE(WPE_PLATFORM)
+    String requestAudioSinkSocket();
+    void audioSinkStarted(const String&);
 #endif
 
     void beginSimulatedHDCPError();

@@ -76,6 +76,21 @@ void WebPageProxy::Internals::voicesDidChange()
     protectedPage->protectedLegacyMainFrameProcess()->send(Messages::WebPage::VoicesDidChange(), protectedPage->webPageIDInMainFrameProcess());
 }
 
+#if ENABLE(WPE_PLATFORM)
+String WebPageProxy::Internals::requestAudioSinkSocket()
+{
+    // Not needed because our UIProcess doesn't act as a Synthesys client. The SpeechSynthesys does
+    // the IPC directly through its context/page.
+    return { };
+}
+
+void WebPageProxy::Internals::audioSinkStarted(const String& path)
+{
+    // Not needed because our UIProcess doesn't act as a Synthesys client. The SpeechSynthesys does
+    // the IPC directly through its context/page.
+}
+#endif
+
 } // namespace WebKit
 
 #endif // ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(SPEECH_SYNTHESIS)

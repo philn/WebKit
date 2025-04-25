@@ -82,10 +82,23 @@ SpielSpeechWrapper::SpielSpeechWrapper(const PlatformSpeechSynthesizer& synthesi
         GST_DEBUG_CATEGORY_INIT(webkit_spiel_debug, "webkitspiel", 0, "WebKit Spiel");
     });
 
-    m_sink = createPlatformAudioSink("speech"_s);
+    String socketPath;
+#if ENABLE(WPE_PLATFORM)
+    socketPath = m_platformSynthesizer.client().requestAudioSinkSocket();
+#endif
+
+    m_sink = createPlatformAudioSink("speech"_s, WTFMove(socketPath));
     if (!m_sink) {
         GST_ERROR("Failed to create GStreamer audio sink element");
         return;
+    }
+    if (WEBKIT_IS_AUDIO_SINK(m_sink.get()) && !socketPath.isEmpty()) {
+        webkitAudioSinkSetStartedCallback(WEBKIT_AUDIO_SINK(m_sink.get()), [&](const auto& path) {
+            m_platformSynthesizer.client().audioSinkStarted(path);
+        });
+        webkitAudioSinkSetDisposedCallback(WEBKIT_AUDIO_SINK(m_sink.get()), [&](const auto&) {
+            // TODO
+        });
     }
 
     spiel_speaker_new(nullptr, [](GObject*, GAsyncResult* result, gpointer userData) {

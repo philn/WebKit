@@ -1980,6 +1980,11 @@ public:
 
     void setNeedsFixedContainerEdgesUpdate() { m_needsFixedContainerEdgesUpdate = true; }
 
+#if ENABLE(WPE_PLATFORM)
+    String requestAudioSinkSocket();
+    void audioSinkStarted(const String&);
+#endif
+
 private:
     WebPage(WebCore::PageIdentifier, WebPageCreationParameters&&);
 

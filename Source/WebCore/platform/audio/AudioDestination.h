@@ -45,6 +45,10 @@ namespace WebCore {
 // The audio hardware periodically calls the AudioIOCallback render() method asking it to render/output the next render quantum of audio.
 // It optionally will pass in local/live audio input when it calls render().
 
+#if USE(GSTREAMER) && ENABLE(WPE_PLATFORM)
+using AudioSinkStartedCallback = Function<void(const String&)>;
+#endif
+
 struct AudioDestinationCreationOptions {
     AudioIOCallback& callback;
     const String& inputDeviceId;
@@ -53,6 +57,10 @@ struct AudioDestinationCreationOptions {
     float sampleRate;
 #if PLATFORM(IOS_FAMILY)
     const String& sceneIdentifier;
+#endif
+#if USE(GSTREAMER) && ENABLE(WPE_PLATFORM)
+    const String& audioSinkSocketPath;
+    AudioSinkStartedCallback& audioSinkStarted;
 #endif
 };
 

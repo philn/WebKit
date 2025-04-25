@@ -59,6 +59,7 @@ private:
     GRefPtr<GstElement> m_src;
     CompletionHandler<void(bool)> m_startupCompletionHandler;
     CompletionHandler<void(bool)> m_stopCompletionHandler;
+    AudioSinkStartedCallback m_audioSinkStartedCallback;
 };
 
 } // namespace WebCore

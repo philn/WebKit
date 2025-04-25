@@ -570,6 +570,11 @@ private:
 
     void setNeedsFixedContainerEdgesUpdate() final;
 
+#if ENABLE(WPE_PLATFORM)
+    String requestAudioSinkSocket() final;
+    void audioSinkStarted(const String&) final;
+#endif
+
     mutable bool m_cachedMainFrameHasHorizontalScrollbar { false };
     mutable bool m_cachedMainFrameHasVerticalScrollbar { false };
 

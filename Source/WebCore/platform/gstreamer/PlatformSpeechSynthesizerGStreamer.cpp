@@ -77,7 +77,13 @@ GstSpeechSynthesisWrapper::GstSpeechSynthesisWrapper(const PlatformSpeechSynthes
     });
 
     m_src = GST_ELEMENT_CAST(g_object_new(WEBKIT_TYPE_FLITE_SRC, nullptr));
-    GRefPtr<GstElement> audioSink = createPlatformAudioSink("speech"_s);
+
+    String socketPath;
+#if ENABLE(WPE_PLATFORM)
+    socketPath = m_platformSynthesizer.client().requestAudioSinkSocket();
+#endif
+
+    GRefPtr<GstElement> audioSink = createPlatformAudioSink("speech"_s, WTFMove(socketPath));
     if (!audioSink) {
         GST_ERROR("Failed to create GStreamer audio sink element");
         return;
@@ -98,6 +104,10 @@ GstSpeechSynthesisWrapper::GstSpeechSynthesisWrapper(const PlatformSpeechSynthes
             gst_element_set_state(audioSink.get(), GST_STATE_NULL);
             return;
         }
+    } else if (!socketPath.isEmpty()) {
+        webkitAudioSinkSetStartedCallback(WEBKIT_AUDIO_SINK(m_sink.get()), [&](const auto& path) {
+            m_platformSynthesizer.client().audioSinkStarted(path);
+        });
     }
 
     m_volumeElement = makeGStreamerElement("volume"_s);

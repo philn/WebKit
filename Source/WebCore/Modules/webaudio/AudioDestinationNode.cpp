@@ -40,6 +40,7 @@
 #include "AudioWorkletMessagingProxy.h"
 #include "AudioWorkletThread.h"
 #include "DenormalDisabler.h"
+#include "Page.h"
 #include <wtf/TZoneMallocInlines.h>
 
 namespace WebCore {
@@ -127,6 +128,34 @@ void AudioDestinationNode::deref() const
 {
     context().deref();
 }
+
+#if USE(GSTREAMER) && ENABLE(WPE_PLATFORM)
+String AudioDestinationNode::requestAudioSinkSocket()
+{
+    auto document = context().document();
+    if (!document)
+        return emptyString();
+
+    RefPtr page = document->protectedPage();
+    if (!page)
+        return emptyString();
+
+    return page->requestAudioSinkSocket();
+}
+
+void AudioDestinationNode::audioSinkStarted(const String& path)
+{
+    auto document = context().document();
+    if (!document)
+        return;
+
+    RefPtr page = document->protectedPage();
+    if (!page)
+        return;
+
+    page->audioSinkStarted(path);
+}
+#endif
 
 } // namespace WebCore
 

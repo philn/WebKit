@@ -62,6 +62,11 @@ public:
     virtual void setSceneIdentifier(const String&) { }
 #endif
 
+#if USE(GSTREAMER) && ENABLE(WPE_PLATFORM)
+    String requestAudioSinkSocket();
+    void audioSinkStarted(const String&);
+#endif
+
 protected:
     AudioDestinationNode(BaseAudioContext&, float sampleRate);
 

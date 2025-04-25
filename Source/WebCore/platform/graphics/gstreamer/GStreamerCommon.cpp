@@ -1010,9 +1010,9 @@ IGNORE_WARNINGS_END
     return audioSink;
 }
 
-GstElement* createPlatformAudioSink(const String& role)
+GstElement* createPlatformAudioSink(const String& role, String&& sharedMemory)
 {
-    GstElement* audioSink = webkitAudioSinkNew();
+    GstElement* audioSink = webkitAudioSinkNew(WTFMove(sharedMemory));
     if (!audioSink) {
         // This means the WebKit audio sink configuration failed. It can happen for the following reasons:
         // - audio mixing was not requested using the WEBKIT_GST_ENABLE_AUDIO_MIXER

@@ -60,6 +60,9 @@ SpeechSynthesis::SpeechSynthesis(ScriptExecutionContext& context)
     , m_isPaused(false)
     , m_restrictions(NoRestrictions)
     , m_speechSynthesisClient(nullptr)
+#if USE(GSTREAMER) && ENABLE(WPE_PLATFORM)
+    , m_context(context)
+#endif
 {
     if (RefPtr document = dynamicDowncast<Document>(context)) {
 #if PLATFORM(IOS_FAMILY)
@@ -304,6 +307,28 @@ void SpeechSynthesis::boundaryEventOccurred(bool wordBoundary, unsigned charInde
         return;
     boundaryEventOccurred(*protectedCurrentSpeechUtterance()->platformUtterance(), wordBoundary ? SpeechBoundary::SpeechWordBoundary : SpeechBoundary::SpeechSentenceBoundary, charIndex, charLength);
 }
+
+#if USE(GSTREAMER) && ENABLE(WPE_PLATFORM)
+String SpeechSynthesis::requestAudioSinkSocket()
+{
+    Ref protectedContext = { *m_context };
+    RefPtr document = dynamicDowncast<Document>(protectedContext);
+    if (!document)
+        return emptyString();
+
+    return document->frame()->page()->requestAudioSinkSocket();
+}
+
+void SpeechSynthesis::audioSinkStarted(const String& path)
+{
+    Ref protectedContext = { *m_context };
+    RefPtr document = dynamicDowncast<Document>(protectedContext);
+    if (!document)
+        return;
+
+    document->frame()->page()->audioSinkStarted(path);
+}
+#endif
 
 void SpeechSynthesis::voicesChanged()
 {

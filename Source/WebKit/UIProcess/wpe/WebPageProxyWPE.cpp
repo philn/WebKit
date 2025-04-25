@@ -33,6 +33,7 @@
 #include "PageClientImpl.h"
 #include "UserMessage.h"
 #include "WebProcessProxy.h"
+#include "wpe/WPEViewPrivate.h"
 #include <WebCore/PlatformEvent.h>
 #include <wtf/CallbackAggregator.h>
 
@@ -242,5 +243,27 @@ void WebPageProxy::callAfterNextPresentationUpdate(CompletionHandler<void()>&& c
     callback();
 #endif
 }
+
+#if ENABLE(WPE_PLATFORM)
+void WebPageProxy::requestAudioSinkSocket(CompletionHandler<void(String)>&& completionHandler)
+{
+    RefPtr pageClient = this->pageClient();
+    if (!pageClient) {
+        completionHandler({ });
+        return;
+    }
+
+    pageClient->requestAudioSinkSocket(WTFMove(completionHandler));
+}
+
+void WebPageProxy::audioSinkStarted(const String& path)
+{
+    RefPtr pageClient = this->pageClient();
+    if (!pageClient)
+        return;
+
+    pageClient->audioSinkStarted(path);
+}
+#endif
 
 } // namespace WebKit

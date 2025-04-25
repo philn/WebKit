@@ -1166,6 +1166,11 @@ private:
 
     bool limitedMatroskaSupportEnabled() const;
 
+#if USE(GSTREAMER) && ENABLE(WPE_PLATFORM)
+    String requestAudioSinkSocket() final;
+    void audioSinkStarted(const String&) final;
+#endif
+
     Timer m_progressEventTimer;
     Timer m_playbackProgressTimer;
     Timer m_scanTimer;

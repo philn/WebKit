@@ -749,6 +749,11 @@ public:
     virtual WebCore::FrameDamageHistory* damageHistoryForTesting() const { return nullptr; }
 #endif
 
+#if ENABLE(WPE_PLATFORM)
+    virtual String requestAudioSinkSocket() { return emptyString(); }
+    virtual void audioSinkStarted(const String &) { }
+#endif
+
     WEBCORE_EXPORT virtual ~ChromeClient();
 
 protected:

@@ -827,6 +827,11 @@ public:
     virtual void setURLIsPictureInPictureForScreenTime(bool) { };
     virtual void setURLIsPlayingVideoForScreenTime(bool) { };
 #endif
+
+#if ENABLE(WPE_PLATFORM)
+    virtual void requestAudioSinkSocket(CompletionHandler<void(String)> &&) = 0;
+    virtual void audioSinkStarted(const String &) = 0;
+#endif
 };
 
 } // namespace WebKit

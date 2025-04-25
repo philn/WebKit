@@ -21,6 +21,7 @@
 #if USE(GSTREAMER)
 
 #include <gst/gst.h>
+#include <wtf/Forward.h>
 
 G_BEGIN_DECLS
 
@@ -37,7 +38,7 @@ typedef struct _WebKitAudioSinkPrivate WebKitAudioSinkPrivate;
 struct _WebKitAudioSink {
     GstBin parent;
 
-    WebKitAudioSinkPrivate *priv;
+    WebKitAudioSinkPrivate* priv;
 };
 
 struct _WebKitAudioSinkClass {
@@ -48,6 +49,12 @@ GType webkit_audio_sink_get_type(void);
 
 G_END_DECLS
 
-GstElement* webkitAudioSinkNew();
+GstElement* webkitAudioSinkNew(String&& socketPath = { });
+
+using AudioSinkStartedCallback = Function<void(const String&)>;
+void webkitAudioSinkSetStartedCallback(WebKitAudioSink*, AudioSinkStartedCallback&&);
+
+using AudioSinkDisposedCallback = Function<void(const String&)>;
+void webkitAudioSinkSetDisposedCallback(WebKitAudioSink*, AudioSinkDisposedCallback&&);
 
 #endif // USE(GSTREAMER)

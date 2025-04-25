@@ -5652,4 +5652,16 @@ void Page::setPresentingApplicationAuditToken(std::optional<audit_token_t> prese
 }
 #endif
 
+#if ENABLE(WPE_PLATFORM)
+String Page::requestAudioSinkSocket()
+{
+    return m_chrome->client().requestAudioSinkSocket();
+}
+
+void Page::audioSinkStarted(const String& path)
+{
+    m_chrome->client().audioSinkStarted(path);
+}
+#endif
+
 } // namespace WebCore

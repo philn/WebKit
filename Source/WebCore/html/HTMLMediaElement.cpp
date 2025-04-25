@@ -10091,6 +10091,26 @@ bool HTMLMediaElement::limitedMatroskaSupportEnabled() const
 #endif
 }
 
+#if USE(GSTREAMER) && ENABLE(WPE_PLATFORM)
+String HTMLMediaElement::requestAudioSinkSocket()
+{
+    auto page = document().protectedPage();
+    if (!page)
+        return emptyString();
+
+    return page->requestAudioSinkSocket();
+}
+
+void HTMLMediaElement::audioSinkStarted(const String& path)
+{
+    auto page = document().protectedPage();
+    if (!page)
+        return;
+
+    page->audioSinkStarted(path);
+}
+#endif
+
 } // namespace WebCore
 
 #endif // ENABLE(VIDEO)

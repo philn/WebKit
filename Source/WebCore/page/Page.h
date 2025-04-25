@@ -1306,6 +1306,11 @@ public:
     WEBCORE_EXPORT void setPresentingApplicationBundleIdentifier(String&&);
 #endif
 
+#if ENABLE(WPE_PLATFORM)
+    String requestAudioSinkSocket();
+    void audioSinkStarted(const String&);
+#endif
+
 private:
     explicit Page(PageConfiguration&&);
 

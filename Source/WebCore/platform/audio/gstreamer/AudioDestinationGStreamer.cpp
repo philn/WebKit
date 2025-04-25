@@ -109,6 +109,7 @@ unsigned long AudioDestination::maxChannelCount()
 AudioDestinationGStreamer::AudioDestinationGStreamer(const CreationOptions& options)
     : AudioDestination(options)
     , m_renderBus(AudioBus::create(options.numberOfOutputChannels, AudioUtilities::renderQuantumSize, false))
+    , m_audioSinkStartedCallback(WTFMove(options.audioSinkStarted))
 {
     static Atomic<uint32_t> pipelineId;
     m_pipeline = gst_pipeline_new(makeString("audio-destination-"_s, pipelineId.exchangeAdd(1)).ascii().data());
@@ -123,7 +124,21 @@ AudioDestinationGStreamer::AudioDestinationGStreamer(const CreationOptions& opti
     webkitWebAudioSourceSetBus(WEBKIT_WEB_AUDIO_SRC(m_src.get()), m_renderBus);
 
     auto& quirksManager = GStreamerQuirksManager::singleton();
-    GRefPtr<GstElement> audioSink = quirksManager.createWebAudioSink();
+    GRefPtr<GstElement> audioSink;
+#if ENABLE(WPE_PLATFORM)
+    if (!options.audioSinkSocketPath.isEmpty())
+        audioSink = createPlatformAudioSink("music"_s, String { options.audioSinkSocketPath });
+    if (WEBKIT_IS_AUDIO_SINK(audioSink.get()) && !options.audioSinkSocketPath.isEmpty()) {
+        webkitAudioSinkSetStartedCallback(WEBKIT_AUDIO_SINK(audioSink.get()), [&](const auto& path) {
+            m_audioSinkStartedCallback(path);
+        });
+    }
+#endif
+    if (!audioSink)
+        audioSink = quirksManager.createWebAudioSink();
+    if (!audioSink)
+        audioSink = createPlatformAudioSink("music"_s);
+
     m_audioSinkAvailable = audioSink;
     if (!audioSink) {
         GST_ERROR("Failed to create GStreamer audio sink element");
