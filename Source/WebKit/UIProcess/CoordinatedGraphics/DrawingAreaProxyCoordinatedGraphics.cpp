@@ -170,6 +170,7 @@ void DrawingAreaProxyCoordinatedGraphics::sizeDidChange()
     if (m_isWaitingForDidUpdateGeometry)
         return;
 
+    WTFLogAlways("%s line %d size: %dx%d", __PRETTY_FUNCTION__, __LINE__, m_size.width(), m_size.height());
     sendUpdateGeometry();
 }
 
@@ -293,23 +294,33 @@ void DrawingAreaProxyCoordinatedGraphics::sendUpdateGeometry()
     m_lastSentSize = m_size;
     m_isWaitingForDidUpdateGeometry = true;
 
-    sendWithAsyncReply(Messages::DrawingArea::UpdateGeometry(m_size), [weakThis = WeakPtr { *this }] {
+    auto sendResult = sendWithAsyncReply(Messages::DrawingArea::UpdateGeometry(m_size), [weakThis = WeakPtr { *this }] {
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         if (!weakThis)
             return;
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         weakThis->didUpdateGeometry();
     });
+    if (sendResult) {
+        WTFLogAlways("%s line %d %zu", __PRETTY_FUNCTION__, __LINE__, sendResult->toUInt64());
+    } else {
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+    }
 }
 
 void DrawingAreaProxyCoordinatedGraphics::didUpdateGeometry()
 {
     ASSERT(m_isWaitingForDidUpdateGeometry);
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     m_isWaitingForDidUpdateGeometry = false;
 
     // If the view was resized while we were waiting for a DidUpdateGeometry reply from the web process,
     // we need to resend the new size here.
-    if (m_lastSentSize != m_size)
+    if (m_lastSentSize != m_size) {
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         sendUpdateGeometry();
+    }
 }
 
 #if !PLATFORM(WPE)

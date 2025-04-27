@@ -196,12 +196,16 @@ void LayerTreeHost::flushLayers()
 #endif
     page->finalizeRenderingUpdate(flags);
 
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+
     if (m_pendingResize) {
+        WTFLogAlways("%s line %d size=%dx%d", __PRETTY_FUNCTION__, __LINE__, page->size().width(), page->size().height());
         m_compositor->setSize(page->size(), page->deviceScaleFactor());
         auto& rootLayer = m_sceneState->rootLayer();
         Locker locker { rootLayer.lock() };
         rootLayer.setSize(page->size());
     }
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
 #if PLATFORM(GTK)
     // If we have an active transient zoom, we want the zoom to win over any changes
@@ -348,10 +352,13 @@ void LayerTreeHost::ensureDrawing()
 
 void LayerTreeHost::sizeDidChange()
 {
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     m_pendingResize = true;
-    if (m_isWaitingForRenderer)
+    if (m_isWaitingForRenderer) {
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         scheduleLayerFlush();
-    else {
+    } else {
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         cancelPendingLayerFlush();
         flushLayers();
     }

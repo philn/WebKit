@@ -74,16 +74,22 @@ DrawingAreaCoordinatedGraphics::~DrawingAreaCoordinatedGraphics() = default;
 
 void DrawingAreaCoordinatedGraphics::setNeedsDisplay()
 {
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+    // Ref webPage = m_webPage.get();
+
     if (m_layerTreeHost) {
         ASSERT(m_dirtyRegion.isEmpty());
         return;
     }
 
-    setNeedsDisplayInRect(m_webPage->bounds());
+    auto b = m_webPage->bounds();
+    WTFLogAlways("->>>>>> needs display on bounds %d,%d @ %dx%d", b.x(), b.y(), b.width(), b.height());
+    setNeedsDisplayInRect(b);
 }
 
 void DrawingAreaCoordinatedGraphics::setNeedsDisplayInRect(const IntRect& rect)
 {
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     if (m_layerTreeHost) {
         ASSERT(m_dirtyRegion.isEmpty());
 #if USE(GRAPHICS_LAYER_TEXTURE_MAPPER)
@@ -91,11 +97,13 @@ void DrawingAreaCoordinatedGraphics::setNeedsDisplayInRect(const IntRect& rect)
 #endif
         return;
     }
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     IntRect dirtyRect = rect;
     dirtyRect.intersect(m_webPage->bounds());
     if (dirtyRect.isEmpty())
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     m_dirtyRegion.unite(dirtyRect);
     scheduleDisplay();
@@ -624,23 +632,28 @@ void DrawingAreaCoordinatedGraphics::exitAcceleratedCompositingMode()
 void DrawingAreaCoordinatedGraphics::scheduleDisplay()
 {
     ASSERT(!m_layerTreeHost);
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (m_isWaitingForDidUpdate) {
         m_scheduledWhileWaitingForDidUpdate = true;
         return;
     }
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (m_isPaintingSuspended)
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (m_displayTimer.isActive())
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     m_displayTimer.startOneShot(0_s);
 }
 
 void DrawingAreaCoordinatedGraphics::displayTimerFired()
 {
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     display();
 }
 
@@ -650,23 +663,28 @@ void DrawingAreaCoordinatedGraphics::display()
     ASSERT(!m_isWaitingForDidUpdate);
     ASSERT(!m_inUpdateGeometry);
 
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     if (m_layerTreeStateIsFrozen)
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (m_isPaintingSuspended)
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     UpdateInfo updateInfo;
     display(updateInfo);
 
     if (updateInfo.updateRectBounds.isEmpty())
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (m_layerTreeHost) {
         // The call to update caused layout which turned on accelerated compositing.
         // Don't send an Update message in this case.
         return;
     }
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
 #if PLATFORM(GTK) || PLATFORM(WPE)
     dispatchPendingCallbacksAfterEnsuringDrawing();
@@ -706,19 +724,23 @@ void DrawingAreaCoordinatedGraphics::display(UpdateInfo& updateInfo)
 {
     ASSERT(!m_isPaintingSuspended || m_inUpdateGeometry);
     ASSERT(!m_layerTreeHost);
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     Ref webPage = m_webPage.get();
     webPage->updateRendering();
     webPage->finalizeRenderingUpdate({ });
     webPage->flushPendingEditorStateUpdate();
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     // The layout may have put the page into accelerated compositing mode. If the LayerTreeHost is
     // in charge of displaying, we have nothing more to do.
     if (m_layerTreeHost)
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (m_dirtyRegion.isEmpty())
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     updateInfo.viewSize = webPage->size();
     updateInfo.deviceScaleFactor = webPage->corePage()->deviceScaleFactor();
@@ -732,11 +754,13 @@ void DrawingAreaCoordinatedGraphics::display(UpdateInfo& updateInfo)
     auto bitmap = ShareableBitmap::create({ bitmapSize });
     if (!bitmap)
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (auto handle = bitmap->createHandle())
         updateInfo.bitmapHandle = WTFMove(*handle);
     else
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     auto rects = m_dirtyRegion.rects();
     if (shouldPaintBoundsRect(bounds, rects)) {

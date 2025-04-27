@@ -691,6 +691,8 @@ WebPage::WebPage(PageIdentifier pageID, WebPageCreationParameters&& parameters)
     , m_textAnimationController(makeUniqueRef<TextAnimationController>(*this))
 #endif
 {
+    WTFLogAlways("%s line %d size=%dx%d", __PRETTY_FUNCTION__, __LINE__, m_viewSize.width(), m_viewSize.height());
+
     WEBPAGE_RELEASE_LOG(Loading, "constructor:");
 
 #if PLATFORM(COCOA)
@@ -1338,6 +1340,7 @@ void WebPage::reinitializeWebPage(WebPageCreationParameters&& parameters)
 {
     ASSERT(m_drawingArea);
 
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     setSize(parameters.viewSize);
 
     // If the UIProcess created a new DrawingArea, then we need to do the same.
@@ -1345,6 +1348,7 @@ void WebPage::reinitializeWebPage(WebPageCreationParameters&& parameters)
         RefPtr oldDrawingArea = std::exchange(m_drawingArea, nullptr);
         oldDrawingArea->removeMessageReceiverIfNeeded();
 
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         m_drawingArea = DrawingArea::create(*this, parameters);
         RefPtr drawingArea = m_drawingArea;
         updateAfterDrawingAreaCreation(parameters);
@@ -2388,10 +2392,13 @@ RefPtr<WebCore::Page> WebPage::protectedCorePage() const
 
 void WebPage::setSize(const WebCore::IntSize& viewSize)
 {
+    WTFLogAlways("%s line %d size=%dx%d", __PRETTY_FUNCTION__, __LINE__, m_viewSize.width(), m_viewSize.height());
     if (m_viewSize == viewSize)
         return;
 
     m_viewSize = viewSize;
+    WTFLogAlways("%s line %d size=%dx%d", __PRETTY_FUNCTION__, __LINE__, m_viewSize.width(), m_viewSize.height());
+    WTFReportBacktrace();
     RefPtr view = protectedCorePage()->protectedMainFrame()->virtualView();
     if (!view) {
         ASSERT_NOT_REACHED();

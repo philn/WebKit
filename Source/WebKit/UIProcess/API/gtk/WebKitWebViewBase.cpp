@@ -448,17 +448,24 @@ static void refreshInternalScaling(WebKitWebViewBase* self)
 
 static void webkitWebViewBaseUpdateDisplayID(WebKitWebViewBase* webViewBase, GdkMonitor* monitor)
 {
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     if (!monitor)
         return;
 
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     auto displayID = ScreenManager::singleton().displayID(monitor);
     if (displayID == webViewBase->priv->displayID)
         return;
 
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     webViewBase->priv->displayID = displayID;
     refreshInternalScaling(webViewBase);
-    if (webViewBase->priv->pageProxy)
+
+    if (webViewBase->priv->pageProxy) {
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         webViewBase->priv->pageProxy->windowScreenDidChange(displayID);
+    }
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 }
 
 void webkitWebViewBaseToplevelWindowIsActiveChanged(WebKitWebViewBase* webViewBase, bool isActive)
@@ -2412,6 +2419,7 @@ static void webkitWebViewBaseConstructed(GObject* object)
     g_signal_connect_object(gesture, "swipe", G_CALLBACK(webkitWebViewBaseTouchSwipe), viewWidget, G_CONNECT_SWAPPED);
 
     priv->displayID = ScreenManager::singleton().primaryDisplayID();
+    WTFLogAlways("phil primary display: %u", priv->displayID);
 }
 
 static void webkit_web_view_base_class_init(WebKitWebViewBaseClass* webkitWebViewBaseClass)
@@ -2528,8 +2536,12 @@ void webkitWebViewBaseCreateWebPage(WebKitWebViewBase* webkitWebViewBase, Ref<AP
     auto& pageConfiguration = priv->pageProxy->configuration();
     priv->pageProxy->initializeWebPage(pageConfiguration.openedSite(), pageConfiguration.initialSandboxFlags());
 
-    if (priv->displayID)
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+    if (priv->displayID) {
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         priv->pageProxy->windowScreenDidChange(priv->displayID);
+    }
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     refreshInternalScaling(webkitWebViewBase);
     // We attach this here, because changes in scale factor are passed directly to the page proxy.
@@ -2919,8 +2931,13 @@ void webkitWebViewBaseDidRelaunchWebProcess(WebKitWebViewBase* webkitWebViewBase
         priv->viewGestureController = WebKit::ViewGestureController::create(*priv->pageProxy);
         priv->viewGestureController->setSwipeGestureEnabled(priv->isBackForwardNavigationGestureEnabled);
     }
-    if (priv->displayID)
+
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+    if (priv->displayID) {
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         priv->pageProxy->windowScreenDidChange(priv->displayID);
+    }
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 }
 
 void webkitWebViewBasePageClosed(WebKitWebViewBase* webkitWebViewBase)

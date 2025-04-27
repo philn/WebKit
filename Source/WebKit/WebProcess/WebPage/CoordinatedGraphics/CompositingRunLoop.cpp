@@ -51,10 +51,12 @@ CompositingRunLoop::CompositingRunLoop(Function<void ()>&& updateFunction)
     m_updateTimer.setPriority(RunLoopSourcePriority::CompositingThreadUpdateTimer);
     m_updateTimer.setName("[WebKit] CompositingRunLoop"_s);
 #endif
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 }
 
 CompositingRunLoop::~CompositingRunLoop()
 {
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     ASSERT(RunLoop::isMain());
     // Make sure the RunLoop is stopped after the CompositingRunLoop, because m_updateTimer has a reference.
     RunLoop::protectedMain()->dispatch([runLoop = m_runLoop] {
@@ -67,24 +69,28 @@ CompositingRunLoop::~CompositingRunLoop()
 
 bool CompositingRunLoop::isCurrent() const
 {
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     return m_runLoop->isCurrent();
 }
 
 bool CompositingRunLoop::isActive()
 {
     Locker stateLocker { m_state.lock };
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     return m_state.update != UpdateState::Idle;
 }
 
 void CompositingRunLoop::performTask(Function<void ()>&& function)
 {
     ASSERT(RunLoop::isMain());
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     m_runLoop->dispatch(WTFMove(function));
 }
 
 void CompositingRunLoop::performTaskSync(Function<void ()>&& function)
 {
     ASSERT(RunLoop::isMain());
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     Locker locker { m_dispatchSyncConditionLock };
     m_runLoop->dispatch([this, function = WTFMove(function)] {
         function();
@@ -97,6 +103,7 @@ void CompositingRunLoop::performTaskSync(Function<void ()>&& function)
 void CompositingRunLoop::suspend()
 {
     Locker stateLocker { m_state.lock };
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     m_state.isSuspended = true;
     m_updateTimer.stop();
 }
@@ -104,6 +111,7 @@ void CompositingRunLoop::suspend()
 void CompositingRunLoop::resume()
 {
     Locker stateLocker { m_state.lock };
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     m_state.isSuspended = false;
     if (m_state.update == UpdateState::Scheduled)
         m_updateTimer.startOneShot(0_s);
@@ -112,11 +120,13 @@ void CompositingRunLoop::resume()
 void CompositingRunLoop::scheduleUpdate()
 {
     Locker stateLocker { m_state.lock };
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     scheduleUpdate(stateLocker);
 }
 
 void CompositingRunLoop::scheduleUpdate(Locker<Lock>& stateLocker)
 {
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     // An update was requested. Depending on the state:
     //  - if Idle, enter the Scheduled state and start the update timer,
     //  - if Scheduled, do nothing,
@@ -142,6 +152,7 @@ void CompositingRunLoop::scheduleUpdate(Locker<Lock>& stateLocker)
 void CompositingRunLoop::stopUpdates()
 {
     // Stop everything.
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     Locker locker { m_state.lock };
     m_updateTimer.stop();
@@ -155,6 +166,7 @@ void CompositingRunLoop::updateCompleted(Locker<Lock>& stateLocker)
     //  - if Idle, Scheduled or InProgress, do nothing,
     //  - if InProgress, schedule a new update in case a pending update was marked,
     //    otherwise push the scene update state into Idle.
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     UNUSED_PARAM(stateLocker);
 
@@ -178,6 +190,7 @@ void CompositingRunLoop::updateCompleted(Locker<Lock>& stateLocker)
 
 void CompositingRunLoop::updateTimerFired()
 {
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     {
         // Scene update is now in progress.
         Locker locker { m_state.lock };
@@ -185,6 +198,7 @@ void CompositingRunLoop::updateTimerFired()
             return;
         m_state.update = UpdateState::InProgress;
     }
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     m_updateFunction();
 }
 

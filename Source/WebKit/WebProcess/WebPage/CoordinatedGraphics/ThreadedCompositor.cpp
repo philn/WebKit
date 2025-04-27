@@ -101,6 +101,7 @@ ThreadedCompositor::ThreadedCompositor(LayerTreeHost& layerTreeHost, ThreadedDis
     initializeFPSCounter();
 
     const auto& webPage = m_layerTreeHost->webPage();
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     updateSceneAttributes(webPage.size(), webPage.deviceScaleFactor());
 
     m_surface->didCreateCompositingRunLoop(m_compositingRunLoop->runLoop());
@@ -227,6 +228,8 @@ void ThreadedCompositor::setSize(const IntSize& size, float deviceScaleFactor)
 {
     ASSERT(RunLoop::isMain());
     Locker locker { m_attributes.lock };
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+    WTFReportBacktrace();
     updateSceneAttributes(size, deviceScaleFactor);
 }
 
@@ -317,12 +320,15 @@ void ThreadedCompositor::renderLayerTree()
 #if PLATFORM(GTK) || PLATFORM(WPE)
     TraceScope traceScope(RenderLayerTreeStart, RenderLayerTreeEnd);
 #endif
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (m_suspendedCount > 0)
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     if (!m_context || !m_context->makeContextCurrent())
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
 #if !HAVE(DISPLAY_LINK)
     m_display.updateTimer->stop();
@@ -344,6 +350,7 @@ void ThreadedCompositor::renderLayerTree()
 
     if (viewportSize.isEmpty())
         return;
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
 
     TransformationMatrix viewportTransform;
     viewportTransform.scale(deviceScaleFactor);
@@ -483,6 +490,7 @@ void ThreadedCompositor::resetFrameDamageHistory()
 
 void ThreadedCompositor::updateSceneAttributes(const IntSize& size, float deviceScaleFactor)
 {
+    WTFLogAlways("%s line %d ->> size %dx%d", __PRETTY_FUNCTION__, __LINE__, size.width(), size.height());
     m_attributes.viewportSize = size;
     m_attributes.deviceScaleFactor = deviceScaleFactor;
     m_attributes.viewportSize.scale(m_attributes.deviceScaleFactor);
