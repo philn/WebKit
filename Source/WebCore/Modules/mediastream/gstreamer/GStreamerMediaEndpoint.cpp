@@ -187,6 +187,30 @@ bool GStreamerMediaEndpoint::initializePipeline()
         return false;
     }
 
+    g_signal_connect_swapped(rtpBin.get(), "element-added", G_CALLBACK(+[](GStreamerMediaEndpoint* self, GstElement* element) {
+        GUniquePtr<char> elementName(gst_element_get_name(element));
+        auto view = StringView::fromLatin1(elementName.get());
+        if (!view.startsWith("rtpptdemux"_s))
+            return;
+
+        auto pad = adoptGRef(gst_element_get_static_pad(element, "sink"));
+        gst_pad_add_probe(pad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+            auto self = reinterpret_cast<GStreamerMediaEndpoint*>(userData);
+            auto buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+            GstMappedRtpBuffer rtpBuffer(buffer, GST_MAP_READ);
+            if (UNLIKELY(!rtpBuffer))
+                return GST_PAD_PROBE_OK;
+
+            uint32_t ssrc = gst_rtp_buffer_get_ssrc(rtpBuffer.mappedData());
+            self->m_inputBuffers.add(ssrc, GRefPtr<GstBuffer>(buffer));
+            return GST_PAD_PROBE_REMOVE;
+        }, self, nullptr);
+
+        g_signal_connect(element, "new-payload-type", G_CALLBACK(+[](GstElement* ptDemux, unsigned, GstPad* pad, GStreamerMediaEndpoint* self) {
+            self->handlePtDemuxPayloadType(ptDemux, pad);
+        }), self);
+    }), this);
+
     if (gstObjectHasProperty(rtpBin.get(), "add-reference-timestamp-meta"_s)) {
         auto disableCaptureTimeTracking = StringView::fromLatin1(g_getenv("WEBKIT_GST_DISABLE_WEBRTC_CAPTURE_TIME_TRACKING"));
         if (disableCaptureTimeTracking.isEmpty() || disableCaptureTimeTracking == "0"_s)
@@ -1362,12 +1386,16 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
 {
     ASSERT(isMainThread());
 
-    GRefPtr<GstWebRTCRTPTransceiver> rtcTransceiver(data.transceiver);
-    auto trackId = data.trackId;
+    // NOTE: Here ideally we should match WebKit-side transceivers with data.transceiver but we
+    // cannot because in some situations (simulcast, mostly), we can end-up with multiple webrtcbin
+    // src pads associated to the same transceiver.
     auto transceiver = m_peerConnectionBackend.existingTransceiver([&](auto& backend) -> bool {
-        return backend.rtcTransceiver() == rtcTransceiver.get();
+        GUniqueOutPtr<char> mid;
+        g_object_get(backend.rtcTransceiver(), "mid", &mid.outPtr(), nullptr);
+        return data.mid == StringView::fromLatin1(mid.get());
     });
     if (!transceiver) {
+        GRefPtr<GstWebRTCRTPTransceiver> rtcTransceiver(data.transceiver);
         unsigned mLineIndex;
         g_object_get(rtcTransceiver.get(), "mlineindex", &mLineIndex, nullptr);
         GUniqueOutPtr<GstWebRTCSessionDescription> description;
@@ -1377,6 +1405,7 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
             GST_WARNING_OBJECT(m_pipeline.get(), "SDP media for transceiver %u not found, skipping incoming track setup", mLineIndex);
             return;
         }
+        const auto& trackId = data.trackId;
         transceiver = &m_peerConnectionBackend.newRemoteTransceiver(makeUnique<GStreamerRtpTransceiverBackend>(WTFMove(rtcTransceiver)), data.type, trackId.isolatedCopy());
     }
 
@@ -2467,6 +2496,187 @@ std::optional<bool> GStreamerMediaEndpoint::canTrickleIceCandidates() const
             return true;
     }
     return false;
+}
+
+
+void GStreamerMediaEndpoint::handlePtDemuxPayloadType(GstElement* ptDemux, GstPad* pad)
+{
+    GUniqueOutPtr<GstWebRTCSessionDescription> description;
+    g_object_get(m_webrtcBin.get(), "current-remote-description", &description.outPtr(), nullptr);
+    if (!description)
+        return;
+
+    auto currentCaps = adoptGRef(gst_pad_get_current_caps(pad));
+
+    auto sinkPad = adoptGRef(gst_element_get_static_pad(ptDemux, "sink"));
+    auto sinkCaps = adoptGRef(gst_pad_get_current_caps(sinkPad.get()));
+    const auto structure = gst_caps_get_structure(sinkCaps.get(), 0);
+    auto ssrc = gstStructureGet<unsigned>(structure, "ssrc"_s);
+    if (!ssrc)
+        return;
+
+    auto buffer = m_inputBuffers.take(*ssrc);
+    if (!buffer)
+        return;
+
+    GstMappedRtpBuffer rtpBuffer(buffer, GST_MAP_READ);
+    if (UNLIKELY(!rtpBuffer))
+        return;
+
+    GRefPtr<GstCaps> caps;
+    unsigned totalMedias = gst_sdp_message_medias_len(description->sdp);
+    for (unsigned i = 0; i < totalMedias; i++) {
+        const auto media = gst_sdp_message_get_media(description->sdp, i);
+        auto mediaCaps = adoptGRef(gst_caps_new_empty_simple("application/x-rtp"));
+        uint8_t midExtID = 0;
+        uint8_t ridExtID = 0;
+
+        gst_sdp_media_attributes_to_caps(media, mediaCaps.get());
+        auto s = gst_caps_get_structure(mediaCaps.get(), 0);
+        for (int ii = 0; ii < gst_structure_n_fields(s); ii++) {
+            auto name = StringView::fromLatin1(gst_structure_nth_field_name(s, ii));
+            if (!name.startsWith("extmap-"_s))
+                continue;
+
+            auto value = gstStructureGetString(s, name);
+            if (value == StringView::fromLatin1(GST_RTP_HDREXT_BASE "sdes:mid")) {
+                auto id = parseInteger<uint8_t>(name.substring(7));
+                if (UNLIKELY(!id))
+                    continue;
+                if (*id && *id < 15)
+                    midExtID = *id;
+            } else if (value == StringView::fromLatin1(GST_RTP_HDREXT_BASE "sdes:rtp-stream-id")) {
+                auto id = parseInteger<uint8_t>(name.substring(7));
+                if (UNLIKELY(!id))
+                    continue;
+                if (*id && *id < 15)
+                    ridExtID = *id;
+            }
+            if (midExtID && ridExtID)
+                break;
+        }
+
+        if (!midExtID)
+            continue;
+
+        GST_DEBUG("phil midExtID: %u ridExtID: %u", midExtID, ridExtID);
+
+        uint8_t* pdata;
+        uint16_t bits;
+        unsigned wordlen;
+        if (!gst_rtp_buffer_get_extension_data(rtpBuffer.mappedData(), &bits, reinterpret_cast<gpointer*>(&pdata), &wordlen))
+            continue;
+
+        GstRTPHeaderExtensionFlags extensionFlags;
+        gsize bytelen = wordlen * 4;
+        guint headerUnitTypes;
+        gsize offset = 0;
+        GUniquePtr<char> mid, rid;
+
+        if (bits == 0xBEDE) {
+            /* one byte extensions */
+            headerUnitTypes = 1;
+            extensionFlags = static_cast<GstRTPHeaderExtensionFlags>(GST_RTP_HEADER_EXTENSION_ONE_BYTE);
+        } else if (bits >> 4 == 0x100) {
+            /* two byte extensions */
+            headerUnitTypes = 2;
+            extensionFlags = static_cast<GstRTPHeaderExtensionFlags>(GST_RTP_HEADER_EXTENSION_TWO_BYTE);
+        } else {
+            GST_DEBUG("phil unknown extension bit pattern 0x%02x%02x", bits >> 8, bits & 0xff);
+            continue;
+        }
+
+        while (TRUE) {
+            guint8 readId, readLength;
+
+            if (offset + headerUnitTypes >= bytelen)
+                /* not enough remaining data */
+                break;
+
+            if (extensionFlags & GST_RTP_HEADER_EXTENSION_ONE_BYTE) {
+                readId = GST_READ_UINT8(pdata + offset) >> 4;
+                readLength = (GST_READ_UINT8(pdata + offset) & 0x0F) + 1;
+                offset += 1;
+
+                if (!readId)
+                    /* padding */
+                    continue;
+
+                if (readId == 15)
+                    /* special id for possible future expansion */
+                    break;
+            } else {
+                readId = GST_READ_UINT8(pdata + offset);
+                offset += 1;
+
+                if (!readId)
+                    /* padding */
+                    continue;
+
+                readLength = GST_READ_UINT8(pdata + offset);
+                offset += 1;
+            }
+            GST_TRACE("found rtp header extension with id %u and length %u", readId, readLength);
+
+            /* Ignore extension headers where the size does not fit */
+            if (offset + readLength > bytelen) {
+                GST_WARNING("Extension length extends past the size of the extension data");
+                break;
+            }
+
+            if (readId == midExtID)
+                mid.reset(g_strndup((const char *) &pdata[offset], readLength));
+            else if (readId == ridExtID)
+                rid.reset(g_strndup((const char *) &pdata[offset], readLength));
+
+            if (rid && mid)
+                break;
+
+            offset += readLength;
+        }
+
+        if (mid) {
+            gst_caps_set_simple(mediaCaps.get(), "a-mid", G_TYPE_STRING, mid.get(), nullptr);
+
+            if (rid)
+                gst_caps_set_simple(mediaCaps.get(), "a-rid", G_TYPE_STRING, rid.get(), nullptr);
+
+            GST_DEBUG_OBJECT(pipeline(), "Set mid '%s' and rid '%s' on item with ssrc %u on mline %u", mid.get(), rid.get(), *ssrc, i);
+            caps = WTFMove(mediaCaps);
+            break;
+        }
+    }
+
+    if (!caps)
+        return;
+
+    auto s = gst_caps_get_structure(caps.get(), 0);
+    auto s2 = gst_caps_get_structure(currentCaps.get(), 0);
+    for (int j = 0; j < gst_structure_n_fields(s2); j++) {
+        auto name = StringView::fromLatin1(gst_structure_nth_field_name(s2, j));
+        if (name != "media"_s && name != "payload"_s && name != "clock-rate"_s && name != "encoding-name"_s)
+            continue;
+        auto key = name.toStringWithoutCopying();
+        gst_structure_set_value(s, key.ascii().data(), gst_structure_get_value(s2, key.utf8().data()));
+    }
+
+    // Remove "ssrc-*" attributes matching other SSRCs.
+    gstStructureFilterAndMapInPlace(s, [&](auto id, auto) -> bool {
+        auto idString = gstIdToString(id);
+        if (!idString.startsWith("ssrc-"_s))
+            return true;
+
+        auto value = parseInteger<unsigned>(idString.substring(5));
+        if (!value)
+            return true;
+
+        return *value == *ssrc;
+    });
+
+    gst_caps_set_simple(caps.get(), "ssrc", G_TYPE_UINT, *ssrc, nullptr);
+
+    GST_DEBUG("phil caps: %" GST_PTR_FORMAT, caps.get());
+    gst_pad_set_caps(pad, caps.get());
 }
 
 void GStreamerMediaEndpoint::startRTCLogs()
