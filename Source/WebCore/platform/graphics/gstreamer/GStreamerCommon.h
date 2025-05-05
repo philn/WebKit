@@ -278,6 +278,7 @@ GstBuffer* gstBufferNewWrappedFast(void* data, size_t length);
 
 // These functions should be used for elements not provided by WebKit itself and not provided by GStreamer -core.
 GstElement* makeGStreamerElement(ASCIILiteral factoryName, const String& name = emptyString());
+GstElement* makeGStreamerBin(ASCIILiteral description, bool ghostUnlinkedPads);
 
 template<typename T>
 std::optional<T> gstStructureGet(const GstStructure*, ASCIILiteral key);

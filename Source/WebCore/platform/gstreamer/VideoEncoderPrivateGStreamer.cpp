@@ -220,6 +220,7 @@ struct _WebKitVideoEncoderPrivate {
     GRefPtr<GstElement> capsFilter;
     GRefPtr<GstElement> inputCapsFilter;
     GRefPtr<GstElement> outputCapsFilter;
+    GRefPtr<GstElement> screenShareConvert;
     GRefPtr<GstElement> videoConvert;
     GRefPtr<GstElement> videoScale;
     GRefPtr<GstCaps> encodedCaps;
@@ -287,7 +288,7 @@ static void videoEncoderSetBitrate(WebKitVideoEncoder* self, guint bitrate)
     }
 }
 
-static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId, GRefPtr<GstCaps>&& inputCaps, GRefPtr<GstCaps>&& encodedCaps)
+static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId, GRefPtr<GstCaps>&& inputCaps, GRefPtr<GstCaps>&& encodedCaps, bool isScreenShare)
 {
     ASSERT(encoderId != EncoderId::None);
 
@@ -385,16 +386,29 @@ static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
             gst_ghost_pad_set_target(GST_GHOST_PAD(sinkPad.get()), sinkPadTarget.get());
         }
     } else {
+        if (isScreenShare && !priv->screenShareConvert) {
+#if USE(GSTREAMER_GL)
+            priv->screenShareConvert = makeGStreamerBin("glupload ! video/x-raw(memory:GLMemory),format=(string)RGBA ! glcolorconvert ! gldownload"_s, true);
+#else
+            gst_printerrln("Screenshare encoding requested without build-time gstreamer-gl support, this is unlikely to work as expected");
+            priv->screenShareConvert = gst_element_factory_make("identity", nullptr);
+#endif
+            gst_bin_add(GST_BIN_CAST(self), priv->screenShareConvert.get());
+        } else if (!priv->screenShareConvert) {
+            priv->screenShareConvert = gst_element_factory_make("identity", nullptr);
+            gst_bin_add(GST_BIN_CAST(self), priv->screenShareConvert.get());
+        }
+
+        auto sinkPadTarget = adoptGRef(gst_element_get_static_pad(priv->screenShareConvert.get(), "sink"));
+        auto sinkPad = adoptGRef(gst_element_get_static_pad(GST_ELEMENT_CAST(self), "sink"));
+        gst_ghost_pad_set_target(GST_GHOST_PAD(sinkPad.get()), sinkPadTarget.get());
+
         if (useVideoConvertScale == "1"_s) {
             if (!priv->videoConvert) {
                 priv->videoConvert = makeGStreamerElement("videoconvertscale"_s);
                 gst_bin_add(GST_BIN_CAST(self), priv->videoConvert.get());
-
-                auto sinkPadTarget = adoptGRef(gst_element_get_static_pad(priv->videoConvert.get(), "sink"));
-                auto sinkPad = adoptGRef(gst_element_get_static_pad(GST_ELEMENT_CAST(self), "sink"));
-                gst_ghost_pad_set_target(GST_GHOST_PAD(sinkPad.get()), sinkPadTarget.get());
             } else {
-                gst_element_unlink(priv->videoConvert.get(), priv->inputCapsFilter.get());
+                gst_element_unlink_many(priv->screenShareConvert.get(), priv->videoConvert.get(), priv->inputCapsFilter.get(), nullptr);
                 auto caps = adoptGRef(gst_caps_new_any());
                 g_object_set(priv->inputCapsFilter.get(), "caps", caps.get(), nullptr);
             }
@@ -407,12 +421,8 @@ static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
             if (!priv->videoConvert) {
                 priv->videoConvert = makeGStreamerElement("videoconvert"_s);
                 gst_bin_add(GST_BIN_CAST(self), priv->videoConvert.get());
-
-                auto sinkPadTarget = adoptGRef(gst_element_get_static_pad(priv->videoConvert.get(), "sink"));
-                auto sinkPad = adoptGRef(gst_element_get_static_pad(GST_ELEMENT_CAST(self), "sink"));
-                gst_ghost_pad_set_target(GST_GHOST_PAD(sinkPad.get()), sinkPadTarget.get());
             } else {
-                gst_element_unlink_many(priv->videoConvert.get(), priv->videoScale.get(), priv->inputCapsFilter.get(), nullptr);
+                gst_element_unlink_many(priv->screenShareConvert.get(), priv->videoConvert.get(), priv->videoScale.get(), priv->inputCapsFilter.get(), nullptr);
                 auto caps = adoptGRef(gst_caps_new_any());
                 g_object_set(priv->inputCapsFilter.get(), "caps", caps.get(), nullptr);
             }
@@ -439,6 +449,7 @@ static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
     if (priv->inputFilter)
         gst_element_link(priv->inputFilter.get(), priv->encoder.get());
     else {
+        gst_element_link(priv->screenShareConvert.get(), priv->videoConvert.get());
         if (useVideoConvertScale) {
             if (!gst_element_link(priv->videoConvert.get(), priv->inputCapsFilter.get())) {
                 GST_WARNING_OBJECT(self, "Failed to link videoconvertscale and input capsfilter");
@@ -535,7 +546,7 @@ bool videoEncoderSupportsCodec(WebKitVideoEncoder* self, const String& codecName
     return videoEncoderFindForFormat(self, outputCaps) != None;
 }
 
-bool videoEncoderSetCodec(WebKitVideoEncoder* self, const String& codecName, const IntSize& size, std::optional<double> frameRate)
+bool videoEncoderSetCodec(WebKitVideoEncoder* self, const String& codecName, const IntSize& size, std::optional<double> frameRate, bool isScreenShare)
 {
     auto [inputCaps, outputCaps] = GStreamerCodecUtilities::capsFromCodecString(codecName, size, frameRate);
     GST_DEBUG_OBJECT(self, "Input caps: %" GST_PTR_FORMAT, inputCaps.get());
@@ -546,7 +557,7 @@ bool videoEncoderSetCodec(WebKitVideoEncoder* self, const String& codecName, con
         return false;
     }
 
-    return videoEncoderSetEncoder(self, encoderId, WTFMove(inputCaps), WTFMove(outputCaps));
+    return videoEncoderSetEncoder(self, encoderId, WTFMove(inputCaps), WTFMove(outputCaps), isScreenShare);
 }
 
 void videoEncoderSetBitRateAllocation(WebKitVideoEncoder* self, RefPtr<WebKitVideoEncoderBitRateAllocation>&& allocation)
@@ -791,7 +802,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
         }, [](GstElement* encoder, LatencyMode mode) {
             switch (mode) {
             case REALTIME_LATENCY_MODE:
-                gst_util_set_object_arg(G_OBJECT(encoder), "tune", "zerolatency");
+                gst_util_set_object_arg(G_OBJECT(encoder), "tune", "zerolatency,fastdecode");
                 gst_util_set_object_arg(G_OBJECT(encoder), "speed-preset", "ultrafast");
                 break;
             case QUALITY_LATENCY_MODE:
@@ -806,6 +817,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
         [](WebKitVideoEncoder* self) {
             g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
             g_object_set(self->priv->outputCapsFilter.get(), "caps", self->priv->encodedCaps.get(), nullptr);
+            gst_util_set_object_arg(G_OBJECT(self->priv->encoder.get()), "usage-type", "screen");
         }, "bitrate"_s, setBitrateBitPerSec, "gop-size"_s, [](GstElement*, BitrateMode) {
             notImplemented();
         }, [](GstElement*, LatencyMode) {

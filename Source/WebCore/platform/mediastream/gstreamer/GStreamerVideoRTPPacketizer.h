@@ -28,7 +28,7 @@ namespace WebCore {
 
 class GStreamerVideoRTPPacketizer final : public GStreamerRTPPacketizer {
 public:
-    static RefPtr<GStreamerVideoRTPPacketizer> create(RefPtr<UniqueSSRCGenerator>, const GstStructure* codecParameters, GUniquePtr<GstStructure>&& encodingParameters);
+    static RefPtr<GStreamerVideoRTPPacketizer> create(RefPtr<UniqueSSRCGenerator>, const GstStructure* codecParameters, GUniquePtr<GstStructure>&& encodingParameters, bool isScreenShare);
 
     void updateStats() final;
 

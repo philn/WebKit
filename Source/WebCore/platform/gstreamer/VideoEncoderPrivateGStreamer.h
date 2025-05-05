@@ -87,6 +87,7 @@ private:
 };
 
 bool videoEncoderSupportsCodec(WebKitVideoEncoder*, const String&);
-bool videoEncoderSetCodec(WebKitVideoEncoder*, const String&, const WebCore::IntSize&, std::optional<double> frameRate = std::nullopt);
+
+bool videoEncoderSetCodec(WebKitVideoEncoder*, const String&, const WebCore::IntSize&, std::optional<double> frameRate = std::nullopt, bool isScreenShare = false);
 void videoEncoderSetBitRateAllocation(WebKitVideoEncoder*, RefPtr<WebKitVideoEncoderBitRateAllocation>&&);
 void teardownVideoEncoderSingleton();

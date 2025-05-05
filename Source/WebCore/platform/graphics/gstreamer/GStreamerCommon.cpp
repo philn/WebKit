@@ -1110,11 +1110,25 @@ GstElement* /* (transfer floating) */ makeGStreamerElement(ASCIILiteral factoryN
     Locker locker { lock };
     if (!element && !cache.contains(factoryName)) {
         cache.append(factoryName);
-        WTFLogAlways("GStreamer element %s not found. Please install it", factoryName.characters());
+        gst_printerrln("GStreamer element %s not found. Please install it", factoryName.characters());
         ASSERT_NOT_REACHED_WITH_MESSAGE("GStreamer element %s not found. Please install it", factoryName.characters());
     }
     ASSERT(g_object_is_floating(element));
     return element;
+}
+
+GstElement* /* (transfer floating) */ makeGStreamerBin(ASCIILiteral description, bool ghostUnlinkedPads)
+{
+    static Lock lock;
+    static Vector<const char*> cache WTF_GUARDED_BY_LOCK(lock);
+    GUniqueOutPtr<GError> error;
+    auto* bin = gst_parse_bin_from_description(description, ghostUnlinkedPads, &error.outPtr());
+    Locker locker { lock };
+    if (!bin && !cache.contains(description)) {
+        cache.append(description);
+        gst_printerrln("Unable to create bin for description: \"%s\". Error: %s", description.characters(), error->message);
+    }
+    return bin;
 }
 
 #if USE(GSTREAMER_WEBRTC)
