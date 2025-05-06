@@ -200,6 +200,9 @@ GstElement* GStreamerCapturer::createSource()
         }, this, nullptr);
     }
 
+    // if (gstElementMatchesFactoryAndHasProperty(m_src.get(), "pipewiresrc"_s, "use-bufferpool"_s))
+    //     g_object_set(m_src.get(), "use-bufferpool", FALSE, nullptr);
+
     if (m_deviceType == CaptureDevice::DeviceType::Camera) {
         if (gstElementMatchesFactoryAndHasProperty(m_src.get(), "pipewiresrc"_s, "use-bufferpool"_s))
             g_object_set(m_src.get(), "use-bufferpool", FALSE, nullptr);

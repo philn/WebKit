@@ -388,7 +388,7 @@ static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
     } else {
         if (isScreenShare && !priv->screenShareConvert) {
 #if USE(GSTREAMER_GL)
-            priv->screenShareConvert = makeGStreamerBin("glupload ! video/x-raw(memory:GLMemory),format=(string)RGBA ! glcolorconvert ! gldownload"_s, true);
+            priv->screenShareConvert = makeGStreamerBin("glupload ! video/x-raw(memory:GLMemory),format=(string)RGBA,pixel-aspect-ratio=1/1 ! glcolorconvert ! gldownload ! videorate drop-only=1 skip-to-first=1 ! tee name=t ! queue t. ! queue ! gdppay ! filesink location=/home/phil/tmp/foo.raw"_s, true);
 #else
             gst_printerrln("Screenshare encoding requested without build-time gstreamer-gl support, this is unlikely to work as expected");
             priv->screenShareConvert = gst_element_factory_make("identity", nullptr);
@@ -415,11 +415,13 @@ static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
         } else {
             if (!priv->videoScale) {
                 priv->videoScale = makeGStreamerElement("videoscale"_s);
+                g_object_set(priv->videoScale.get(), "n-threads", 2, nullptr);
                 gst_bin_add(GST_BIN_CAST(self), priv->videoScale.get());
             }
 
             if (!priv->videoConvert) {
                 priv->videoConvert = makeGStreamerElement("videoconvert"_s);
+                g_object_set(priv->videoConvert.get(), "n-threads", 2, nullptr);
                 gst_bin_add(GST_BIN_CAST(self), priv->videoConvert.get());
             } else {
                 gst_element_unlink_many(priv->screenShareConvert.get(), priv->videoConvert.get(), priv->videoScale.get(), priv->inputCapsFilter.get(), nullptr);

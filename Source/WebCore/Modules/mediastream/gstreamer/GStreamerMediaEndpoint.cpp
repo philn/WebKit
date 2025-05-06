@@ -61,6 +61,10 @@
 #include <wtf/glib/RunLoopSourcePriority.h>
 #include <wtf/text/StringToIntegerConversion.h>
 
+#if USE(GSTREAMER_GL)
+#include <gst/gl/gl.h>
+#endif
+
 GST_DEBUG_CATEGORY(webkit_webrtc_endpoint_debug);
 #define GST_CAT_DEFAULT webkit_webrtc_endpoint_debug
 
@@ -158,6 +162,14 @@ bool GStreamerMediaEndpoint::initializePipeline()
     connectSimpleBusMessageCallback(m_pipeline.get(), [this](GstMessage* message) {
         handleMessage(message);
     });
+
+#if USE(GSTREAMER_GL)
+    static ASCIILiteral gstGlDisplayContextyType = ASCIILiteral::fromLiteralUnsafe(GST_GL_DISPLAY_CONTEXT_TYPE);
+    if (!setGstElementGLContext(m_pipeline.get(), gstGlDisplayContextyType))
+        return false;
+    if (!setGstElementGLContext(m_pipeline.get(), "gst.gl.app_context"_s))
+        return false;
+#endif
 
     auto binName = makeString("webkit-webrtcbin-"_s, nPipeline++);
     m_webrtcBin = makeGStreamerElement("webrtcbin"_s, binName);
