@@ -146,32 +146,34 @@ GstElement* GStreamerCapturer::createSource()
         m_src = makeElement("pipewiresrc");
         ASSERT(m_src);
 
-        if (m_deviceType == CaptureDevice::DeviceType::Screen) {
-            auto srcPad = adoptGRef(gst_element_get_static_pad(m_src.get(), "src"));
-            gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, [](GstPad*, GstPadProbeInfo* info, void* userData) -> GstPadProbeReturn {
-                auto* event = gst_pad_probe_info_get_event(info);
-                if (GST_EVENT_TYPE(event) != GST_EVENT_CAPS)
-                    return GST_PAD_PROBE_OK;
+        // if (m_deviceType == CaptureDevice::DeviceType::Screen) {
+        //     auto srcPad = adoptGRef(gst_element_get_static_pad(m_src.get(), "src"));
+        //     gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, [](GstPad*, GstPadProbeInfo* info, void* userData) -> GstPadProbeReturn {
+        //         auto* event = gst_pad_probe_info_get_event(info);
+        //         if (GST_EVENT_TYPE(event) != GST_EVENT_CAPS)
+        //             return GST_PAD_PROBE_OK;
 
-                auto self = reinterpret_cast<GStreamerCapturer*>(userData);
-                callOnMainThread([event = GRefPtr(event), weakThis = ThreadSafeWeakPtr { *self }] {
-                    RefPtr protectedThis = weakThis.get();
-                    if (!protectedThis)
-                        return;
+        //         auto self = reinterpret_cast<GStreamerCapturer*>(userData);
+        //         callOnMainThread([event = GRefPtr(event), weakThis = ThreadSafeWeakPtr { *self }] {
+        //             RefPtr protectedThis = weakThis.get();
+        //             if (!protectedThis)
+        //                 return;
 
-                    GstCaps* caps;
-                    gst_event_parse_caps(event.get(), &caps);
-                    protectedThis->forEachObserver([caps](GStreamerCapturerObserver& observer) {
-                        observer.sourceCapsChanged(caps);
-                    });
-                });
-                return GST_PAD_PROBE_OK;
-            }, this, nullptr);
-        }
+        //             GstCaps* caps;
+        //             gst_event_parse_caps(event.get(), &caps);
+        //             protectedThis->forEachObserver([caps](GStreamerCapturerObserver& observer) {
+        //                 observer.sourceCapsChanged(caps);
+        //             });
+        //         });
+        //         return GST_PAD_PROBE_OK;
+        //     }, this, nullptr);
+        // }
 
         auto path = AtomString::number(m_pipewireDevice->objectId());
         // FIXME: The path property is deprecated in favor of target-object but the portal doesn't expose this object.
         g_object_set(m_src.get(), "path", path.string().ascii().data(), "fd", m_pipewireDevice->fd(), nullptr);
+        // g_object_set(m_src.get(), "do-timestamp", TRUE, nullptr);
+
     } else {
         ASSERT(m_device);
         auto sourceName = makeString(unsafeSpan(name()), hex(reinterpret_cast<uintptr_t>(this)));
@@ -198,16 +200,7 @@ GstElement* GStreamerCapturer::createSource()
             });
             return GST_PAD_PROBE_OK;
         }, this, nullptr);
-    }
 
-    // if (gstElementMatchesFactoryAndHasProperty(m_src.get(), "pipewiresrc"_s, "use-bufferpool"_s))
-    //     g_object_set(m_src.get(), "use-bufferpool", FALSE, nullptr);
-
-    if (m_deviceType == CaptureDevice::DeviceType::Camera) {
-        if (gstElementMatchesFactoryAndHasProperty(m_src.get(), "pipewiresrc"_s, "use-bufferpool"_s))
-            g_object_set(m_src.get(), "use-bufferpool", FALSE, nullptr);
-
-        auto srcPad = adoptGRef(gst_element_get_static_pad(m_src.get(), "src"));
         gst_pad_add_probe(srcPad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_PUSH | GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer) -> GstPadProbeReturn {
             VideoFrameTimeMetadata metadata;
             metadata.captureTime = MonotonicTime::now().secondsSinceEpoch();
@@ -219,6 +212,16 @@ GstElement* GStreamerCapturer::createSource()
             return GST_PAD_PROBE_OK;
         }, nullptr, nullptr);
     }
+
+    // if (gstElementMatchesFactoryAndHasProperty(m_src.get(), "pipewiresrc"_s, "use-bufferpool"_s))
+    //     g_object_set(m_src.get(), "use-bufferpool", FALSE, nullptr);
+
+    if (m_deviceType == CaptureDevice::DeviceType::Camera) {
+        if (gstElementMatchesFactoryAndHasProperty(m_src.get(), "pipewiresrc"_s, "use-bufferpool"_s))
+            g_object_set(m_src.get(), "use-bufferpool", FALSE, nullptr);
+    }
+    //auto srcPad = adoptGRef(gst_element_get_static_pad(m_src.get(), "src"));
+    //}
 
     return m_src.get();
 }

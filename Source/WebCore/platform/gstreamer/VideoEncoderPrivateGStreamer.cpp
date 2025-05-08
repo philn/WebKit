@@ -347,6 +347,8 @@ static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
             gst_bin_remove(GST_BIN_CAST(self), priv->encoder.get());
         }
         priv->encoder = gst_element_factory_create(encoderDefinition->factory.get(), nullptr);
+        if (gstObjectHasProperty(priv->encoder.get(), "qos"))
+            g_object_set(priv->encoder.get(), "qos", TRUE, nullptr);
         gst_bin_add(GST_BIN_CAST(self), priv->encoder.get());
         shouldLinkEncoder = true;
     } else {
@@ -389,8 +391,9 @@ static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
         if (isScreenShare && !priv->screenShareConvert) {
 #if USE(GSTREAMER_GL)
             // ! video/x-raw(memory:GLMemory),format=(string)RGBA,pixel-aspect-ratio=1/1
-            //  ! videorate drop-only=1 skip-to-first=1
-            priv->screenShareConvert = makeGStreamerBin("glupload ! glcolorconvert ! gldownload"_s, true);
+            //
+            priv->screenShareConvert = makeGStreamerBin("glupload ! glcolorconvert ! gldownload  ! videorate drop-only=1 skip-to-first=1"_s, true);
+            //priv->screenShareConvert = makeGStreamerBin("vapostproc ! capsfilter caps=video/x-raw ! videorate drop-only=1 skip-to-first=1"_s, true);
             //  ! tee name=t ! queue t. ! queue ! videoconvert ! x264enc ! mp4mux fragment-duration=1000 fragment-mode=0 streamable=0 force-create-timecode-trak=1 ! filesink location=/home/phil/tmp/foo.raw
 #else
             gst_printerrln("Screenshare encoding requested without build-time gstreamer-gl support, this is unlikely to work as expected");
@@ -417,8 +420,8 @@ static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
             }
         } else {
             if (!priv->videoScale) {
-                priv->videoScale = makeGStreamerElement("identity"_s);
-                //g_object_set(priv->videoScale.get(), "n-threads", 2, nullptr);
+                priv->videoScale = makeGStreamerElement("videoscale"_s);
+                g_object_set(priv->videoScale.get(), "n-threads", 2, nullptr);
                 gst_bin_add(GST_BIN_CAST(self), priv->videoScale.get());
             }
 
@@ -712,6 +715,7 @@ static void videoEncoderConstructed(GObject* encoder)
 static void setupVaEncoder(WebKitVideoEncoder* self)
 {
     g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
+    g_object_set(self->priv->encoder.get(), "aud", TRUE, nullptr);
 }
 
 static void setVaBitrateMode(GstElement* encoder, BitrateMode mode)
