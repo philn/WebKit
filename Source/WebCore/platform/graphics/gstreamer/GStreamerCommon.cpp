@@ -1120,9 +1120,9 @@ GstElement* /* (transfer floating) */ makeGStreamerElement(ASCIILiteral factoryN
 GstElement* /* (transfer floating) */ makeGStreamerBin(ASCIILiteral description, bool ghostUnlinkedPads)
 {
     static Lock lock;
-    static Vector<const char*> cache WTF_GUARDED_BY_LOCK(lock);
+    static Vector<String> cache WTF_GUARDED_BY_LOCK(lock);
     GUniqueOutPtr<GError> error;
-    auto* bin = gst_parse_bin_from_description(description, ghostUnlinkedPads, &error.outPtr());
+    auto bin = gst_parse_bin_from_description(description.characters(), ghostUnlinkedPads, &error.outPtr());
     Locker locker { lock };
     if (!bin && !cache.contains(description)) {
         cache.append(description);
