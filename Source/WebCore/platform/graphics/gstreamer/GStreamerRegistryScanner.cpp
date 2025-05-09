@@ -723,6 +723,11 @@ void GStreamerRegistryScanner::initializeEncoders(const GStreamerRegistryScanner
             m_encoderMimeTypeSet.add("video/x-m4v"_s);
         }
     }
+
+    if (auto result = factories.hasElementForMediaType(ElementFactories::Type::AudioParser, "audio/x-raw"_s)) {
+        gst_printerrln("wooo");
+        m_encoderCodecMap.add("pcm"_s, result);
+    }
 }
 
 GStreamerRegistryScanner::CodecLookupResult GStreamerRegistryScanner::isHEVCCodecSupported(Configuration configuration, const String& codec, bool shouldCheckForHardwareUse) const
