@@ -579,6 +579,7 @@ bool MediaPlayerPrivateGStreamer::doSeek(const SeekTarget& target, float rate, b
 
     if (rate >= 0.0 && startTime >= duration()) {
         didEnd();
+        GST_DEBUG("phil");
         return false;
     }
 
@@ -612,13 +613,16 @@ bool MediaPlayerPrivateGStreamer::doSeek(const SeekTarget& target, float rate, b
         return true;
     }
 
+    GST_DEBUG("phil");
     return gst_element_send_event(m_pipeline.get(), event);
 }
 
 void MediaPlayerPrivateGStreamer::seekToTarget(const SeekTarget& inTarget)
 {
-    if (!m_pipeline || m_didErrorOccur || isMediaStreamPlayer())
+    if (!m_pipeline || m_didErrorOccur || isMediaStreamPlayer()) {
+        GST_DEBUG("phil");
         return;
+    }
 
     GST_INFO_OBJECT(pipeline(), "[Seek] seek attempt to %s", toString(inTarget.time).utf8().data());
 
@@ -651,6 +655,7 @@ void MediaPlayerPrivateGStreamer::seekToTarget(const SeekTarget& inTarget)
         m_timeOfOverlappingSeek = target.time;
         if (m_isSeekPending) {
             m_seekTarget = target;
+            GST_DEBUG("phil");
             return;
         }
     }
@@ -695,6 +700,7 @@ void MediaPlayerPrivateGStreamer::seekToTarget(const SeekTarget& inTarget)
         }
     }
 
+    GST_DEBUG("phil");
     m_isSeeking = true;
     m_seekTarget = target;
     m_isEndReached = false;
