@@ -33,6 +33,7 @@
 #include "VideoEncoderPrivateGStreamer.h"
 #include <gst/app/gstappsink.h>
 #include <gst/transcoder/gsttranscoder.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/Scope.h>
 #include <wtf/TZoneMallocInlines.h>
 
@@ -159,6 +160,7 @@ MediaRecorderPrivateBackend::~MediaRecorderPrivateBackend()
         webkitMediaStreamSrcSignalEndOfStream(WEBKIT_MEDIA_STREAM_SRC(m_src.get()));
     if (m_transcoder) {
         unregisterPipeline(m_pipeline);
+        disconnectSimpleBusMessageCallback(m_pipeline.get());
         m_pipeline.clear();
         m_transcoder.clear();
     }
@@ -227,6 +229,7 @@ void MediaRecorderPrivateBackend::fetchData(MediaRecorderPrivate::FetchDataCallb
             buffer = m_data.take();
             timeCode = m_timeCode;
         }
+        gst_printerrln("timeCode: %f", timeCode);
         completionHandler(buffer.releaseNonNull(), mimeType, timeCode);
         {
             Locker locker { m_dataLock };
@@ -276,14 +279,23 @@ GRefPtr<GstEncodingContainerProfile> MediaRecorderPrivateBackend::containerProfi
     if (scanner.isContentTypeSupported(GStreamerRegistryScanner::Configuration::Encoding, contentType, { }) == MediaPlayerEnums::SupportsType::IsNotSupported)
         return nullptr;
 
+    auto codecs = contentType.codecs();
+
+    bool isMatroskaMuxer = false;
     auto mp4Variant = isGStreamerPluginAvailable("fmp4"_s) ? "iso-fragmented"_s : "iso"_s;
     StringBuilder containerCapsDescriptionBuilder;
     auto containerType = contentType.containerType();
     if (containerType.endsWith("mp4"_s))
         containerCapsDescriptionBuilder.append("video/quicktime, variant="_s, mp4Variant);
-    else if (containerType.endsWith("webm"_s))
-        containerCapsDescriptionBuilder.append(selectedTracks.videoTrack ? "video/webm"_s : "audio/webm"_s);
-    else
+    else if (containerType.endsWith("webm"_s)) {
+        ASCIILiteral muxerType = "webm"_s;
+        // The WebM muxer doesn't support PCM, so fallback to Matroska.
+        if (selectedTracks.audioTrack && codecs.contains("pcm"_s)) {
+            muxerType = "x-matroska"_s;
+            isMatroskaMuxer = true;
+        }
+        containerCapsDescriptionBuilder.append(selectedTracks.videoTrack ? "video"_s : "audio"_s, '/', muxerType);
+    } else
         containerCapsDescriptionBuilder.append(containerType);
 
     auto containerCapsDescription = containerCapsDescriptionBuilder.toString();
@@ -303,9 +315,11 @@ GRefPtr<GstEncodingContainerProfile> MediaRecorderPrivateBackend::containerProfi
         propertiesBuilder.append("]}"_s);
         auto properties = propertiesBuilder.toString();
         gst_encoding_profile_set_element_properties(GST_ENCODING_PROFILE(profile.get()), gst_structure_from_string(properties.ascii().data(), nullptr));
+    } else if (isMatroskaMuxer) {
+        auto properties = "element-properties-map, map={[matroskamux,streamable=1]}"_s;
+        gst_encoding_profile_set_element_properties(GST_ENCODING_PROFILE(profile.get()), gst_structure_from_string(properties.characters(), nullptr));
     }
 
-    auto codecs = contentType.codecs();
     if (selectedTracks.videoTrack) {
         if (codecs.isEmpty()) {
             if (containerType.endsWith("mp4"_s))
@@ -320,6 +334,17 @@ GRefPtr<GstEncodingContainerProfile> MediaRecorderPrivateBackend::containerProfi
             m_videoCodec = codecs.first();
         auto [_, videoCaps] = GStreamerCodecUtilities::capsFromCodecString(m_videoCodec, { });
         GST_DEBUG("Creating video encoding profile for caps %" GST_PTR_FORMAT, videoCaps.get());
+        if (isMatroskaMuxer) {
+            auto structure = gst_caps_get_structure(videoCaps.get(), 0);
+            if (gst_structure_has_name(structure, "video/x-h264")) {
+                // Remove profile and level fields, this is a workaround for a caps negotiation issue.
+                gstStructureFilterAndMapInPlace(structure, [](auto id, auto) -> bool {
+                    auto idString = gstIdToString(id);
+                    return idString != "profile"_s && idString != "level"_s;
+                });
+            }
+        }
+
         m_videoEncodingProfile = adoptGRef(GST_ENCODING_PROFILE(gst_encoding_video_profile_new(videoCaps.get(), nullptr, nullptr, 1)));
         gst_encoding_container_profile_add_profile(profile.get(), m_videoEncodingProfile.get());
     }
@@ -330,6 +355,8 @@ GRefPtr<GstEncodingContainerProfile> MediaRecorderPrivateBackend::containerProfi
             audioCapsName = "audio/x-vorbis"_s;
         else if (codecs.contains("opus"_s))
             audioCapsName = "audio/x-opus"_s;
+        else if (codecs.contains("pcm"_s))
+            audioCapsName = "audio/x-raw"_s;
         else if (codecs.findIf([](auto& codec) { return codec.startsWith("mp4a"_s); }) != notFound)
             audioCapsName = "audio/mpeg, mpegversion=4"_s;
         else if (containerType.endsWith("webm"_s))
@@ -457,6 +484,7 @@ bool MediaRecorderPrivateBackend::preparePipeline()
     gst_element_set_start_time(m_pipeline.get(), GST_CLOCK_TIME_NONE);
 
     registerActivePipeline(m_pipeline);
+    connectSimpleBusMessageCallback(m_pipeline.get());
 
     g_signal_connect_swapped(m_pipeline.get(), "source-setup", G_CALLBACK(+[](MediaRecorderPrivateBackend* recorder, GstElement* sourceElement) {
         recorder->setSource(sourceElement);
@@ -477,12 +505,28 @@ bool MediaRecorderPrivateBackend::preparePipeline()
         auto classifiers = elementClass.split('/');
         if (classifiers.contains("Audio"_s) && classifiers.contains("Codec"_s) && classifiers.contains("Encoder"_s))
             recorder->configureAudioEncoder(element);
+
+        GUniquePtr<char> elementName(gst_element_get_name(element));
+        auto nameView = StringView::fromLatin1(elementName.get());
+        if (nameView.startsWith("queue"_s)) {
+            g_object_set(element, "max-size-buffers", 1, "max-size-time", 0, "max-size-bytes", 0, "flush-on-eos", TRUE, nullptr);
+            // gst_util_set_object_arg(G_OBJECT(element), "leaky", "downstream");
+        }
+
+        if (nameView.startsWith("videorate"_s))
+            g_object_set(element, "drop-only", TRUE, "max-rate", 60, nullptr);
     }), this);
 
     m_signalAdapter = adoptGRef(gst_transcoder_get_sync_signal_adapter(m_transcoder.get()));
-    g_signal_connect(m_signalAdapter.get(), "warning", G_CALLBACK(+[](GstTranscoder*, [[maybe_unused]] GError* error, [[maybe_unused]] GstStructure* details) {
-        GST_WARNING("%s details: %" GST_PTR_FORMAT, error->message, details);
-    }), nullptr);
+#ifndef GST_DISABLE_GST_DEBUG
+    g_signal_connect(m_signalAdapter.get(), "warning", G_CALLBACK(+[](GstTranscoder*, GError* error, GstStructure* details, MediaRecorderPrivateBackend* recorder) {
+        GST_WARNING_OBJECT(recorder->m_pipeline.get(), "%s details: %" GST_PTR_FORMAT, error->message, details);
+    }), this);
+
+    g_signal_connect(m_signalAdapter.get(), "error", G_CALLBACK(+[](GstTranscoder*, GError* error, GstStructure* details, MediaRecorderPrivateBackend* recorder) {
+        GST_ERROR_OBJECT(recorder->m_pipeline.get(), "%s details: %" GST_PTR_FORMAT, error->message, details);
+    }), this);
+#endif
 
     g_signal_connect_swapped(m_signalAdapter.get(), "done", G_CALLBACK(+[](MediaRecorderPrivateBackend* recorder) {
         recorder->notifyEOS();
