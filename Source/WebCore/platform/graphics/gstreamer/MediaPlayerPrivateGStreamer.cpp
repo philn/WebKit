@@ -160,7 +160,6 @@ MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
     , m_player(player)
     , m_referrer(player->referrer())
     , m_cachedDuration(MediaTime::invalidTime())
-    , m_timeOfOverlappingSeek(MediaTime::invalidTime())
     , m_fillTimer(*this, &MediaPlayerPrivateGStreamer::fillTimerFired)
     , m_maxTimeLoaded(MediaTime::zeroTime())
     , m_preload(player->preload())
@@ -610,8 +609,7 @@ bool MediaPlayerPrivateGStreamer::doSeek(const SeekTarget& target, float rate, b
 
     if (isAsync) {
         gst_element_call_async(m_pipeline.get(), reinterpret_cast<GstElementCallAsyncFunc>(+[](GstElement* pipeline, gpointer userData) {
-            GstEvent* event = static_cast<GstEvent*>(userData);
-            gst_element_send_event(pipeline, event);
+            gst_element_send_event(pipeline, GST_EVENT_CAST(userData));
         }), event, nullptr);
 
         return true;
@@ -652,12 +650,9 @@ void MediaPlayerPrivateGStreamer::seekToTarget(const SeekTarget& inTarget)
     MediaTelemetryReport::singleton().reportPlaybackState(MediaTelemetryReport::AVPipelineState::SeekStart, makeString(toString(playbackPosition()), "->"_s, toString(target.time)));
 #endif
 
-    if (m_isSeeking) {
-        m_timeOfOverlappingSeek = target.time;
-        if (m_isSeekPending) {
-            m_seekTarget = target;
-            return;
-        }
+    if (m_isSeeking && m_isSeekPending) {
+        m_seekTarget = target;
+        return;
     }
 
     GstState state;
@@ -2731,12 +2726,6 @@ void MediaPlayerPrivateGStreamer::finishSeek()
 #endif
     m_isSeeking = false;
     invalidateCachedPosition();
-    if (m_timeOfOverlappingSeek != m_seekTarget.time && m_timeOfOverlappingSeek.isValid()) {
-        seekToTarget(SeekTarget { m_timeOfOverlappingSeek });
-        m_timeOfOverlappingSeek = MediaTime::invalidTime();
-        return;
-    }
-    m_timeOfOverlappingSeek = MediaTime::invalidTime();
 
     // The pipeline can still have a pending state. In this case a position query will fail.
     // Right now we can use m_seekTarget as a fallback.
