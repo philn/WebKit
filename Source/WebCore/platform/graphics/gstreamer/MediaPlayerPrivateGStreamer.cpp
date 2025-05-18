@@ -597,11 +597,16 @@ bool MediaPlayerPrivateGStreamer::doSeek(const SeekTarget& target, float rate, b
         changePipelineState(GST_STATE_PAUSED);
     }
 
+    ASCIILiteral seekType = "accurate"_s;
+    auto flags = seekFlagsForTarget(target);
+    if (flags & GST_SEEK_FLAG_KEY_UNIT)
+        seekType = "key-unit"_s;
+
     auto seekStart = toGstClockTime(startTime);
     auto seekStop = toGstClockTime(endTime);
-    GstEvent* event = gst_event_new_seek(rate, GST_FORMAT_TIME, m_seekFlags, GST_SEEK_TYPE_SET, seekStart, GST_SEEK_TYPE_SET, seekStop);
+    GstEvent* event = gst_event_new_seek(rate, GST_FORMAT_TIME, flags, GST_SEEK_TYPE_SET, seekStart, GST_SEEK_TYPE_SET, seekStop);
 
-    GST_DEBUG_OBJECT(pipeline(), "[Seek] Performing actual seek to %" GST_TIMEP_FORMAT " (endTime: %" GST_TIMEP_FORMAT ") at rate %f", &seekStart, &seekStop, rate);
+    GST_DEBUG_OBJECT(pipeline(), "[Seek] Performing actual %s seek to %" GST_TIMEP_FORMAT " (endTime: %" GST_TIMEP_FORMAT ") at rate %f", seekType.characters(), &seekStart, &seekStop, rate);
 
     if (isAsync) {
         gst_element_call_async(m_pipeline.get(), reinterpret_cast<GstElementCallAsyncFunc>(+[](GstElement* pipeline, gpointer userData) {
@@ -1592,7 +1597,7 @@ MediaTime MediaPlayerPrivateGStreamer::playbackPosition() const
     }
 
     // We can't trust sinks position when pipeline is flushed (e.g. after MSE samples removal).
-    GstClockTime gstreamerPosition = isPipelineWaitingPreroll() ? GST_CLOCK_TIME_NONE : gstreamerPositionFromSinks();
+    GstClockTime gstreamerPosition = (m_isPaused || isPipelineWaitingPreroll()) ? GST_CLOCK_TIME_NONE : gstreamerPositionFromSinks();
     GST_TRACE_OBJECT(pipeline(), "Position %" GST_TIME_FORMAT ", canFallBackToLastFinishedSeekPosition: %s", GST_TIME_ARGS(gstreamerPosition), boolForPrinting(m_canFallBackToLastFinishedSeekPosition));
 
     // Cached position is marked as non valid here but we might fail to get a new one so initializing to this as "educated guess".
@@ -3770,8 +3775,17 @@ void MediaPlayerPrivateGStreamer::invalidateCachedPositionOnNextIteration() cons
 void MediaPlayerPrivateGStreamer::ensureSeekFlags()
 {
     RefPtr player = m_player.get();
-    auto flag = (player && player->isLooping()) ? GST_SEEK_FLAG_SEGMENT : GST_SEEK_FLAG_FLUSH;
-    m_seekFlags = static_cast<GstSeekFlags>(flag | GST_SEEK_FLAG_ACCURATE);
+    m_seekFlags = (player && player->isLooping()) ? GST_SEEK_FLAG_SEGMENT : GST_SEEK_FLAG_FLUSH;
+}
+
+GstSeekFlags MediaPlayerPrivateGStreamer::seekFlagsForTarget(const SeekTarget& target)
+{
+    auto flags = m_seekFlags;
+    if (target.negativeThreshold != MediaTime::zeroTime())
+        flags = static_cast<GstSeekFlags>(flags | GST_SEEK_FLAG_KEY_UNIT);
+    else
+        flags = static_cast<GstSeekFlags>(flags | GST_SEEK_FLAG_ACCURATE);
+    return flags;
 }
 
 void MediaPlayerPrivateGStreamer::triggerRepaint(GRefPtr<GstSample>&& sample)

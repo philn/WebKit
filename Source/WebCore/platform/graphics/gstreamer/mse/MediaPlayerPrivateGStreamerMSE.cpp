@@ -241,6 +241,15 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek(const SeekTarget& target, float rate
     m_isWaitingForPreroll = true;
     m_isEndReached = false;
 
+    ASCIILiteral seekType = "accurate"_s;
+    auto flags = seekFlagsForTarget(target);
+    if (flags & GST_SEEK_FLAG_KEY_UNIT)
+        seekType = "key-unit"_s;
+
+    auto seekStart = toGstClockTime(target.time);
+
+    GST_DEBUG_OBJECT(pipeline(), "[Seek] Performing actual %s seek to %" GST_TIMEP_FORMAT " at rate %f", seekType.characters(), &seekStart, rate);
+
     // Important: In order to ensure correct propagation whether pre-roll has happened or not, we send the seek directly
     // to the source element, rather than letting playbin do the routing.
     {
@@ -253,8 +262,8 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek(const SeekTarget& target, float rate
         // the seek event, but since we're sending the event directly to the source element we need to take the
         // STATE_LOCK on the pipeline ourselves.
         auto locker = GstStateLocker(pipeline());
-        gst_element_seek(m_source.get(), rate, GST_FORMAT_TIME, m_seekFlags,
-            GST_SEEK_TYPE_SET, toGstClockTime(target.time), GST_SEEK_TYPE_NONE, 0);
+        gst_element_seek(m_source.get(), rate, GST_FORMAT_TIME, flags,
+            GST_SEEK_TYPE_SET, seekStart, GST_SEEK_TYPE_NONE, 0);
     }
     invalidateCachedPosition();
 

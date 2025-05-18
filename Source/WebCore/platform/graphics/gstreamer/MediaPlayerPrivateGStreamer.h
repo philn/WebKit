@@ -342,6 +342,7 @@ protected:
     virtual bool doSeek(const SeekTarget& position, float rate, bool isAsync = false);
     void invalidateCachedPosition() const;
     void ensureSeekFlags();
+    GstSeekFlags seekFlagsForTarget(const SeekTarget&);
 
     static void sourceSetupCallback(MediaPlayerPrivateGStreamer*, GstElement*);
 
