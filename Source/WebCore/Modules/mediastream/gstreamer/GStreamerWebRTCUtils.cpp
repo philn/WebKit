@@ -295,7 +295,8 @@ enum class NextSDPField {
     Raddr,
     Rport,
     TcpType,
-    Ufrag
+    Ufrag,
+    Generation
 };
 
 std::optional<RTCIceCandidate::Fields> parseIceCandidateSDP(const String& sdp)
@@ -370,6 +371,8 @@ std::optional<RTCIceCandidate::Fields> parseIceCandidateSDP(const String& sdp)
                 nextSdpField = NextSDPField::TcpType;
             else if (token == "ufrag"_s)
                 nextSdpField = NextSDPField::Ufrag;
+            else if (token == "generation"_s)
+                nextSdpField = NextSDPField::Generation;
             else {
                 switch (nextSdpField) {
                 case NextSDPField::None:
@@ -388,6 +391,9 @@ std::optional<RTCIceCandidate::Fields> parseIceCandidateSDP(const String& sdp)
                     break;
                 case NextSDPField::Ufrag:
                     usernameFragment = tokenString;
+                    break;
+                case NextSDPField::Generation:
+                    // Unsupported.
                     break;
                 }
             }
