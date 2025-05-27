@@ -532,6 +532,7 @@ void VideoFrame::copyTo(std::span<uint8_t> destination, VideoPixelFormat pixelFo
     }
 
     GST_TRACE("Copying frame data to pixel format %d", static_cast<int>(pixelFormat));
+    GST_DEBUG("Input caps: %" GST_PTR_FORMAT, inputCaps);
     if (pixelFormat == VideoPixelFormat::NV12) {
         auto spanPlaneLayoutY = computedPlaneLayout[0];
         auto widthY = inputFrame.componentWidth(0);
@@ -559,20 +560,24 @@ void VideoFrame::copyTo(std::span<uint8_t> destination, VideoPixelFormat pixelFo
     if (pixelFormat == VideoPixelFormat::I420 || pixelFormat == VideoPixelFormat::I420A) {
         auto spanPlaneLayoutY = computedPlaneLayout[0];
         auto widthY = inputFrame.componentWidth(0);
+        GST_DEBUG("Y offset: %zu stride: %zu", spanPlaneLayoutY.destinationOffset, spanPlaneLayoutY.destinationStride);
         PlaneLayout planeLayoutY { spanPlaneLayoutY.destinationOffset, spanPlaneLayoutY.destinationStride ? spanPlaneLayoutY.destinationStride : widthY };
         auto planeY = inputFrame.componentData(0);
         auto bytesPerRowY = inputFrame.componentStride(0);
         copyPlane(destination.data(), planeY, bytesPerRowY, spanPlaneLayoutY);
 
         auto spanPlaneLayoutU = computedPlaneLayout[1];
+        GST_DEBUG("U offset: %zu stride: %zu", spanPlaneLayoutU.destinationOffset, spanPlaneLayoutU.destinationStride);
         auto widthUV = inputFrame.componentWidth(1);
         PlaneLayout planeLayoutU { spanPlaneLayoutU.destinationOffset, spanPlaneLayoutU.destinationStride ? spanPlaneLayoutU.destinationStride : widthUV / 2 };
 
         auto spanPlaneLayoutV = computedPlaneLayout[2];
+        GST_DEBUG("V offset: %zu stride: %zu", spanPlaneLayoutV.destinationOffset, spanPlaneLayoutV.destinationStride);
         PlaneLayout planeLayoutV { spanPlaneLayoutV.destinationOffset, spanPlaneLayoutV.destinationStride ? spanPlaneLayoutV.destinationStride : widthUV / 2 };
 
         auto planeU = inputFrame.componentData(1);
         auto bytesPerRowU = inputFrame.componentStride(1);
+        GST_DEBUG("bytesPerRowU: %u", bytesPerRowU);
         copyPlane(destination.data(), planeU, bytesPerRowU, spanPlaneLayoutU);
 
         auto planeV = inputFrame.componentData(2);
@@ -583,6 +588,7 @@ void VideoFrame::copyTo(std::span<uint8_t> destination, VideoPixelFormat pixelFo
         planeLayouts.append(planeLayoutY);
         planeLayouts.append(planeLayoutU);
         planeLayouts.append(planeLayoutV);
+        GST_DEBUG("widthY: %d widthUV: %d", widthY, widthUV);
 
         if (pixelFormat == VideoPixelFormat::I420A) {
             auto spanPlaneLayoutA = computedPlaneLayout[3];
