@@ -21,6 +21,7 @@
 #include "config.h"
 
 #include "VideoFrameGStreamer.h"
+#include <gst/gstinfo.h>
 
 #if ENABLE(VIDEO) && USE(GSTREAMER)
 
@@ -500,20 +501,24 @@ void VideoFrameGStreamer::setPresentationTime(const MediaTime& presentationTime)
     GST_BUFFER_PTS(buffer) = GST_BUFFER_DTS(buffer) = toGstClockTime(1_s / presentationTime.toDouble());
 }
 
-WTF_ALLOW_UNSAFE_BUFFER_USAGE_BEGIN // GLib port
+//WTF_ALLOW_UNSAFE_BUFFER_USAGE_BEGIN // GLib port
 static void copyPlane(uint8_t* destination, const uint8_t* source, uint64_t sourceStride, const ComputedPlaneLayout& spanPlaneLayout)
 {
     uint64_t sourceOffset = spanPlaneLayout.sourceTop * sourceStride;
     sourceOffset += spanPlaneLayout.sourceLeftBytes;
     uint64_t destinationOffset = spanPlaneLayout.destinationOffset;
     uint64_t rowBytes = spanPlaneLayout.sourceWidthBytes;
+    GST_TRACE("%zu rows", spanPlaneLayout.sourceHeight);
     for (size_t rowIndex = 0; rowIndex < spanPlaneLayout.sourceHeight; ++rowIndex) {
+        GST_DEBUG("Copy to offset %zu, sourceOffset: %zu %zu bytes", destinationOffset, sourceOffset, rowBytes);
         std::memcpy(destination + destinationOffset, source + sourceOffset, rowBytes);
+        GST_MEMDUMP("src", source + sourceOffset, rowBytes);
+        GST_MEMDUMP("dst", destination + destinationOffset, rowBytes);
         sourceOffset += sourceStride;
         destinationOffset += spanPlaneLayout.destinationStride;
     }
 }
-WTF_ALLOW_UNSAFE_BUFFER_USAGE_END
+//WTF_ALLOW_UNSAFE_BUFFER_USAGE_END
 
 void VideoFrame::copyTo(std::span<uint8_t> destination, VideoPixelFormat pixelFormat, Vector<ComputedPlaneLayout>&& computedPlaneLayout, CompletionHandler<void(std::optional<Vector<PlaneLayout>>&&)>&& callback)
 {
@@ -562,8 +567,8 @@ void VideoFrame::copyTo(std::span<uint8_t> destination, VideoPixelFormat pixelFo
         auto widthY = inputFrame.componentWidth(0);
         GST_DEBUG("Y offset: %zu stride: %zu", spanPlaneLayoutY.destinationOffset, spanPlaneLayoutY.destinationStride);
         PlaneLayout planeLayoutY { spanPlaneLayoutY.destinationOffset, spanPlaneLayoutY.destinationStride ? spanPlaneLayoutY.destinationStride : widthY };
-        auto planeY = inputFrame.componentData(0);
-        auto bytesPerRowY = inputFrame.componentStride(0);
+        auto planeY = (uint8_t*)inputFrame.planeData(0);
+        auto bytesPerRowY = inputFrame.planeStride(0);
         copyPlane(destination.data(), planeY, bytesPerRowY, spanPlaneLayoutY);
 
         auto spanPlaneLayoutU = computedPlaneLayout[1];
@@ -575,13 +580,15 @@ void VideoFrame::copyTo(std::span<uint8_t> destination, VideoPixelFormat pixelFo
         GST_DEBUG("V offset: %zu stride: %zu", spanPlaneLayoutV.destinationOffset, spanPlaneLayoutV.destinationStride);
         PlaneLayout planeLayoutV { spanPlaneLayoutV.destinationOffset, spanPlaneLayoutV.destinationStride ? spanPlaneLayoutV.destinationStride : widthUV / 2 };
 
-        auto planeU = inputFrame.componentData(1);
-        auto bytesPerRowU = inputFrame.componentStride(1);
+        auto planeU = (uint8_t*)inputFrame.planeData(1);
+        //auto planeU = (uint8_t*)GST_VIDEO_FRAME_COMP_PLANE(inputFrame.get(), GST_VIDEO_COMP_U);
+        auto bytesPerRowU = inputFrame.planeStride(1);
+        //auto bytesPerRowU = (int)GST_VIDEO_FRAME_COMP_STRIDE(inputFrame.get(), GST_VIDEO_COMP_U);
         GST_DEBUG("bytesPerRowU: %u", bytesPerRowU);
         copyPlane(destination.data(), planeU, bytesPerRowU, spanPlaneLayoutU);
 
-        auto planeV = inputFrame.componentData(2);
-        auto bytesPerRowV = inputFrame.componentStride(2);
+        auto planeV = (uint8_t*)inputFrame.planeData(2);
+        auto bytesPerRowV = inputFrame.planeStride(2);
         copyPlane(destination.data(), planeV, bytesPerRowV, spanPlaneLayoutV);
 
         Vector<PlaneLayout> planeLayouts;
