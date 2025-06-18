@@ -128,6 +128,21 @@ void AppendPipeline::configureOptionalDemuxerFromAnyThread()
                 return AbortableTaskQueue::Void();
             });
         }), this);
+
+        g_signal_connect_swapped(m_demux.get(), "pad-added", G_CALLBACK(+[](AppendPipeline* appendPipeline, GstPad* pad) {
+            ASSERT(!isMainThread());
+            GST_DEBUG_OBJECT(appendPipeline->pipeline(), "Pad added: %" GST_PTR_FORMAT, pad);
+            // phil
+            gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, reinterpret_cast<GstPadProbeCallback>(+[](GstPad* pad, GstPadProbeInfo* info, AppendPipeline* appendPipeline) -> GstPadProbeReturn {
+                GstEvent* event = GST_PAD_PROBE_INFO_EVENT(info);
+                if (GST_EVENT_TYPE(event) != GST_EVENT_CAPS)
+                    return GST_PAD_PROBE_OK;
+
+                appendPipeline->checkIfParserNeededForDemuxerPad(GRefPtr(pad));
+                return GST_PAD_PROBE_OK;
+            }), appendPipeline, nullptr);
+        }), this);
+
     } else {
         // m_demux can be an identity or an id3demux element at this point.
         gst_pad_add_probe(demuxerSrcPad.get(), GST_PAD_PROBE_TYPE_BUFFER, reinterpret_cast<GstPadProbeCallback>(
@@ -345,18 +360,10 @@ GstPadProbeReturn AppendPipeline::appsrcEndOfAppendCheckerProbe(GstPadProbeInfo*
     return GST_PAD_PROBE_DROP;
 }
 
-void AppendPipeline::handleNeedContextSyncMessage(GstMessage* message)
+void AppendPipeline::checkIfParserNeededForDemuxerPad(const GRefPtr<GstPad>& pad)
 {
-    auto scopeExit = makeScopeExit([&] {
-        // MediaPlayerPrivateGStreamerBase will take care of setting up encryption.
-        m_playerPrivate->handleNeedContextMessage(message);
-    });
-
-    if (!m_demux->numsrcpads)
-        return;
-
-    auto pad = GST_PAD_CAST(m_demux->srcpads->data);
-    auto peer = adoptGRef(gst_pad_get_peer(pad));
+    // Remove the parser in case the demuxer pad is emitting encrypted buffers.
+    auto peer = adoptGRef(gst_pad_get_peer(pad.get()));
     if (!peer)
         return;
 
@@ -380,10 +387,24 @@ void AppendPipeline::handleNeedContextSyncMessage(GstMessage* message)
         return;
 
     gstElementLockAndSetState(parser.get(), GST_STATE_NULL);
-    gst_pad_unlink(pad, peer.get());
+    gst_pad_unlink(pad.get(), peer.get());
     gst_pad_unlink(srcPad.get(), parserPeerPad.get());
     gst_bin_remove(GST_BIN_CAST(m_pipeline.get()), parser.get());
-    gst_pad_link(pad, parserPeerPad.get());
+    gst_pad_link(pad.get(), parserPeerPad.get());
+}
+
+void AppendPipeline::handleNeedContextSyncMessage(GstMessage* message)
+{
+    auto scopeExit = makeScopeExit([&] {
+        // MediaPlayerPrivateGStreamerBase will take care of setting up encryption.
+        m_playerPrivate->handleNeedContextMessage(message);
+    });
+
+    if (!m_demux->numsrcpads)
+        return;
+
+    GRefPtr pad = GST_PAD_CAST(m_demux->srcpads->data);
+    checkIfParserNeededForDemuxerPad(pad);
 }
 
 std::tuple<GRefPtr<GstCaps>, StreamType, FloatSize> AppendPipeline::parseDemuxerSrcPadCaps(GstCaps* demuxerSrcPadCaps)

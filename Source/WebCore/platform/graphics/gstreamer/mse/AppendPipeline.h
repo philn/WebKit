@@ -109,6 +109,7 @@ private:
     };
 
     void configureOptionalDemuxerFromAnyThread();
+    void checkIfParserNeededForDemuxerPad(const GRefPtr<GstPad>&);
     void handleErrorSyncMessage(GstMessage*);
     void handleNeedContextSyncMessage(GstMessage*);
     // For debug purposes only:
