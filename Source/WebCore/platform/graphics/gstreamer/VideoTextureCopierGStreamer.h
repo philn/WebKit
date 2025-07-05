@@ -21,7 +21,7 @@
 
 #if USE(GSTREAMER_GL)
 
-#include "CoordinatedPlatformLayerBuffer.h"
+#include "CoordinatedPlatformLayerBufferVideo.h"
 #include "ImageOrientation.h"
 #include "TextureMapperGLHeaders.h"
 #include "TextureMapperShaderProgram.h"
@@ -44,7 +44,7 @@ public:
     VideoTextureCopierGStreamer(ColorConversion);
     ~VideoTextureCopierGStreamer();
 
-    bool copyVideoTextureToPlatformTexture(CoordinatedPlatformLayerBuffer& inputTexture, IntSize& frameSize, GLuint outputTexture, GLenum outputTarget, GLint level, GLenum internalFormat, GLenum format, GLenum type, bool flipY, ImageOrientation sourceOrientation, bool premultiplyAlpha);
+    bool copyVideoTextureToPlatformTexture(CoordinatedPlatformLayerBufferVideo& inputTexture, IntSize& frameSize, GLuint outputTexture, GLenum outputTarget, GLint level, GLenum internalFormat, GLenum format, GLenum type, bool flipY, ImageOrientation sourceOrientation, bool premultiplyAlpha);
     void updateColorConversionMatrix(ColorConversion);
     void updateTextureSpaceMatrix();
     void updateTransformationMatrix();

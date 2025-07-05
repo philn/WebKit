@@ -26,12 +26,9 @@
 #pragma once
 
 #if USE(COORDINATED_GRAPHICS)
-#include "TextureMapperGLHeaders.h"
-
 #include "GLFence.h"
 #include "TextureMapperFlags.h"
 #include "TextureMapperPlatformLayer.h"
-#include "TextureMapperShaderProgram.h"
 #include <wtf/OptionSet.h>
 
 namespace WebCore {
@@ -61,8 +58,6 @@ public:
         if (auto fence = WTFMove(m_fence))
             fence->serverWait();
     }
-
-    virtual TextureMapperShaderProgram::Options copyOptions(bool premultiplyAlpha) = 0;
 
 protected:
     CoordinatedPlatformLayerBuffer(Type type, const IntSize& size, OptionSet<TextureMapperFlags> flags, std::unique_ptr<GLFence>&& fence)

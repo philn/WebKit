@@ -44,6 +44,10 @@
 #endif
 #endif
 
+#if USE (GSTREAMER_GL)
+#include "CoordinatedPlatformLayerBufferVideo.h"
+#endif
+
 #if USE(COORDINATED_GRAPHICS)
 #include "CoordinatedPlatformLayerBufferRGB.h"
 #include "GraphicsLayerContentsDisplayDelegateCoordinated.h"
@@ -181,6 +185,8 @@ bool GraphicsContextGLTextureMapperANGLE::copyTextureFromVideoFrame(VideoFrame& 
     // if (!gbmDevice.device())
     //     return false;
 
+    auto& gstFrame = reinterpret_cast<VideoFrameGStreamer&>(frame);
+    auto videoBuffer = CoordinatedPlatformLayerBufferVideo::create(gstFrame.sample(), &gstFrame.info(), { }, { }, true, { });
     EGLImageBacking sharedImage(platformDisplay());
     auto size = IntSize(frame.presentationSize());
     sharedImage.reset(size.width(), size.height(), format == GraphicsContextGL::RGBA);
@@ -192,7 +198,7 @@ bool GraphicsContextGLTextureMapperANGLE::copyTextureFromVideoFrame(VideoFrame& 
 
     m_videoTextureCopier->setPendingDmabufTarget(sharedImage.fd(), sharedImage.format(), sharedImage.stride());
 
-    auto result = m_videoTextureCopier->copyVideoTextureToPlatformTexture(this, size, outputTexture, outputTarget, level, internalFormat, format, type, flipY, frame.rotation(), premultiplyAlpha);
+    auto result = m_videoTextureCopier->copyVideoTextureToPlatformTexture(*videoBuffer, size, outputTexture, outputTarget, level, internalFormat, format, type, flipY, frame.rotation(), premultiplyAlpha);
 
     makeContextCurrent();
 

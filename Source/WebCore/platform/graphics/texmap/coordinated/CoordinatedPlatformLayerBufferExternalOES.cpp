@@ -50,11 +50,6 @@ void CoordinatedPlatformLayerBufferExternalOES::paintToTextureMapper(TextureMapp
     textureMapper.drawTextureExternalOES(m_textureID, m_flags, targetRect, modelViewMatrix, opacity);
 }
 
-TextureMapperShaderProgram::Options CoordinatedPlatformLayerBufferExternalOES::copyOptions(bool)
-{
-    return TextureMapperShaderProgram::TextureExternalOES;
-}
-
 } // namespace WebCore
 
 #endif // USE(COORDINATED_GRAPHICS)

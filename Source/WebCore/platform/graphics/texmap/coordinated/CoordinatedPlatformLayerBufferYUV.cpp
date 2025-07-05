@@ -137,31 +137,6 @@ void CoordinatedPlatformLayerBufferYUV::paintToTextureMapper(TextureMapper& text
     }
 }
 
-TextureMapperShaderProgram::Options CoordinatedPlatformLayerBufferYUV::copyOptions(bool)
-{
-    TextureMapperShaderProgram::Options options;
-    switch (m_planeCount) {
-    case 1:
-        ASSERT(m_yuvPlane[0] == m_yuvPlane[1] && m_yuvPlane[1] == m_yuvPlane[2]);
-        ASSERT(m_yuvPlaneOffset[0] == 2 && m_yuvPlaneOffset[1] == 1 && !m_yuvPlaneOffset[2]);
-        options = TextureMapperShaderProgram::TexturePackedYUV;
-        break;
-    case 2:
-        ASSERT(!m_yuvPlaneOffset[0]);
-        options = m_yuvPlaneOffset[1] ? TextureMapperShaderProgram::TextureNV21 : TextureMapperShaderProgram::TextureNV12;
-        break;
-    case 3:
-        ASSERT(!m_yuvPlaneOffset[0] && !m_yuvPlaneOffset[1] && !m_yuvPlaneOffset[2]);
-        options = TextureMapperShaderProgram::TextureYUV;
-        break;
-    case 4:
-        ASSERT(!m_yuvPlaneOffset[0] && !m_yuvPlaneOffset[1] && !m_yuvPlaneOffset[2]);
-        options = TextureMapperShaderProgram::TextureYUVA;
-        break;
-    }
-    return options;
-}
-
 } // namespace WebCore
 
 #endif // USE(COORDINATED_GRAPHICS)

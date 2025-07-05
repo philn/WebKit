@@ -66,15 +66,6 @@ void CoordinatedPlatformLayerBufferRGB::paintToTextureMapper(TextureMapper& text
         textureMapper.drawTexture(m_textureID, m_flags, targetRect, modelViewMatrix, opacity);
 }
 
-TextureMapperShaderProgram::Options CoordinatedPlatformLayerBufferRGB::copyOptions(bool premultiplyAlpha)
-{
-    TextureMapperShaderProgram::Options options = TextureMapperShaderProgram::TextureRGB;
-    if (premultiplyAlpha)
-        options.add(TextureMapperShaderProgram::Premultiply);
-
-    return options;
-}
-
 } // namespace WebCore
 
 #endif // USE(COORDINATED_GRAPHICS)

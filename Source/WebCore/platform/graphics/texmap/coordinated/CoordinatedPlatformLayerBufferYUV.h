@@ -30,6 +30,8 @@
 
 namespace WebCore {
 
+typedef float GLfloat;
+
 class BitmapTexture;
 
 class CoordinatedPlatformLayerBufferYUV final : public CoordinatedPlatformLayerBuffer {
@@ -44,10 +46,8 @@ public:
     unsigned planeCount() const { return m_planeCount; }
     const std::array<unsigned, 4> planes() const { return m_planes; }
     const std::array<unsigned, 4> yuvPlanes() const { return m_yuvPlane; }
+    const std::array<unsigned, 4> yuvPlaneOffsets() const { return m_yuvPlaneOffset; }
     const std::array<GLfloat, 16>& yuvToRgbMatrix() const;
-    //YuvToRgbColorSpace yuvToRgbColorSpace() const { return m_yuvToRgbColorSpace; }
-
-    TextureMapperShaderProgram::Options copyOptions(bool premultiplyAlpha) final;
 
 private:
     void paintToTextureMapper(TextureMapper&, const FloatRect&, const TransformationMatrix& modelViewMatrix = TransformationMatrix(), float opacity = 1.0) override;

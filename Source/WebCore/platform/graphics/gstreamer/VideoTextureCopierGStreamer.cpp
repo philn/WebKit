@@ -28,15 +28,15 @@
 #include "CoordinatedPlatformLayerBufferYUV.h"
 #include "FloatRect.h"
 #include "GLContext.h"
-#include "GLContextEGL.h"
+// #include "GLContextEGL.h"
 #include "ImageOrientation.h"
 
-#if USE(LIBEPOXY)
-#include "EpoxyEGL.h"
-#else
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#endif
+// #if USE(LIBEPOXY)
+// #include "EpoxyEGL.h"
+// #else
+// #include <EGL/egl.h>
+// #include <EGL/eglext.h>
+// #endif
 
 namespace WebCore {
 
@@ -153,7 +153,7 @@ void VideoTextureCopierGStreamer::setPendingDmabufTarget(int fd, uint32_t format
     m_pendingDmabuf.stride = stride;
 }
 
-bool VideoTextureCopierGStreamer::copyVideoTextureToPlatformTexture(CoordinatedPlatformLayerBuffer& inputTexture, IntSize& frameSize, GLuint outputTexture, GLenum outputTarget, GLint level, GLenum internalFormat, GLenum format, GLenum type, bool flipY, ImageOrientation sourceOrientation, bool premultiplyAlpha)
+bool VideoTextureCopierGStreamer::copyVideoTextureToPlatformTexture(CoordinatedPlatformLayerBufferVideo& inputTexture, IntSize& frameSize, GLuint outputTexture, GLenum outputTarget, GLint level, GLenum internalFormat, GLenum format, GLenum type, bool flipY, ImageOrientation sourceOrientation, bool premultiplyAlpha)
 {
     if (!m_framebuffer || !m_vbo || frameSize.isEmpty())
         return false;
@@ -175,7 +175,44 @@ bool VideoTextureCopierGStreamer::copyVideoTextureToPlatformTexture(CoordinatedP
     PlatformDisplay::sharedDisplay().sharingGLContext()->makeContextCurrent();
 
     // Determine what shader program to use and create it if necessary.
-    TextureMapperShaderProgram::Options options = inputTexture.copyOptions(premultiplyAlpha);
+    TextureMapperShaderProgram::Options options;
+    switch (inputTexture.type()) {
+    case CoordinatedPlatformLayerBuffer::Type::RGB:
+        options = TextureMapperShaderProgram::TextureRGB;
+        if (premultiplyAlpha)
+            options.add(TextureMapperShaderProgram::Premultiply);
+        break;
+    case CoordinatedPlatformLayerBuffer::Type::YUV: {
+        auto& yuvBuffer = reinterpret_cast<CoordinatedPlatformLayerBufferYUV&>(inputTexture.buffer());
+        const auto& yuvPlanes = yuvBuffer.yuvPlanes();
+        const auto& yuvPlaneOffsets = yuvBuffer.yuvPlaneOffsets();
+        switch (yuvBuffer.planeCount()) {
+        case 1:
+            ASSERT(yuvPlanes[0] == yuvPlanes[1] && yuvPlanes[1] == yuvPlanes[2]);
+            ASSERT(yuvPlaneOffsets[0] == 2 && yuvPlaneOffsets[1] == 1 && !yuvPlaneOffsets[2]);
+            options = TextureMapperShaderProgram::TexturePackedYUV;
+            break;
+        case 2:
+            ASSERT(!yuvPlaneOffsets[0]);
+            options = yuvPlaneOffsets[1] ? TextureMapperShaderProgram::TextureNV21 : TextureMapperShaderProgram::TextureNV12;
+            break;
+        case 3:
+            ASSERT(!yuvPlaneOffsets[0] && !yuvPlaneOffsets[1] && !yuvPlaneOffsets[2]);
+            options = TextureMapperShaderProgram::TextureYUV;
+            break;
+        case 4:
+            ASSERT(!yuvPlaneOffsets[0] && !yuvPlaneOffsets[1] && !yuvPlaneOffsets[2]);
+            options = TextureMapperShaderProgram::TextureYUVA;
+            break;
+        };
+       break;
+    }
+    case CoordinatedPlatformLayerBuffer::Type::ExternalOES:
+        options = TextureMapperShaderProgram::TextureExternalOES;
+        break;
+    default:
+        break;
+    };
 
     if (options != m_shaderOptions) {
         m_shaderProgram = TextureMapperShaderProgram::create(options);
@@ -237,7 +274,7 @@ bool VideoTextureCopierGStreamer::copyVideoTextureToPlatformTexture(CoordinatedP
 
     switch (inputTexture.type()) {
     case CoordinatedPlatformLayerBuffer::Type::RGB: {
-        auto& rgbTexture = WTF::downcast<CoordinatedPlatformLayerBufferRGB&>(inputTexture);
+        auto& rgbTexture = WTF::downcast<CoordinatedPlatformLayerBufferRGB&>(inputTexture.buffer());
         glUniform1i(m_shaderProgram->samplerLocation(), 0);
 
         glActiveTexture(GL_TEXTURE0);
@@ -246,9 +283,9 @@ bool VideoTextureCopierGStreamer::copyVideoTextureToPlatformTexture(CoordinatedP
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         break;
-    }
+      }
     case CoordinatedPlatformLayerBuffer::Type::YUV: {
-        auto& yuvTexture = WTF::downcast<CoordinatedPlatformLayerBufferYUV&>(inputTexture);
+        auto& yuvTexture = WTF::downcast<CoordinatedPlatformLayerBufferYUV&>(inputTexture.buffer());
         const auto& yuvPlanes = yuvTexture.yuvPlanes();
         switch (yuvTexture.planeCount()) {
         case 1:
@@ -283,7 +320,7 @@ bool VideoTextureCopierGStreamer::copyVideoTextureToPlatformTexture(CoordinatedP
         break;
     }
     case CoordinatedPlatformLayerBuffer::Type::ExternalOES: {
-        auto& oesTexture = WTF::downcast<CoordinatedPlatformLayerBufferExternalOES&>(inputTexture);
+        auto& oesTexture = WTF::downcast<CoordinatedPlatformLayerBufferExternalOES&>(inputTexture.buffer());
         glUniform1i(m_shaderProgram->externalOESTextureLocation(), 0);
 
         glActiveTexture(GL_TEXTURE0);
@@ -322,7 +359,7 @@ bool VideoTextureCopierGStreamer::copyVideoTextureToPlatformTexture(CoordinatedP
 
     if (image)
         downcast<GLContextEGL>(*GLContext::current()).destroyImage(image);
-    
+
     bool ok = (glGetError() == GL_NO_ERROR);
 
     // Restore previous context.

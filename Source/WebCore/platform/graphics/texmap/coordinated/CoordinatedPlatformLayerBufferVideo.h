@@ -35,23 +35,25 @@ using DMABufFormat = std::pair<uint32_t, uint64_t>;
 
 class CoordinatedPlatformLayerBufferVideo final : public CoordinatedPlatformLayerBuffer {
 public:
-    static std::unique_ptr<CoordinatedPlatformLayerBufferVideo> create(GstSample*, GstVideoInfo*, std::optional<DMABufFormat>, std::optional<GstVideoDecoderPlatform>, bool gstGLEnabled, OptionSet<TextureMapperFlags>);
-    CoordinatedPlatformLayerBufferVideo(GstBuffer*, GstVideoInfo*, std::optional<std::pair<uint32_t, uint64_t>>, std::optional<GstVideoDecoderPlatform>, bool gstGLEnabled, OptionSet<TextureMapperFlags>);
+    static std::unique_ptr<CoordinatedPlatformLayerBufferVideo> create(GstSample*, const GstVideoInfo*, std::optional<DMABufFormat>, std::optional<GstVideoDecoderPlatform>, bool gstGLEnabled, OptionSet<TextureMapperFlags>);
+    CoordinatedPlatformLayerBufferVideo(GstBuffer*, const GstVideoInfo*, std::optional<std::pair<uint32_t, uint64_t>>, std::optional<GstVideoDecoderPlatform>, bool gstGLEnabled, OptionSet<TextureMapperFlags>);
     virtual ~CoordinatedPlatformLayerBufferVideo();
 
     std::unique_ptr<CoordinatedPlatformLayerBuffer> copyBuffer() const;
 
-    TextureMapperShaderProgram::Options copyOptions(bool) final { return { }; }
+    CoordinatedPlatformLayerBuffer::Type type() const { return m_buffer->type(); }
+    CoordinatedPlatformLayerBuffer& buffer() const { return *m_buffer.get(); };
+    //TextureMapperShaderProgram::Options copyOptions(bool) final { return { }; }
 
 private:
     void paintToTextureMapper(TextureMapper&, const FloatRect&, const TransformationMatrix& modelViewMatrix = TransformationMatrix(), float opacity = 1.0) override;
 
-    std::unique_ptr<CoordinatedPlatformLayerBuffer> createBufferIfNeeded(GstBuffer*, GstVideoInfo*, std::optional<std::pair<uint32_t, uint64_t>>, bool gstGLEnabled);
+    std::unique_ptr<CoordinatedPlatformLayerBuffer> createBufferIfNeeded(GstBuffer*, const GstVideoInfo*, std::optional<std::pair<uint32_t, uint64_t>>, bool gstGLEnabled);
 #if USE(GBM)
-    std::unique_ptr<CoordinatedPlatformLayerBuffer> createBufferFromDMABufMemory(GstBuffer*, GstVideoInfo*, std::optional<std::pair<uint32_t, uint64_t>>);
+    std::unique_ptr<CoordinatedPlatformLayerBuffer> createBufferFromDMABufMemory(GstBuffer*, const GstVideoInfo*, std::optional<std::pair<uint32_t, uint64_t>>);
 #endif
 #if USE(GSTREAMER_GL)
-    std::unique_ptr<CoordinatedPlatformLayerBuffer> createBufferFromGLMemory(GstBuffer*, GstVideoInfo*);
+    std::unique_ptr<CoordinatedPlatformLayerBuffer> createBufferFromGLMemory(GstBuffer*, const GstVideoInfo*);
 #endif
 
     GstVideoFrame m_videoFrame;
