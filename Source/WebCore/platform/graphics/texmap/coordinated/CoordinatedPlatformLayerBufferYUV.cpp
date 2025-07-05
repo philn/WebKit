@@ -65,10 +65,8 @@ CoordinatedPlatformLayerBufferYUV::CoordinatedPlatformLayerBufferYUV(unsigned pl
 
 CoordinatedPlatformLayerBufferYUV::~CoordinatedPlatformLayerBufferYUV() = default;
 
-void CoordinatedPlatformLayerBufferYUV::paintToTextureMapper(TextureMapper& textureMapper, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix, float opacity)
+const std::array<GLfloat, 16>& CoordinatedPlatformLayerBufferYUV::yuvToRgbMatrix() const
 {
-    waitForContentsIfNeeded();
-
     static constexpr std::array<GLfloat, 16> s_bt601ConversionMatrix {
         1.164383561643836,  0.0,                1.596026785714286, -0.874202217873451,
         1.164383561643836, -0.391762290094914, -0.812967647237771,  0.531667823499146,
@@ -94,20 +92,27 @@ void CoordinatedPlatformLayerBufferYUV::paintToTextureMapper(TextureMapper& text
         0.0,                0.0,                0.0,                1.0,
     };
 
-    const std::array<GLfloat, 16>& yuvToRgbMatrix = [&] {
-        switch (m_yuvToRgbColorSpace) {
-        case YuvToRgbColorSpace::BT601:
-            return s_bt601ConversionMatrix;
-        case YuvToRgbColorSpace::BT709:
-            return s_bt709ConversionMatrix;
-        case YuvToRgbColorSpace::BT2020:
-            return s_bt2020ConversionMatrix;
-        case YuvToRgbColorSpace::SMPTE240M:
-            return s_smpte240MConversionMatrix;
-        }
-        RELEASE_ASSERT_NOT_REACHED();
-    }();
+    static constexpr std::array<GLfloat, 16> emptyMatrix { };
 
+    switch (m_yuvToRgbColorSpace) {
+    case YuvToRgbColorSpace::BT601:
+        return s_bt601ConversionMatrix;
+    case YuvToRgbColorSpace::BT709:
+        return s_bt709ConversionMatrix;
+    case YuvToRgbColorSpace::BT2020:
+        return s_bt2020ConversionMatrix;
+    case YuvToRgbColorSpace::SMPTE240M:
+        return s_smpte240MConversionMatrix;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+    return emptyMatrix;
+}
+
+void CoordinatedPlatformLayerBufferYUV::paintToTextureMapper(TextureMapper& textureMapper, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix, float opacity)
+{
+    waitForContentsIfNeeded();
+
+    const auto& yuvToRgbMatrix = this->yuvToRgbMatrix();
     switch (m_planeCount) {
     case 1:
         ASSERT(m_yuvPlane[0] == m_yuvPlane[1] && m_yuvPlane[1] == m_yuvPlane[2]);
@@ -130,6 +135,31 @@ void CoordinatedPlatformLayerBufferYUV::paintToTextureMapper(TextureMapper& text
             yuvToRgbMatrix, m_flags, targetRect, modelViewMatrix, opacity, m_planes[m_yuvPlane[3]]);
         break;
     }
+}
+
+TextureMapperShaderProgram::Options CoordinatedPlatformLayerBufferYUV::copyOptions(bool)
+{
+    TextureMapperShaderProgram::Options options;
+    switch (m_planeCount) {
+    case 1:
+        ASSERT(m_yuvPlane[0] == m_yuvPlane[1] && m_yuvPlane[1] == m_yuvPlane[2]);
+        ASSERT(m_yuvPlaneOffset[0] == 2 && m_yuvPlaneOffset[1] == 1 && !m_yuvPlaneOffset[2]);
+        options = TextureMapperShaderProgram::TexturePackedYUV;
+        break;
+    case 2:
+        ASSERT(!m_yuvPlaneOffset[0]);
+        options = m_yuvPlaneOffset[1] ? TextureMapperShaderProgram::TextureNV21 : TextureMapperShaderProgram::TextureNV12;
+        break;
+    case 3:
+        ASSERT(!m_yuvPlaneOffset[0] && !m_yuvPlaneOffset[1] && !m_yuvPlaneOffset[2]);
+        options = TextureMapperShaderProgram::TextureYUV;
+        break;
+    case 4:
+        ASSERT(!m_yuvPlaneOffset[0] && !m_yuvPlaneOffset[1] && !m_yuvPlaneOffset[2]);
+        options = TextureMapperShaderProgram::TextureYUVA;
+        break;
+    }
+    return options;
 }
 
 } // namespace WebCore

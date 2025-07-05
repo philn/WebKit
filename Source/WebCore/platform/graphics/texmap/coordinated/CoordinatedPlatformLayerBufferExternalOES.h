@@ -36,6 +36,10 @@ public:
     CoordinatedPlatformLayerBufferExternalOES(unsigned textureID, const IntSize&, OptionSet<TextureMapperFlags>, std::unique_ptr<GLFence>&&);
     virtual ~CoordinatedPlatformLayerBufferExternalOES();
 
+    unsigned textureID() const { return m_textureID; }
+
+    TextureMapperShaderProgram::Options copyOptions(bool premultiplyAlpha) final;
+
 private:
     void paintToTextureMapper(TextureMapper&, const FloatRect&, const TransformationMatrix& modelViewMatrix = TransformationMatrix(), float opacity = 1.0) override;
 

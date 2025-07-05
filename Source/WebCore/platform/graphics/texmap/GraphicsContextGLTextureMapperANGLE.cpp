@@ -174,12 +174,47 @@ RefPtr<GraphicsLayerContentsDisplayDelegate> GraphicsContextGLTextureMapperANGLE
 }
 
 #if ENABLE(VIDEO)
-bool GraphicsContextGLTextureMapperANGLE::copyTextureFromVideoFrame(VideoFrame&, PlatformGLObject, GCGLenum, GCGLint, GCGLenum, GCGLenum, GCGLenum, bool, bool)
+bool GraphicsContextGLTextureMapperANGLE::copyTextureFromVideoFrame(VideoFrame& frame, PlatformGLObject outputTexture, GCGLenum outputTarget, GCGLint level, GCGLenum internalFormat, GCGLenum format, GCGLenum type, bool premultiplyAlpha, bool flipY)
 {
-    // FIXME: Implement copy-free (or at least, software copy-free) texture transfer.
+#if USE(GSTREAMER_GL)
+    // const auto& gbmDevice = GBMDevice::get();
+    // if (!gbmDevice.device())
+    //     return false;
+
+    EGLImageBacking sharedImage(platformDisplay());
+    auto size = IntSize(frame.presentationSize());
+    sharedImage.reset(size.width(), size.height(), format == GraphicsContextGL::RGBA);
+
+    releaseThreadResources(ReleaseThreadResourceBehavior::ReleaseCurrentContext);
+
+    if (!m_videoTextureCopier)
+        m_videoTextureCopier = makeUnique<VideoTextureCopierGStreamer>(TEXTURE_COPIER_COLOR_CONVERT_FLAG);
+
+    m_videoTextureCopier->setPendingDmabufTarget(sharedImage.fd(), sharedImage.format(), sharedImage.stride());
+
+    auto result = m_videoTextureCopier->copyVideoTextureToPlatformTexture(this, size, outputTexture, outputTarget, level, internalFormat, format, type, flipY, frame.rotation(), premultiplyAlpha);
+
+    makeContextCurrent();
+
+    if (result) {
+        GL_BindTexture(outputTarget, outputTexture);
+        GL_EGLImageTargetTexture2DOES(outputTarget, sharedImage.image());
+        return true;
+    }
     return false;
+#else
+    UNUSED_PARAM(frame);
+    UNUSED_PARAM(outputTexture);
+    UNUSED_PARAM(outputTarget);
+    UNUSED_PARAM(level);
+    UNUSED_PARAM(internalFormat);
+    UNUSED_PARAM(format);
+    UNUSED_PARAM(type);
+    UNUSED_PARAM(premultiplyAlpha);
+    UNUSED_PARAM(flipY);
+#endif // USE(GSTREAMER_GL)
 }
-#endif
+#endif // ENABLE(VIDEO)
 
 #if ENABLE(MEDIA_STREAM) || ENABLE(WEB_CODECS)
 RefPtr<VideoFrame> GraphicsContextGLTextureMapperANGLE::surfaceBufferToVideoFrame(SurfaceBuffer)

@@ -30,6 +30,10 @@
 #include "GLContextWrapper.h"
 #include "GraphicsContextGLANGLE.h"
 
+#if USE(GSTREAMER_GL)
+#include "VideoTextureCopierGStreamer.h"
+#endif
+
 namespace WebCore {
 
 class TextureMapperGCGLPlatformLayer;
@@ -89,6 +93,9 @@ private:
     std::unique_ptr<TextureMapperGCGLPlatformLayer> m_texmapLayer;
 
     friend class TextureMapperGCGLPlatformLayer;
+#endif
+#if USE(GSTREAMER_GL)
+    std::unique_ptr<VideoTextureCopierGStreamer> m_videoTextureCopier;
 #endif
 };
 

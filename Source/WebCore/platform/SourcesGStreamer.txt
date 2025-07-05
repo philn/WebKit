@@ -75,6 +75,7 @@ platform/graphics/gstreamer/VideoEncoderGStreamer.cpp
 platform/graphics/gstreamer/VideoFrameGStreamer.cpp
 platform/graphics/gstreamer/VideoFrameMetadataGStreamer.cpp
 platform/graphics/gstreamer/VideoSinkGStreamer.cpp
+platform/graphics/gstreamer/VideoTextureCopierGStreamer.cpp
 platform/graphics/gstreamer/VideoTrackPrivateGStreamer.cpp
 platform/graphics/gstreamer/WebKitAudioSinkGStreamer.cpp
 platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp
