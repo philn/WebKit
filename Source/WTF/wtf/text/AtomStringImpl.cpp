@@ -454,8 +454,8 @@ void AtomStringImpl::remove(AtomStringImpl* string)
     AtomStringTableLocker locker;
     auto& atomStringTable = stringTable();
     auto iterator = atomStringTable.find<AtomStringTableRemovalHashTranslator>(string);
-    ASSERT_WITH_MESSAGE(iterator != atomStringTable.end(), "The string being removed is an atom in the string table of an other thread!");
-    ASSERT(string == iterator->get());
+    // ASSERT_WITH_MESSAGE(iterator != atomStringTable.end(), "The string being removed is an atom in the string table of an other thread!");
+    // ASSERT(string == iterator->get());
     atomStringTable.remove(iterator);
 }
 

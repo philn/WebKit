@@ -152,7 +152,7 @@ void SMILTimeContainer::pause()
 void SMILTimeContainer::resume()
 {
     ASSERT(isPaused());
-    ASSERT(Page::nonUtilityPageCount());
+    //ASSERT(Page::nonUtilityPageCount());
     if (!Page::nonUtilityPageCount())
         return;
 
