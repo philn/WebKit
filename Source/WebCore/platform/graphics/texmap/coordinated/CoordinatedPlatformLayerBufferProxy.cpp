@@ -83,13 +83,15 @@ void CoordinatedPlatformLayerBufferProxy::consumePendingBufferIfNeeded()
 
 void CoordinatedPlatformLayerBufferProxy::setDisplayBuffer(std::unique_ptr<CoordinatedPlatformLayerBuffer>&& buffer)
 {
-    Locker locker { m_lock };
-    if (!m_layer) {
-        m_pendingBuffer = WTFMove(buffer);
-        return;
-    }
+    {
+        Locker locker { m_lock };
+        if (!m_layer) {
+            m_pendingBuffer = WTFMove(buffer);
+            return;
+        }
 
-    m_pendingBuffer = nullptr;
+        m_pendingBuffer = nullptr;
+    }
 
     {
         Locker layerLocker { m_layer->lock() };
