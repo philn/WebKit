@@ -186,6 +186,9 @@ void RealtimeOutgoingMediaSourceGStreamer::stopOutgoingSource(StoppedCallback&& 
             return GST_PAD_PROBE_REMOVE;
         }
 
+        if (!data->callback)
+            return GST_PAD_PROBE_REMOVE;
+
         auto callData = createProbeData();
         callData->source = self;
         callData->callback = std::exchange(data->callback, nullptr);
@@ -198,8 +201,13 @@ void RealtimeOutgoingMediaSourceGStreamer::stopOutgoingSource(StoppedCallback&& 
                 return;
             }
             self->removeOutgoingSource();
-            if (self->m_track)
-                self->m_track->removeObserver(*self);
+            callOnMainThread([source = WTFMove(data->source)] {
+                auto self = source.get();
+                if (!self)
+                    return;
+                if (self->m_track)
+                    self->m_track->removeObserver(*self);
+            });
             data->callback();
         }), callData, reinterpret_cast<GDestroyNotify>(destroyProbeData));
         return GST_PAD_PROBE_OK;

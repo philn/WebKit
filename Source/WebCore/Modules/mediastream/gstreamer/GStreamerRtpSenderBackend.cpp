@@ -69,7 +69,6 @@ GStreamerRtpSenderBackend::GStreamerRtpSenderBackend(WeakPtr<GStreamerPeerConnec
 
 void GStreamerRtpSenderBackend::clearSource()
 {
-    ASSERT(hasSource());
     GST_DEBUG_OBJECT(m_rtcSender.get(), "Clearing source");
     m_source = nullptr;
 }
@@ -122,7 +121,7 @@ void GStreamerRtpSenderBackend::stopSource()
         source->stop([&] {
             clearSource();
         });
-    }, [&](std::nullptr_t&) {
+    }, [](std::nullptr_t&) {
     });
 }
 
