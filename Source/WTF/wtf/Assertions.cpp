@@ -150,6 +150,24 @@ static void logToStderr([[maybe_unused]] WTFLogChannel* channel, const char* buf
     fputs(buffer, stderr);
 }
 
+#if USE(GLIB)
+
+#define GST_LEVEL_LOG 6
+struct GstDebugCategory;
+typedef GstDebugCategory* (*GstDebugCategoryNewFunc)
+    (const gchar * name, guint color, const gchar * description);
+typedef void (*GstDebugLogFunc)
+    (GstDebugCategory* category, int level,
+    const gchar * file, const gchar * function, gint line,
+    void* object, const gchar * format, ...);
+
+static GstDebugCategoryNewFunc gstDebugCategoryNewFunc = nullptr;
+static GstDebugLogFunc gstDebugLogFunc = nullptr;
+
+static GstDebugCategory* gstCategoryJSC = nullptr;
+
+#endif // USE(GLIB)
+
 WTF_ATTRIBUTE_PRINTF(2, 0)
 static void vprintf_stderr_common([[maybe_unused]] WTFLogChannel* channel, const char* format, va_list args)
 {
@@ -205,6 +223,39 @@ ALLOW_NONLITERAL_FORMAT_END
         } while (size > 1024);
     }
 #endif
+
+#if USE(GLIB)
+    // Initialize GStreamer logging if GStreamer is loaded.
+    if (!gstCategoryJSC) {
+        gstDebugLogFunc = reinterpret_cast<GstDebugLogFunc>(
+           dlsym(RTLD_DEFAULT, "gst_debug_log"));
+        gstDebugCategoryNewFunc = reinterpret_cast<GstDebugCategoryNewFunc>(
+            dlsym(RTLD_DEFAULT, "_gst_debug_category_new"));
+        if (gstDebugCategoryNewFunc && gstDebugCategoryNewFunc) {
+            gstCategoryJSC = gstDebugCategoryNewFunc("webkitjsc", 0,
+                "Logging from JSC, e.g. WTFLogAlways(), console.log()");
+        }
+    }
+    if (gstCategoryJSC) {
+        // GStreamer logging is set up, use it.
+
+        va_list argsCopy;
+        va_copy(argsCopy, args);
+        ALLOW_NONLITERAL_FORMAT_BEGIN
+        String loggingString = WTF::createWithFormatAndArguments(format, argsCopy);
+        ALLOW_NONLITERAL_FORMAT_END
+
+        // The logging string will always have a newline, except for crash messages.
+        // GStreamer expects no trailing newline, remove it.
+        if (loggingString.endsWith('\n'))
+            loggingString = loggingString.left(loggingString.length() - 1);
+
+        gstDebugLogFunc(gstCategoryJSC, GST_LEVEL_LOG,
+            __FILE__, __func__, __LINE__,
+            nullptr, "%s", loggingString.utf8().data());
+    }
+#endif
+
     vfprintf(stderr, format, args);
 }
 
