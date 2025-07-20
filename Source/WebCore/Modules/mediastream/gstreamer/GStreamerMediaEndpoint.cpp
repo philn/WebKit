@@ -2037,6 +2037,12 @@ GstElement* GStreamerMediaEndpoint::requestAuxiliarySender(GRefPtr<GstWebRTCDTLS
     return estimator;
 }
 
+void GStreamerMediaEndpoint::prepareForClose()
+{
+    if (m_pipeline && GST_STATE(m_pipeline.get()) > GST_STATE_READY)
+        gst_element_set_state(m_pipeline.get(), GST_STATE_READY);
+}
+
 void GStreamerMediaEndpoint::close()
 {
     // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/issues/2760
@@ -2057,9 +2063,6 @@ void GStreamerMediaEndpoint::close()
         return;
     }
 #endif
-
-    if (m_pipeline && GST_STATE(m_pipeline.get()) > GST_STATE_READY)
-        gst_element_set_state(m_pipeline.get(), GST_STATE_READY);
 
 #if !RELEASE_LOG_DISABLED
     stopLoggingStats();
