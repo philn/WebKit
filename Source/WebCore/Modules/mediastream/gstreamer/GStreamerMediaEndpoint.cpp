@@ -785,7 +785,8 @@ void GStreamerMediaEndpoint::doSetLocalDescription(const RTCSessionDescription* 
 
     if (!m_unlinkedOutgoingSources.isEmpty())
         GST_WARNING_OBJECT(m_pipeline.get(), "Unlinked outgoing sources lingering");
-    gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
+    else
+        gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
 
     setDescription(initialDescription.get(), DescriptionType::Local, [protectedThis = Ref(*this), this, initialSDP = WTFMove(initialSDP), remoteDescriptionSdp = WTFMove(remoteDescriptionSdp), remoteDescriptionSdpType = WTFMove(remoteDescriptionSdpType)](const GstSDPMessage& message) {
         if (protectedThis->isStopped())
