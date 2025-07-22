@@ -27,6 +27,7 @@
 #include "ExceptionOr.h"
 #include "GStreamerCommon.h"
 #include "GStreamerDataChannelHandler.h"
+#include "GStreamerIceBackend.h"
 #include "GStreamerIncomingTrackProcessor.h"
 #include "GStreamerRegistryScanner.h"
 #include "GStreamerRtpReceiverBackend.h"
@@ -170,6 +171,21 @@ bool GStreamerMediaEndpoint::initializePipeline()
     m_webrtcBin = makeGStreamerElement("webrtcbin"_s, binName);
     if (!m_webrtcBin)
         return false;
+
+    if (webkitGstCheckVersion(1, 22, 0)) {
+        // phil
+        auto peerConnectionBackend = this->peerConnectionBackend();
+        if (!peerConnectionBackend)
+            return false;
+
+        auto backend = webkitGstWebRTCCreateIceBackend("foo"_s, peerConnectionBackend->context());
+        if (!backend) {
+            gst_printerrln("Unable to create ICE backend");
+            return false;
+        }
+        gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
+        //g_object_set(m_webrtcBin.get(), "ice-agent", backend, nullptr);
+    }
 
     // Lower default latency from 200ms to 40ms.
     g_object_set(m_webrtcBin.get(), "latency", 40, nullptr);

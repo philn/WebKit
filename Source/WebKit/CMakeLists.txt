@@ -374,6 +374,8 @@ set(WebKit_MESSAGES_IN_FILES
     WebProcess/Network/webrtc/WebRTCMonitor
     WebProcess/Network/webrtc/WebRTCResolver
 
+    WebProcess/Network/webrtc/gstreamer/GStreamerIceBackendProxy
+
     WebProcess/Network/NetworkProcessConnection
     WebProcess/Network/WebResourceLoader
     WebProcess/Network/WebSocketChannel
