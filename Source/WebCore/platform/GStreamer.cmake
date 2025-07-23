@@ -122,7 +122,7 @@ if (ENABLE_VIDEO)
             ${GSTREAMER_WEBRTC_INCLUDE_DIRS}
         )
         list(APPEND WebCore_PRIVATE_FRAMEWORK_HEADERS
-            Modules/mediastream/gstreamer/GStreamerIceBackend.h
+            Modules/mediastream/gstreamer/GStreamerIceAgent.h
         )
 
         if (NOT USE_GSTREAMER_FULL)

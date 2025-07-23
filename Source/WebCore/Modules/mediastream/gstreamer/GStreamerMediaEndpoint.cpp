@@ -27,7 +27,7 @@
 #include "ExceptionOr.h"
 #include "GStreamerCommon.h"
 #include "GStreamerDataChannelHandler.h"
-#include "GStreamerIceBackend.h"
+#include "GStreamerIceAgent.h"
 #include "GStreamerIncomingTrackProcessor.h"
 #include "GStreamerRegistryScanner.h"
 #include "GStreamerRtpReceiverBackend.h"
@@ -181,12 +181,12 @@ bool GStreamerMediaEndpoint::initializePipeline()
         if (!peerConnectionBackend)
             return false;
 
-        auto backend = webkitGstWebRTCCreateIceBackend("foo"_s, peerConnectionBackend->context());
-        if (!backend) {
-            gst_printerrln("Unable to create ICE backend");
+        auto agent = webkitGstWebRTCCreateIceAgent("foo"_s, peerConnectionBackend->context());
+        if (!agent) {
+            gst_printerrln("Unable to create ICE agent");
             return false;
         }
-        m_webrtcBin = gst_element_factory_create_full(webrtcBinFactory.get(), "name", binName.ascii().data(), "ice-agent", backend, nullptr);
+        m_webrtcBin = gst_element_factory_create_full(webrtcBinFactory.get(), "name", binName.ascii().data(), "ice-agent", agent, nullptr);
     }
 #endif
     if (!m_webrtcBin)

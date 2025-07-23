@@ -18,7 +18,7 @@
  */
 
 #include "config.h"
-#include "GStreamerIceBackend.h"
+#include "GStreamerIceAgent.h"
 
 #if USE(GSTREAMER_WEBRTC)
 
@@ -32,25 +32,25 @@
 using namespace WTF;
 using namespace WebCore;
 
-typedef struct _WebKitGstIceBackendPrivate {
+typedef struct _WebKitGstIceAgentPrivate {
     RefPtr<GStreamerIceBackend> iceBackend;
-} WebKitGstIceBackendPrivate;
+} WebKitGstIceAgentPrivate;
 
-typedef struct _WebKitGstIceBackend {
+typedef struct _WebKitGstIceAgent {
     GstWebRTCICE parent;
-    WebKitGstIceBackendPrivate* priv;
-} WebKitGstIceBackend;
+    WebKitGstIceAgentPrivate* priv;
+} WebKitGstIceAgent;
 
-typedef struct _WebKitGstIceBackendClass {
+typedef struct _WebKitGstIceAgentClass {
     GstWebRTCICEClass parentClass;
-} WebKitGstIceBackendClass;
+} WebKitGstIceAgentClass;
 
 GST_DEBUG_CATEGORY(webkit_webrtc_ice_backend_debug);
 #define GST_CAT_DEFAULT webkit_webrtc_ice_backend_debug
 
-WEBKIT_DEFINE_TYPE_WITH_CODE(WebKitGstIceBackend, webkit_gst_webrtc_ice_backend, GST_TYPE_WEBRTC_ICE, GST_DEBUG_CATEGORY_INIT(webkit_webrtc_ice_backend_debug, "webkitwebrtcicebackend", 0, "WebRTC ICE backend"))
+WEBKIT_DEFINE_TYPE_WITH_CODE(WebKitGstIceAgent, webkit_gst_webrtc_ice_backend, GST_TYPE_WEBRTC_ICE, GST_DEBUG_CATEGORY_INIT(webkit_webrtc_ice_backend_debug, "webkitwebrtcicebackend", 0, "WebRTC ICE backend"))
 
-static void webkitGstWebRTCIceBackendSetOnIceCandidate(GstWebRTCICE* ice,
+static void webkitGstWebRTCIceAgentSetOnIceCandidate(GstWebRTCICE* ice,
     GstWebRTCICEOnCandidateFunc func,
     gpointer user_data,
     GDestroyNotify notify)
@@ -58,7 +58,7 @@ static void webkitGstWebRTCIceBackendSetOnIceCandidate(GstWebRTCICE* ice,
     // TODO
 }
 
-static void webkitGstWebRTCIceBackendSetForceRelay(GstWebRTCICE* ice, gboolean forceRelay)
+static void webkitGstWebRTCIceAgentSetForceRelay(GstWebRTCICE* ice, gboolean forceRelay)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
     if (!backend->priv->iceBackend)
@@ -68,7 +68,7 @@ static void webkitGstWebRTCIceBackendSetForceRelay(GstWebRTCICE* ice, gboolean f
 
 }
 
-static gboolean webkitGstWebRTCIceBackendAddTurnServer(GstWebRTCICE* ice, const gchar* uri)
+static gboolean webkitGstWebRTCIceAgentAddTurnServer(GstWebRTCICE* ice, const gchar* uri)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
     if (!backend->priv->iceBackend)
@@ -78,26 +78,26 @@ static gboolean webkitGstWebRTCIceBackendAddTurnServer(GstWebRTCICE* ice, const 
     return TRUE;
 }
 
-static void webkitGstWebRTCIceBackendFinalize(GObject* object)
+static void webkitGstWebRTCIceAgentFinalize(GObject* object)
 {
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_backend_parent_class)->finalize(object);
 }
 
-static void webkitGstWebRTCIceBackendConstructed(GObject* object)
+static void webkitGstWebRTCIceAgentConstructed(GObject* object)
 {
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_backend_parent_class)->constructed(object);
 }
 
-static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceBackendClass* klass)
+static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* klass)
 {
     auto gobjectClass = G_OBJECT_CLASS(klass);
-    gobjectClass->constructed = webkitGstWebRTCIceBackendConstructed;
-    gobjectClass->finalize = webkitGstWebRTCIceBackendFinalize;
+    gobjectClass->constructed = webkitGstWebRTCIceAgentConstructed;
+    gobjectClass->finalize = webkitGstWebRTCIceAgentFinalize;
 
     auto iceClass = GST_WEBRTC_ICE_CLASS(klass);
-    iceClass->set_on_ice_candidate = webkitGstWebRTCIceBackendSetOnIceCandidate;
-    iceClass->set_force_relay = webkitGstWebRTCIceBackendSetForceRelay;
-    iceClass->add_turn_server = webkitGstWebRTCIceBackendAddTurnServer;
+    iceClass->set_on_ice_candidate = webkitGstWebRTCIceAgentSetOnIceCandidate;
+    iceClass->set_force_relay = webkitGstWebRTCIceAgentSetForceRelay;
+    iceClass->add_turn_server = webkitGstWebRTCIceAgentAddTurnServer;
 }
 
 RefPtr<GStreamerIceBackend> GStreamerIceBackend::create(SocketProvider& provider)
@@ -105,7 +105,7 @@ RefPtr<GStreamerIceBackend> GStreamerIceBackend::create(SocketProvider& provider
     return provider.createGStreamerIceBackend();
 }
 
-WebKitGstIceBackend* webkitGstWebRTCCreateIceBackend(ASCIILiteral name, ScriptExecutionContext* context)
+WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(ASCIILiteral name, ScriptExecutionContext* context)
 {
     if (!context)
         return nullptr;
@@ -114,7 +114,7 @@ WebKitGstIceBackend* webkitGstWebRTCCreateIceBackend(ASCIILiteral name, ScriptEx
     if (!socketProvider)
         return nullptr;
 
-    auto backend = reinterpret_cast<WebKitGstIceBackend*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND, "name", name.characters(), nullptr));
+    auto backend = reinterpret_cast<WebKitGstIceAgent*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND, "name", name.characters(), nullptr));
     backend->priv->iceBackend = GStreamerIceBackend::create(*socketProvider);
     return backend;
 }

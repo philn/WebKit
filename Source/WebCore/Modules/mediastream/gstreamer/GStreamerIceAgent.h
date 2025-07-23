@@ -27,8 +27,8 @@
 #include <wtf/Noncopyable.h>
 #include <wtf/ObjectIdentifier.h>
 
-typedef struct _WebKitGstIceBackend WebKitGstIceBackend;
-typedef struct _WebKitGstIceBackendClass WebKitGstIceBackendClass;
+typedef struct _WebKitGstIceAgent WebKitGstIceAgent;
+typedef struct _WebKitGstIceAgentClass WebKitGstIceAgentClass;
 
 namespace WebCore {
 class ScriptExecutionContext;
@@ -57,14 +57,14 @@ protected:
 } // namespace WebCore
 
 #define WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND (webkit_gst_webrtc_ice_backend_get_type())
-#define WEBKIT_GST_WEBRTC_ICE_BACKEND(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND, WebKitGstIceBackend))
-#define WEBKIT_GST_WEBRTC_ICE_BACKEND_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass), WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND, WebKitGstIceBackendClass))
+#define WEBKIT_GST_WEBRTC_ICE_BACKEND(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND, WebKitGstIceAgent))
+#define WEBKIT_GST_WEBRTC_ICE_BACKEND_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass), WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND, WebKitGstIceAgentClass))
 #define WEBKIT_IS_GST_WEBRTC_ICE_BACKEND(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND))
 #define WEBKIT_IS_GST_WEBRTC_ICE_BACKEND_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND))
 
 GType webkit_gst_webrtc_ice_backend_get_type();
 
-WebKitGstIceBackend* webkitGstWebRTCCreateIceBackend(ASCIILiteral, WebCore::ScriptExecutionContext*);
+WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(ASCIILiteral, WebCore::ScriptExecutionContext*);
 
 
 

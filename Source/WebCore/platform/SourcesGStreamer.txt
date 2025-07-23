@@ -23,7 +23,7 @@
 
 Modules/mediastream/gstreamer/GStreamerDataChannelHandler.cpp
 Modules/mediastream/gstreamer/GStreamerDtlsTransportBackend.cpp
-Modules/mediastream/gstreamer/GStreamerIceBackend.cpp
+Modules/mediastream/gstreamer/GStreamerIceAgent.cpp
 Modules/mediastream/gstreamer/GStreamerIceTransportBackend.cpp
 Modules/mediastream/gstreamer/GStreamerMediaEndpoint.cpp
 Modules/mediastream/gstreamer/GStreamerPeerConnectionBackend.cpp
