@@ -35,6 +35,7 @@ private:
     GStreamerIceBackendProxy(WebPageProxyIdentifier);
 
     // GStreamerIceBackend
+    void setForceRelay(bool) final;
     void addTurnServer(const String&) final;
     void refGStreamerIceBackend() final { ref(); }
     void derefGStreamerIceBackend() final { deref(); }
@@ -42,8 +43,6 @@ private:
     // MessageSender
     IPC::Connection *messageSenderConnection() const final;
     uint64_t messageSenderDestinationID() const final;
-
-    std::optional<SharedPreferencesForWebProcess> sharedPreferencesForWebProcess(const IPC::Connection&) const;
 
     WebPageProxyIdentifier m_webPageProxyID;
 };

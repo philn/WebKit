@@ -153,6 +153,12 @@ void GStreamerMediaEndpoint::maybeInsertNetSimForElement(GstBin* bin, GstElement
 
 bool GStreamerMediaEndpoint::initializePipeline()
 {
+    auto webrtcBinFactory = adoptGRef(gst_element_factory_find("webrtcbin"));
+    if (!webrtcBinFactory) {
+        gst_printerrln("GStreamer element webrtcbin not found. Please install gst-plugins-bad");
+        return false;
+    }
+
     static uint32_t nPipeline = 0;
     auto pipelineName = makeString("webkit-webrtc-pipeline-"_s, nPipeline);
     m_pipeline = gst_pipeline_new(pipelineName.ascii().data());
@@ -168,12 +174,9 @@ bool GStreamerMediaEndpoint::initializePipeline()
     });
 
     auto binName = makeString("webkit-webrtcbin-"_s, nPipeline++);
-    m_webrtcBin = makeGStreamerElement("webrtcbin"_s, binName);
-    if (!m_webrtcBin)
-        return false;
 
+#if GST_CHECK_VERSION(1, 20, 0)
     if (webkitGstCheckVersion(1, 22, 0)) {
-        // phil
         auto peerConnectionBackend = this->peerConnectionBackend();
         if (!peerConnectionBackend)
             return false;
@@ -183,9 +186,11 @@ bool GStreamerMediaEndpoint::initializePipeline()
             gst_printerrln("Unable to create ICE backend");
             return false;
         }
-        gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
-        //g_object_set(m_webrtcBin.get(), "ice-agent", backend, nullptr);
+        m_webrtcBin = gst_element_factory_create_full(webrtcBinFactory.get(), "name", binName.ascii().data(), "ice-agent", backend, nullptr);
     }
+#endif
+    if (!m_webrtcBin)
+        m_webrtcBin = gst_element_factory_create(webrtcBinFactory.get(), binName.ascii().data());
 
     // Lower default latency from 200ms to 40ms.
     g_object_set(m_webrtcBin.get(), "latency", 40, nullptr);

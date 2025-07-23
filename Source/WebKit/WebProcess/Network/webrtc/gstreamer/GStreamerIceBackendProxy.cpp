@@ -35,15 +35,17 @@ uint64_t GStreamerIceBackendProxy::messageSenderDestinationID() const
     return identifier().toUInt64();
 }
 
-std::optional<SharedPreferencesForWebProcess> GStreamerIceBackendProxy::sharedPreferencesForWebProcess(const IPC::Connection&) const
+void GStreamerIceBackendProxy::setForceRelay(bool forceRelay)
 {
-    //return WebProcess::singleton().
-    return std::nullopt;
+    gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
+    MessageSender::send(Messages::GStreamerIceBackendProxy::SetForceRelay { forceRelay });
+    gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
 }
 
 void GStreamerIceBackendProxy::addTurnServer(const String& uri)
 {
-    //MessageSender::send(Messages::GStreamerIceBackendProxy::AddTurnServer { uri }, identifier(), m_webPageProxyID);
+    gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
+    MessageSender::send(Messages::GStreamerIceBackendProxy::AddTurnServer { uri });
 }
 
 } // namespace WebKit

@@ -50,6 +50,24 @@ GST_DEBUG_CATEGORY(webkit_webrtc_ice_backend_debug);
 
 WEBKIT_DEFINE_TYPE_WITH_CODE(WebKitGstIceBackend, webkit_gst_webrtc_ice_backend, GST_TYPE_WEBRTC_ICE, GST_DEBUG_CATEGORY_INIT(webkit_webrtc_ice_backend_debug, "webkitwebrtcicebackend", 0, "WebRTC ICE backend"))
 
+static void webkitGstWebRTCIceBackendSetOnIceCandidate(GstWebRTCICE* ice,
+    GstWebRTCICEOnCandidateFunc func,
+    gpointer user_data,
+    GDestroyNotify notify)
+{
+    // TODO
+}
+
+static void webkitGstWebRTCIceBackendSetForceRelay(GstWebRTCICE* ice, gboolean forceRelay)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    if (!backend->priv->iceBackend)
+        return;
+
+    backend->priv->iceBackend->setForceRelay(forceRelay);
+
+}
+
 static gboolean webkitGstWebRTCIceBackendAddTurnServer(GstWebRTCICE* ice, const gchar* uri)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
@@ -77,6 +95,8 @@ static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceBackendClass* k
     gobjectClass->finalize = webkitGstWebRTCIceBackendFinalize;
 
     auto iceClass = GST_WEBRTC_ICE_CLASS(klass);
+    iceClass->set_on_ice_candidate = webkitGstWebRTCIceBackendSetOnIceCandidate;
+    iceClass->set_force_relay = webkitGstWebRTCIceBackendSetForceRelay;
     iceClass->add_turn_server = webkitGstWebRTCIceBackendAddTurnServer;
 }
 

@@ -18,12 +18,12 @@
 #if USE(GSTREAMER_WEBRTC)
 
 [
+    ExceptionForEnabledBy,
     DispatchedFrom=WebContent,
-    DispatchedTo=Networking,
-    EnabledBy=PeerConnectionEnabled
+    DispatchedTo=Networking
 ]
 messages -> GStreamerIceBackendProxy {
-
+    SetForceRelay(bool forceRelay);
     AddTurnServer(String uri);
 }
 

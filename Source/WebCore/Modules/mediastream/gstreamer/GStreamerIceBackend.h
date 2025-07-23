@@ -44,6 +44,7 @@ public:
     void ref() { refGStreamerIceBackend(); }
     void deref() { derefGStreamerIceBackend(); }
 
+    virtual void setForceRelay(bool) = 0;
     virtual void addTurnServer(const String&) = 0;
 
 protected:
