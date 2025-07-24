@@ -47,7 +47,9 @@ typedef struct _GstWebRTCRTPSender GstWebRTCRTPSender;
 typedef struct _GstWebRTCRTPTransceiver GstWebRTCRTPTransceiver;
 typedef struct _GstRTPHeaderExtension GstRTPHeaderExtension;
 typedef struct _GstWebRTCICE GstWebRTCICE;
-#endif
+typedef struct _GstWebRTCICEStream GstWebRTCICEStream;
+
+#endif // USE(GSTREAMER_WEBRTC)
 
 namespace WTF {
 
@@ -240,7 +242,11 @@ template<> GRefPtr<GstWebRTCICE> adoptGRef(GstWebRTCICE*);
 template<> GstWebRTCICE* refGPtr<GstWebRTCICE>(GstWebRTCICE*);
 template<> void derefGPtr<GstWebRTCICE>(GstWebRTCICE*);
 
-#endif
+template<> GRefPtr<GstWebRTCICEStream> adoptGRef(GstWebRTCICEStream*);
+template<> GstWebRTCICEStream* refGPtr<GstWebRTCICEStream>(GstWebRTCICEStream*);
+template<> void derefGPtr<GstWebRTCICEStream>(GstWebRTCICEStream*);
+
+#endif // USE(GSTREAMER_WEBRTC)
 
 } // namespace WTF
 
