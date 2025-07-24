@@ -20,7 +20,10 @@ void GStreamerIceBackend::initialize(NetworkConnectionToWebProcess& connectionTo
 }
 
 GStreamerIceBackend::GStreamerIceBackend(NetworkConnectionToWebProcess& connection)
-    : m_connection(connection)
+#if USE(LIBNICE)
+    : GStreamerIceBackendNice()
+#endif
+    , m_connection(connection)
 {
 }
 
@@ -42,16 +45,6 @@ std::optional<SharedPreferencesForWebProcess> GStreamerIceBackend::sharedPrefere
         return connectionToWebProcess->sharedPreferencesForWebProcess();
 
     return std::nullopt;
-}
-
-void GStreamerIceBackend::setForceRelay(bool forceRelay)
-{
-    WTFLogAlways("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
-}
-
-void GStreamerIceBackend::addTurnServer(const String& uri)
-{
-    WTFLogAlways("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
 }
 
 } // namespace WebKit

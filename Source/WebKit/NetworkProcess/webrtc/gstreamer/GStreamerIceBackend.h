@@ -7,6 +7,10 @@
 #include "MessageSender.h"
 #include "WebPageProxyIdentifier.h"
 
+#if USE(LIBNICE)
+#include "GStreamerIceBackendNice.h"
+#endif
+
 #include <wtf/Forward.h>
 #include <wtf/Identified.h>
 #include <wtf/RefCounted.h>
@@ -26,7 +30,11 @@ struct GStreamerIceBackendIdentifierType;
 
 using GStreamerIceBackendIdentifier = ObjectIdentifier<GStreamerIceBackendIdentifierType>;
 
-class GStreamerIceBackend : public RefCounted<GStreamerIceBackend>, public IPC::MessageReceiver, public IPC::MessageSender, public Identified<GStreamerIceBackendIdentifier> {
+class GStreamerIceBackend : public RefCounted<GStreamerIceBackend>, public IPC::MessageReceiver, public IPC::MessageSender, public Identified<GStreamerIceBackendIdentifier>
+#if USE(LIBNICE)
+    , public GStreamerIceBackendNice
+#endif
+    {
     WTF_MAKE_TZONE_ALLOCATED(GStreamerIceBackend);
 public:
     static void initialize(NetworkConnectionToWebProcess&, WebKit::WebPageProxyIdentifier&&, CompletionHandler<void(RefPtr<GStreamerIceBackend>&&)>&&);
@@ -39,14 +47,17 @@ public:
     std::optional<SharedPreferencesForWebProcess> sharedPreferencesForWebProcess() const;
 
 private:
+#if USE(LIBNICE)
+    friend class GStreamerIceBackendNice;
+#endif
+
     template<typename... Args> static Ref<GStreamerIceBackend> create(Args&&...args) { return adoptRef(*new GStreamerIceBackend(std::forward<Args>(args)...)); }
 
     GStreamerIceBackend(NetworkConnectionToWebProcess&);
     IPC::Connection *messageSenderConnection() const final;
     uint64_t messageSenderDestinationID() const final;
 
-    void setForceRelay(bool);
-    void addTurnServer(const String&);
+    IPC::Connection* connection() const final { return messageSenderConnection(); };
 
     WeakPtr<NetworkConnectionToWebProcess> m_connection;
 };

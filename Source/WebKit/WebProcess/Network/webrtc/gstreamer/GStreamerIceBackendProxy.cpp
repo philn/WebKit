@@ -36,7 +36,6 @@ GStreamerIceBackendProxy::~GStreamerIceBackendProxy()
 
 IPC::Connection* GStreamerIceBackendProxy::messageSenderConnection() const
 {
-    //return &WebProcess::singleton().ensureNetworkProcessConnection().connection();
     return m_connection.ptr();
 }
 
@@ -47,14 +46,11 @@ uint64_t GStreamerIceBackendProxy::messageSenderDestinationID() const
 
 void GStreamerIceBackendProxy::setForceRelay(bool forceRelay)
 {
-    gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
     MessageSender::send(Messages::GStreamerIceBackend::SetForceRelay { forceRelay });
-    gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
 }
 
 void GStreamerIceBackendProxy::addTurnServer(const String& uri)
 {
-    gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
     MessageSender::send(Messages::GStreamerIceBackend::AddTurnServer { uri });
 }
 
