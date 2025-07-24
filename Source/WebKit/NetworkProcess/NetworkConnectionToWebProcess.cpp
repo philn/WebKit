@@ -27,6 +27,7 @@
 #include "NetworkConnectionToWebProcess.h"
 
 #include "BlobDataFileReferenceWithSandboxExtension.h"
+#include "GStreamerIceBackendMessages.h"
 #include "LogInitialization.h"
 #include "Logging.h"
 #include "NetworkBroadcastChannelRegistry.h"
@@ -309,7 +310,16 @@ bool NetworkConnectionToWebProcess::dispatchMessage(IPC::Connection& connection,
             networkTransportSession->didReceiveMessage(connection, decoder);
         return true;
     }
-    
+
+#if USE(GSTREAMER_WEBRTC)
+    if (decoder.messageReceiverName() == Messages::GStreamerIceBackend::messageReceiverName()) {
+        MESSAGE_CHECK_WITH_RETURN_VALUE(GStreamerIceBackendIdentifier::isValidIdentifier(decoder.destinationID()), false);
+        if (RefPtr iceBackend = m_gstreamerIceBackends.get(GStreamerIceBackendIdentifier(decoder.destinationID())))
+            iceBackend->didReceiveMessage(connection, decoder);
+        return true;
+    }
+#endif
+
     if (decoder.messageReceiverName() == Messages::WebSWServerConnection::messageReceiverName()) {
         if (RefPtr swConnection = m_swConnection.get())
             swConnection->didReceiveMessage(connection, decoder);
@@ -1766,6 +1776,28 @@ void NetworkConnectionToWebProcess::destroyWebTransportSession(WebTransportSessi
     ASSERT(m_networkTransportSessions.contains(identifier));
     m_networkTransportSessions.remove(identifier);
 }
+
+#if USE(GSTREAMER_WEBRTC)
+void NetworkConnectionToWebProcess::initializeGStreamerIceBackend(WebPageProxyIdentifier&& pageID, CompletionHandler<void(std::optional<GStreamerIceBackendIdentifier>)>&& completionHandler)
+{
+    GStreamerIceBackend::initialize(*this, WTFMove(pageID), [weakThis = WeakPtr { *this }, completionHandler = WTFMove(completionHandler)](RefPtr<GStreamerIceBackend>&& session) mutable {
+        RefPtr protectedThis = weakThis.get();
+        if (!session || !protectedThis)
+            return completionHandler(std::nullopt);
+
+        auto identifier = session->identifier();
+        ASSERT(!protectedThis->m_gstreamerIceBackends.contains(identifier));
+        protectedThis->m_gstreamerIceBackends.set(identifier, session.releaseNonNull());
+        completionHandler(identifier);
+    });
+}
+
+void NetworkConnectionToWebProcess::destroyGStreamerIceBackend(GStreamerIceBackendIdentifier identifier)
+{
+    ASSERT(m_gstreamerIceBackends.contains(identifier));
+    m_gstreamerIceBackends.remove(identifier);
+}
+#endif
 
 void NetworkConnectionToWebProcess::clearFrameLoadRecordsForStorageAccess(WebCore::FrameIdentifier frameID)
 {

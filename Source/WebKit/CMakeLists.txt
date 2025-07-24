@@ -270,6 +270,8 @@ set(WebKit_MESSAGES_IN_FILES
     NetworkProcess/webrtc/NetworkRTCProvider
     NetworkProcess/webrtc/RTCDataChannelRemoteManagerProxy
 
+    NetworkProcess/webrtc/gstreamer/GStreamerIceBackend
+
     NetworkProcess/webtransport/NetworkTransportSession
 
     Shared/AuxiliaryProcess

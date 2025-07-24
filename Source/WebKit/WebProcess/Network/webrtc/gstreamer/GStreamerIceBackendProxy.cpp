@@ -1,51 +1,61 @@
 
 #include "config.h"
 #include "GStreamerIceBackendProxy.h"
+#include "WebCore/GStreamerIceBackend.h"
 
 #if USE(GSTREAMER_WEBRTC)
 
 #include "NetworkConnectionToWebProcessMessages.h"
 #include "NetworkProcessConnection.h"
-#include "GStreamerIceBackendProxyMessages.h"
+#include "GStreamerIceBackendMessages.h"
 
 namespace WebKit {
 using namespace WebCore;
 
 Ref<GStreamerIceBackendProxy> GStreamerIceBackendProxy::create(WebPageProxyIdentifier webPageProxyID)
 {
-    return adoptRef(*new GStreamerIceBackendProxy(webPageProxyID));
+    Ref connection = WebProcess::singleton().ensureNetworkProcessConnection().connection();
+    auto sendResult = connection->sendSync(Messages::NetworkConnectionToWebProcess::InitializeGStreamerIceBackend(webPageProxyID), 0);
+    auto [identifier] = sendResult.takeReply();
+    return adoptRef(*new GStreamerIceBackendProxy(WTFMove(connection), webPageProxyID, *identifier));
 }
 
-GStreamerIceBackendProxy::GStreamerIceBackendProxy(WebPageProxyIdentifier webPageProxyID)
+GStreamerIceBackendProxy::GStreamerIceBackendProxy(Ref<IPC::Connection>&& connection, WebPageProxyIdentifier webPageProxyID, GStreamerIceBackendIdentifier identifier)
     : GStreamerIceBackend()
+    , m_connection(WTFMove(connection))
     , m_webPageProxyID(webPageProxyID)
+    , m_identifier(identifier)
 {
-    gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
+    gst_printerrln("woo %s line %d pid=%d id=%zu", __FILE__, __LINE__, getpid(), messageSenderDestinationID());
 }
 
-GStreamerIceBackendProxy::~GStreamerIceBackendProxy() = default;
+GStreamerIceBackendProxy::~GStreamerIceBackendProxy()
+{
+    m_connection->send(Messages::NetworkConnectionToWebProcess::DestroyGStreamerIceBackend(m_identifier), 0);
+}
 
 IPC::Connection* GStreamerIceBackendProxy::messageSenderConnection() const
 {
-    return &WebProcess::singleton().ensureNetworkProcessConnection().connection();
+    //return &WebProcess::singleton().ensureNetworkProcessConnection().connection();
+    return m_connection.ptr();
 }
 
 uint64_t GStreamerIceBackendProxy::messageSenderDestinationID() const
 {
-    return identifier().toUInt64();
+    return m_identifier.toUInt64();
 }
 
 void GStreamerIceBackendProxy::setForceRelay(bool forceRelay)
 {
     gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
-    MessageSender::send(Messages::GStreamerIceBackendProxy::SetForceRelay { forceRelay });
+    MessageSender::send(Messages::GStreamerIceBackend::SetForceRelay { forceRelay });
     gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
 }
 
 void GStreamerIceBackendProxy::addTurnServer(const String& uri)
 {
     gst_printerrln("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
-    MessageSender::send(Messages::GStreamerIceBackendProxy::AddTurnServer { uri });
+    MessageSender::send(Messages::GStreamerIceBackend::AddTurnServer { uri });
 }
 
 } // namespace WebKit

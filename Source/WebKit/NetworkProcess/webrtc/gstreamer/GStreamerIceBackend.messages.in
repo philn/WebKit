@@ -19,10 +19,13 @@
 
 [
     ExceptionForEnabledBy,
-    DispatchedFrom=Networking,
-    DispatchedTo=WebContent
+    DispatchedFrom=WebContent,
+    DispatchedTo=Networking
 ]
-messages -> GStreamerIceBackendProxy {
+messages -> GStreamerIceBackend {
+    SetForceRelay(bool forceRelay);
+    AddTurnServer(String uri);
+
 }
 
 #endif

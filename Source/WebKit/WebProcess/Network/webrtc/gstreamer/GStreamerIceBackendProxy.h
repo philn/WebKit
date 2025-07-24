@@ -18,6 +18,10 @@ class Decoder;
 
 namespace WebKit {
 
+struct GStreamerIceBackendIdentifierType { };
+
+using GStreamerIceBackendIdentifier = ObjectIdentifier<GStreamerIceBackendIdentifierType>;
+
 class GStreamerIceBackendProxy : public IPC::MessageSender, public IPC::MessageReceiver, public WebCore::GStreamerIceBackend, public RefCounted<GStreamerIceBackendProxy> {
 public:
     static Ref<GStreamerIceBackendProxy> create(WebPageProxyIdentifier);
@@ -32,7 +36,7 @@ public:
     using RefCounted<GStreamerIceBackendProxy>::deref;
 
 private:
-    GStreamerIceBackendProxy(WebPageProxyIdentifier);
+    GStreamerIceBackendProxy(Ref<IPC::Connection>&&, WebPageProxyIdentifier, GStreamerIceBackendIdentifier);
 
     // GStreamerIceBackend
     void setForceRelay(bool) final;
@@ -44,7 +48,9 @@ private:
     IPC::Connection *messageSenderConnection() const final;
     uint64_t messageSenderDestinationID() const final;
 
+    const Ref<IPC::Connection> m_connection;
     WebPageProxyIdentifier m_webPageProxyID;
+    const GStreamerIceBackendIdentifier m_identifier;
 };
 
 } // namespace WebKit
