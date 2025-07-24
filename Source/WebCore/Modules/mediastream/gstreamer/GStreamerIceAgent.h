@@ -47,6 +47,8 @@ public:
     virtual void setForceRelay(bool) = 0;
     virtual void addTurnServer(const String&) = 0;
 
+    virtual std::optional<unsigned> addStream() = 0;
+
 protected:
     GStreamerIceBackend() = default;
     virtual ~GStreamerIceBackend() = default;

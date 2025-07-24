@@ -4,6 +4,12 @@
 #if USE(GSTREAMER_WEBRTC) && USE(LIBNICE)
 
 #include "GRefPtrNice.h"
+#include <wtf/Condition.h>
+#include <wtf/Forward.h>
+#include <wtf/HashMap.h>
+#include <wtf/Lock.h>
+#include <wtf/RunLoop.h>
+#include <wtf/Vector.h>
 
 namespace IPC {
 class Connection;
@@ -18,12 +24,18 @@ public:
 
     void setForceRelay(bool);
     void addTurnServer(const String&);
+    std::optional<unsigned> addStream();
 
 private:
     virtual IPC::Connection* connection() const = 0;
 
     GRefPtr<NiceAgent> m_agent;
+
+    RefPtr<Thread> m_thread;
     GRefPtr<GMainContext> m_mainContext;
+    GRefPtr<GMainLoop> m_loop;
+    Lock m_lock;
+    Condition m_condition;
 };
 
 } // namespace WebKit

@@ -54,6 +54,13 @@ void GStreamerIceBackendProxy::addTurnServer(const String& uri)
     MessageSender::send(Messages::GStreamerIceBackend::AddTurnServer { uri });
 }
 
+std::optional<unsigned> GStreamerIceBackendProxy::addStream()
+{
+    auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::AddStream { }, messageSenderDestinationID());
+    auto [streamId] = sendResult.takeReply();
+    return streamId;
+}
+
 } // namespace WebKit
 
 #endif // USE(GSTREAMER_WEBRTC)
