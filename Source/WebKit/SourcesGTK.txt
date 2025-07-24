@@ -54,6 +54,10 @@ NetworkProcess/webrtc/LibWebRTCSocketClient.cpp
 NetworkProcess/webrtc/NetworkRTCMonitor.cpp
 NetworkProcess/webrtc/NetworkRTCProvider.cpp
 
+NetworkProcess/webrtc/gstreamer/GStreamerIceBackend.cpp
+
+NetworkProcess/webrtc/rice/GStreamerIceBackendRice.cpp
+
 Platform/IPC/glib/ConnectionGLib.cpp
 
 Platform/IPC/unix/ArgumentCodersUnix.cpp
@@ -325,6 +329,8 @@ WebProcess/Inspector/gtk/RemoteWebInspectorUIGtk.cpp
 WebProcess/Inspector/gtk/WebInspectorUIGtk.cpp
 
 WebProcess/MediaCache/WebMediaKeyStorageManager.cpp
+
+WebProcess/Network/webrtc/gstreamer/GStreamerIceBackendProxy.cpp
 
 WebProcess/WebCoreSupport/WebValidationMessageClient.cpp
 

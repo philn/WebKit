@@ -130,6 +130,16 @@ if (ENABLE_VIDEO)
         endif ()
 
         list(APPEND WebCore_LIBRARIES OpenSSL::Crypto)
+
+        if (USE_LIBRICE)
+            list(APPEND WebCore_LIBRARIES LibRice::Proto)
+            list(APPEND WebCore_PRIVATE_FRAMEWORK_HEADERS
+                Modules/mediastream/gstreamer/GStreamerIceAgent.h
+                Modules/mediastream/gstreamer/GStreamerIceUtilities.h
+                platform/graphics/gstreamer/GRefPtrRice.h
+                platform/graphics/gstreamer/GUniquePtrRice.h
+            )
+        endif ()
     endif ()
 endif ()
 

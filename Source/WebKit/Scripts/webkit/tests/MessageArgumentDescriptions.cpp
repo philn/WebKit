@@ -506,6 +506,7 @@ Vector<ASCIILiteral> serializedIdentifiers()
         "WebKit::GeolocationIdentifier"_s,
         "WebKit::GPUProcessConnectionIdentifier"_s,
         "WebKit::GraphicsContextGLIdentifier"_s,
+        "WebKit::GStreamerIceBackendIdentifier"_s,
         "WebKit::IPCConnectionTesterIdentifier"_s,
         "WebKit::IPCStreamTesterIdentifier"_s,
         "WebKit::JSObjectID"_s,

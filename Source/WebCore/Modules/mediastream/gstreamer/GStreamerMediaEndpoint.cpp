@@ -29,6 +29,7 @@
 #include "GStreamerDataChannelHandler.h"
 #include "GStreamerIncomingTrackProcessor.h"
 #include "GStreamerRegistryScanner.h"
+#include "GStreamerIceAgent.h"
 #include "GStreamerRtpReceiverBackend.h"
 #include "GStreamerRtpTransceiverBackend.h"
 #include "GStreamerSctpTransportBackend.h"
@@ -152,6 +153,12 @@ void GStreamerMediaEndpoint::maybeInsertNetSimForElement(GstBin* bin, GstElement
 
 bool GStreamerMediaEndpoint::initializePipeline()
 {
+    auto webrtcBinFactory = adoptGRef(gst_element_factory_find("webrtcbin"));
+    if (!webrtcBinFactory) {
+        gst_printerrln("GStreamer element webrtcbin not found. Please install gst-plugins-bad");
+        return false;
+    }
+
     static uint32_t nPipeline = 0;
     auto pipelineName = makeString("webkit-webrtc-pipeline-"_s, nPipeline);
     m_pipeline = gst_pipeline_new(pipelineName.ascii().data());
@@ -164,12 +171,28 @@ bool GStreamerMediaEndpoint::initializePipeline()
 
     connectSimpleBusMessageCallback(m_pipeline.get(), [this](GstMessage* message) {
         handleMessage(message);
-    });
+    }, AsynchronousPipelineDumping::Yes);
 
-    auto binName = makeString("webkit-webrtcbin-"_s, nPipeline++);
-    m_webrtcBin = makeGStreamerElement("webrtcbin"_s, binName);
+    auto binName = makeString("webkit-webrtcbin-"_s, nPipeline);
+    nPipeline++;
+
+#if GST_CHECK_VERSION(1, 20, 0)
+    auto disableNetworkSandbox = StringView::fromLatin1(g_getenv("WEBKIT_GST_DISABLE_WEBRTC_NETWORK_SANDBOX"));
+    if (webkitGstCheckVersion(1, 22, 0) && disableNetworkSandbox != "1"_s) {
+        auto peerConnectionBackend = this->peerConnectionBackend();
+        if (!peerConnectionBackend)
+            return false;
+
+        auto agent = webkitGstWebRTCCreateIceAgent(makeString(binName, ":ice"_s), peerConnectionBackend->context());
+        if (!agent) {
+            gst_printerrln("Unable to create WebRTC ICE agent");
+            return false;
+        }
+        m_webrtcBin = gst_element_factory_create_full(webrtcBinFactory.get(), "name", binName.ascii().data(), "ice-agent", agent, nullptr);
+    }
+#endif
     if (!m_webrtcBin)
-        return false;
+        m_webrtcBin = gst_element_factory_create(webrtcBinFactory.get(), binName.ascii().data());
 
     // Lower default latency from 200ms to 40ms.
     g_object_set(m_webrtcBin.get(), "latency", 40, nullptr);
@@ -181,7 +204,7 @@ bool GStreamerMediaEndpoint::initializePipeline()
             g_signal_connect_swapped(m_webrtcBin.get(), "deep-element-added", G_CALLBACK(+[](GStreamerMediaEndpoint* self, GstBin* bin, GstElement* element) {
                 GUniquePtr<char> elementName(gst_element_get_name(element));
                 auto view = StringView::fromLatin1(elementName.get());
-                if (view.startsWith("nice"_s))
+                if (view.startsWith("nice"_s) || view.startsWith("ice-sink"_s) || view.startsWith("ice-src"_s))
                     self->maybeInsertNetSimForElement(bin, element);
             }), this);
         } else
@@ -388,8 +411,8 @@ bool GStreamerMediaEndpoint::setConfiguration(MediaEndpointConfiguration& config
     auto iceTransportPolicy = iceTransportPolicyFromConfiguration(configuration);
     g_object_set(m_webrtcBin.get(), "ice-transport-policy", iceTransportPolicy, nullptr);
 
+    bool stunSet = false;
     for (auto& server : configuration.iceServers) {
-        bool stunSet = false;
         for (auto& url : server.urls) {
             if (url.protocol().startsWith("turn"_s)) {
                 auto valid = makeStringByReplacingAll(url.string().isolatedCopy(), "turn:"_s, "turn://"_s);

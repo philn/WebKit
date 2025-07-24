@@ -54,6 +54,10 @@ NetworkProcess/webrtc/LibWebRTCSocketClient.cpp
 NetworkProcess/webrtc/NetworkRTCMonitor.cpp
 NetworkProcess/webrtc/NetworkRTCProvider.cpp
 
+NetworkProcess/webrtc/gstreamer/GStreamerIceBackend.cpp
+
+NetworkProcess/webrtc/rice/GStreamerIceBackendRice.cpp
+
 Platform/IPC/android/ArgumentCodersAndroid.cpp
 
 Platform/IPC/glib/ConnectionGLib.cpp
@@ -297,6 +301,8 @@ WebProcess/InjectedBundle/glib/InjectedBundleGlib.cpp
 WebProcess/Inspector/wpe/WebInspectorUIWPE.cpp
 
 WebProcess/MediaCache/WebMediaKeyStorageManager.cpp
+
+WebProcess/Network/webrtc/gstreamer/GStreamerIceBackendProxy.cpp
 
 WebProcess/WebCoreSupport/glib/WebEditorClientGLib.cpp
 
