@@ -439,6 +439,14 @@ bool NetworkConnectionToWebProcess::dispatchSyncMessage(IPC::Connection& connect
     if (decoder.messageReceiverName() == Messages::IPCTester::messageReceiverName())
         return m_ipcTester->didReceiveSyncMessage(connection, decoder, reply);
 #endif
+
+#if USE(GSTREAMER_WEBRTC)
+    if (decoder.messageReceiverName() == Messages::GStreamerIceBackend::messageReceiverName()) {
+        if (RefPtr iceBackend = m_gstreamerIceBackends.get(GStreamerIceBackendIdentifier(decoder.destinationID())))
+            return iceBackend->didReceiveSyncMessage(connection, decoder, reply);
+    }
+#endif
+
     return false;
 }
 

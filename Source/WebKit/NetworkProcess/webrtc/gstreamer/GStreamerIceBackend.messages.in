@@ -26,6 +26,7 @@ messages -> GStreamerIceBackend {
     SetForceRelay(bool forceRelay);
     AddTurnServer(String uri);
     AddStream() -> (std::optional<unsigned> streamId) Synchronous
+    GatherCandidatesForStream(unsigned streamId) -> (bool result) Synchronous
 }
 
 #endif

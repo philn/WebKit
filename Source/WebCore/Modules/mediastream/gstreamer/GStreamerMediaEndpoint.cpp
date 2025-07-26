@@ -173,7 +173,7 @@ bool GStreamerMediaEndpoint::initializePipeline()
         handleMessage(message);
     });
 
-    auto binName = makeString("webkit-webrtcbin-"_s, nPipeline++);
+    auto binName = makeString("webkit-webrtcbin-"_s, nPipeline);
 
 #if GST_CHECK_VERSION(1, 20, 0)
     if (webkitGstCheckVersion(1, 22, 0)) {
@@ -181,7 +181,8 @@ bool GStreamerMediaEndpoint::initializePipeline()
         if (!peerConnectionBackend)
             return false;
 
-        auto agent = webkitGstWebRTCCreateIceAgent("foo"_s, peerConnectionBackend->context());
+        auto agentName = makeString("webkit-ice-agent-"_s, nPipeline);
+        auto agent = webkitGstWebRTCCreateIceAgent(agentName, peerConnectionBackend->context());
         if (!agent) {
             gst_printerrln("Unable to create ICE agent");
             return false;
@@ -191,6 +192,8 @@ bool GStreamerMediaEndpoint::initializePipeline()
 #endif
     if (!m_webrtcBin)
         m_webrtcBin = gst_element_factory_create(webrtcBinFactory.get(), binName.ascii().data());
+
+    nPipeline++;
 
     // Lower default latency from 200ms to 40ms.
     g_object_set(m_webrtcBin.get(), "latency", 40, nullptr);

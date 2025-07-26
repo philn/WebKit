@@ -37,6 +37,8 @@
 #include "RTCRtpTransceiverDirection.h"
 #include "RTCSdpType.h"
 #include "RTCSignalingState.h"
+#include "ScriptExecutionContextInlines.h"
+#include "ContextDestructionObserverInlines.h"
 
 #include <gst/rtp/rtp.h>
 

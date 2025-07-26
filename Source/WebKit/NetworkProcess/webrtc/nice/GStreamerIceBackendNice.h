@@ -24,7 +24,8 @@ public:
 
     void setForceRelay(bool);
     void addTurnServer(const String&);
-    std::optional<unsigned> addStream();
+    void addStream(CompletionHandler<void(std::optional<unsigned>)>&&);
+    void gatherCandidatesForStream(unsigned, CompletionHandler<void(bool)>&&);
 
 private:
     virtual IPC::Connection* connection() const = 0;

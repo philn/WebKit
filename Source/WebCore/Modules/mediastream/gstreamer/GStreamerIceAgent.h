@@ -26,6 +26,7 @@
 #include <wtf/Identified.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/ObjectIdentifier.h>
+#include <gst/webrtc/webrtc_fwd.h>
 
 typedef struct _WebKitGstIceAgent WebKitGstIceAgent;
 typedef struct _WebKitGstIceAgentClass WebKitGstIceAgentClass;
@@ -39,8 +40,6 @@ using GStreamerIceBackendIdentifier = AtomicObjectIdentifier<GStreamerIce>;
 class GStreamerIceBackend : public Identified<GStreamerIceBackendIdentifier> {
     WTF_MAKE_NONCOPYABLE(GStreamerIceBackend);
 public:
-    static RefPtr<GStreamerIceBackend> create(SocketProvider&);
-
     void ref() { refGStreamerIceBackend(); }
     void deref() { derefGStreamerIceBackend(); }
 
@@ -48,6 +47,7 @@ public:
     virtual void addTurnServer(const String&) = 0;
 
     virtual std::optional<unsigned> addStream() = 0;
+    virtual bool gatherCandidatesForStream(unsigned) = 0;
 
 protected:
     GStreamerIceBackend() = default;
@@ -66,8 +66,9 @@ protected:
 
 GType webkit_gst_webrtc_ice_backend_get_type();
 
-WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(ASCIILiteral, WebCore::ScriptExecutionContext*);
+WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(const String&, WebCore::ScriptExecutionContext*);
 
-
+bool webkitGstWebRTCIceAgentGatherCandidates(WebKitGstIceAgent*, unsigned);
+GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent*, unsigned, GstWebRTCICEComponent);
 
 #endif // USE(GSTREAMER_WEBRTC)

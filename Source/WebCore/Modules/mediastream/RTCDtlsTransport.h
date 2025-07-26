@@ -31,6 +31,7 @@
 #include "EventTarget.h"
 #include "EventTargetInterfaces.h"
 #include "RTCDtlsTransportBackend.h"
+#include "ScriptExecutionContextInlines.h"
 #include <JavaScriptCore/ArrayBuffer.h>
 
 namespace WebCore {

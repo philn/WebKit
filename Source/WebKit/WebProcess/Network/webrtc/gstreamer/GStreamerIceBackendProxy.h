@@ -9,7 +9,7 @@
 #include "WebPageProxyIdentifier.h"
 #include "WebProcess.h"
 #include <WebCore/Document.h>
-#include <WebCore/GStreamerIceBackend.h>
+#include <WebCore/GStreamerIceAgent.h>
 
 namespace IPC {
 class Connection;
@@ -42,6 +42,7 @@ private:
     void setForceRelay(bool) final;
     void addTurnServer(const String&) final;
     std::optional<unsigned> addStream() final;
+    bool gatherCandidatesForStream(unsigned) final;
     void refGStreamerIceBackend() final { ref(); }
     void derefGStreamerIceBackend() final { deref(); }
 

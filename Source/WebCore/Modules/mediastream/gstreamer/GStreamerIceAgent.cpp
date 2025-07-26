@@ -19,9 +19,11 @@
 
 #include "config.h"
 #include "GStreamerIceAgent.h"
+#include "GStreamerIceStream.h"
 
 #if USE(GSTREAMER_WEBRTC)
 
+#include "GStreamerIceTransport.h"
 #include "ScriptExecutionContext.h"
 #include "SocketProvider.h"
 #include <gst/webrtc/ice.h>
@@ -32,14 +34,16 @@
 using namespace WTF;
 using namespace WebCore;
 
-typedef struct _StreamItem {
-    unsigned sessionId;
-    unsigned platformStreamId;
-    GRefPtr<GstWebRTCICEStream> stream;
-} StreamItem;
+// typedef struct _StreamItem {
+//     unsigned sessionId;
+//     //unsigned platformStreamId;
+//     GRefPtr<WebKitGstIceStream> stream;
+// } StreamItem;
 
 typedef struct _WebKitGstIceAgentPrivate {
+    RefPtr<SocketProvider> socketProvider;
     RefPtr<GStreamerIceBackend> iceBackend;
+    HashMap<unsigned, GRefPtr<GstWebRTCICEStream>> streams;
 } WebKitGstIceAgentPrivate;
 
 typedef struct _WebKitGstIceAgent {
@@ -83,14 +87,35 @@ static gboolean webkitGstWebRTCIceAgentAddTurnServer(GstWebRTCICE* ice, const gc
     return TRUE;
 }
 
-static GstWebRTCICEStream* webkitGstWebRTCIceAgentAddStream(GstWebRTCICE* ice, guint sessionId)
+static GstWebRTCICEStream* webkitGstWebRTCIceAgentAddStream(GstWebRTCICE* ice, guint sessionId [[maybe_unused]])
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
     if (!backend->priv->iceBackend)
         return nullptr;
 
-    // TODO
-    return nullptr;
+    auto streamId = backend->priv->iceBackend->addStream();
+    if (!streamId)
+        return nullptr;
+
+    auto stream = GST_WEBRTC_ICE_STREAM(webkitGstWebRTCCreateIceStream(backend, *streamId));
+    backend->priv->streams.add(*streamId, GRefPtr(stream));
+    return stream;
+}
+
+bool webkitGstWebRTCIceAgentGatherCandidates(WebKitGstIceAgent* agent, unsigned streamId)
+{
+    if (!agent->priv->iceBackend)
+        return false;
+
+    return agent->priv->iceBackend->gatherCandidatesForStream(streamId);
+}
+
+GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent* agent, unsigned streamId, GstWebRTCICEComponent component)
+{
+    if (!agent->priv->iceBackend)
+        return nullptr;
+
+    return GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCCreateIceTransport(agent, streamId, component));
 }
 
 static void webkitGstWebRTCIceAgentFinalize(GObject* object)
@@ -116,12 +141,7 @@ static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* kla
     iceClass->add_stream = webkitGstWebRTCIceAgentAddStream;
 }
 
-RefPtr<GStreamerIceBackend> GStreamerIceBackend::create(SocketProvider& provider)
-{
-    return provider.createGStreamerIceBackend();
-}
-
-WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(ASCIILiteral name, ScriptExecutionContext* context)
+WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(const String& name, ScriptExecutionContext* context)
 {
     if (!context)
         return nullptr;
@@ -130,8 +150,9 @@ WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(ASCIILiteral name, ScriptExecut
     if (!socketProvider)
         return nullptr;
 
-    auto backend = reinterpret_cast<WebKitGstIceAgent*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND, "name", name.characters(), nullptr));
-    backend->priv->iceBackend = GStreamerIceBackend::create(*socketProvider);
+    auto backend = reinterpret_cast<WebKitGstIceAgent*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND, "name", name.ascii().data(), nullptr));
+    backend->priv->iceBackend = socketProvider->createGStreamerIceBackend();
+    backend->priv->socketProvider = WTFMove(socketProvider);
     return backend;
 }
 

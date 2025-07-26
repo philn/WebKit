@@ -4,6 +4,7 @@
 
 #if USE(GSTREAMER_WEBRTC) && USE(LIBNICE)
 #include <nice.h>
+#include <wtf/CompletionHandler.h>
 
 namespace WebKit {
 
@@ -53,13 +54,27 @@ void GStreamerIceBackendNice::addTurnServer(const String& uri)
     WTFLogAlways("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
 }
 
-std::optional<unsigned> GStreamerIceBackendNice::addStream()
+void GStreamerIceBackendNice::addStream(CompletionHandler<void(std::optional<unsigned>)>&& completionHandler)
 {
     auto streamId = nice_agent_add_stream(m_agent.get(), 1);
-    if (!streamId)
-        return std::nullopt;
+    if (!streamId) {
+        completionHandler(std::nullopt);
+        return;
+    }
 
-    return { streamId };
+    completionHandler({ streamId });
+}
+
+void GStreamerIceBackendNice::gatherCandidatesForStream(unsigned streamId, CompletionHandler<void(bool)>&& completionHandler)
+{
+    // TODO: Implement as in gst_webrtc_nice_stream_gather_candidates
+
+    if (!nice_agent_gather_candidates(m_agent.get(), streamId)) {
+        completionHandler(false);
+        return;
+    }
+
+    completionHandler(true);
 }
 
 } // namespace WebKit

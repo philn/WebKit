@@ -1,7 +1,6 @@
 
 #include "config.h"
 #include "GStreamerIceBackendProxy.h"
-#include "WebCore/GStreamerIceBackend.h"
 
 #if USE(GSTREAMER_WEBRTC)
 
@@ -56,9 +55,21 @@ void GStreamerIceBackendProxy::addTurnServer(const String& uri)
 
 std::optional<unsigned> GStreamerIceBackendProxy::addStream()
 {
-    auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::AddStream { }, messageSenderDestinationID());
-    auto [streamId] = sendResult.takeReply();
+    // Called from webrtcbin PC thread, and as this is a sync message it needs to be sent from the main thread.
+    std::optional<unsigned> streamId;
+    callOnMainThreadAndWait([&] {
+        auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::AddStream {}, messageSenderDestinationID());
+        auto [reply] = sendResult.takeReply();
+        streamId = reply;
+    });
     return streamId;
+}
+
+bool GStreamerIceBackendProxy::gatherCandidatesForStream(unsigned streamId)
+{
+    auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::GatherCandidatesForStream { streamId }, messageSenderDestinationID());
+    auto [result] = sendResult.takeReply();
+    return result;
 }
 
 } // namespace WebKit
