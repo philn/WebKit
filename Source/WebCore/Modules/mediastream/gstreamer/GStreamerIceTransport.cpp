@@ -61,10 +61,14 @@ static void webkitGstWebRTCIceTransportConstructed(GObject* object)
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_transport_parent_class)->constructed(object);
 
     // auto self = WEBKIT_GST_WEBRTC_ICE_TRANSPORT(object);
-    auto ice = GST_WEBRTC_ICE_TRANSPORT(object);
+    auto transport = GST_WEBRTC_ICE_TRANSPORT(object);
 
-    ice->sink = makeGStreamerElement("appsink"_s);
-    ice->src = makeGStreamerElement("appsrc"_s);
+    static Atomic<uint32_t> counter = 0;
+    auto id = counter.load();
+
+    transport->sink = makeGStreamerElement("appsink"_s, makeString("ice-transport-sink-"_s, id));
+    transport->src = makeGStreamerElement("appsrc"_s, makeString("ice-transport-src-"_s, id));
+    counter.exchangeAdd(1);
 }
 
 static void webkit_gst_webrtc_ice_transport_class_init(WebKitGstIceTransportClass* klass)

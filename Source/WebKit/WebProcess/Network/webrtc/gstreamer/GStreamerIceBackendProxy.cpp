@@ -48,17 +48,22 @@ void GStreamerIceBackendProxy::setForceRelay(bool forceRelay)
     MessageSender::send(Messages::GStreamerIceBackend::SetForceRelay { forceRelay });
 }
 
+void GStreamerIceBackendProxy::setStunServer(const String& uri)
+{
+    MessageSender::send(Messages::GStreamerIceBackend::SetStunServer { uri });
+}
+
 void GStreamerIceBackendProxy::addTurnServer(const String& uri)
 {
     MessageSender::send(Messages::GStreamerIceBackend::AddTurnServer { uri });
 }
 
-std::optional<unsigned> GStreamerIceBackendProxy::addStream()
+std::optional<unsigned> GStreamerIceBackendProxy::addStream(unsigned sessionId)
 {
     // Called from webrtcbin PC thread, and as this is a sync message it needs to be sent from the main thread.
     std::optional<unsigned> streamId;
     callOnMainThreadAndWait([&] {
-        auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::AddStream {}, messageSenderDestinationID());
+        auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::AddStream { sessionId }, messageSenderDestinationID());
         auto [reply] = sendResult.takeReply();
         streamId = reply;
     });

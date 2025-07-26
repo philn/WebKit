@@ -44,6 +44,7 @@ typedef struct _WebKitGstIceAgentPrivate {
     RefPtr<SocketProvider> socketProvider;
     RefPtr<GStreamerIceBackend> iceBackend;
     HashMap<unsigned, GRefPtr<GstWebRTCICEStream>> streams;
+    String stunServer;
 } WebKitGstIceAgentPrivate;
 
 typedef struct _WebKitGstIceAgent {
@@ -77,6 +78,22 @@ static void webkitGstWebRTCIceAgentSetForceRelay(GstWebRTCICE* ice, gboolean for
     backend->priv->iceBackend->setForceRelay(forceRelay);
 }
 
+static void webkitGstWebRTCIceAgentSetStunServer(GstWebRTCICE* ice, const gchar* uri)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    if (!backend->priv->iceBackend)
+        return;
+
+    backend->priv->stunServer = String::fromUTF8(uri);
+    backend->priv->iceBackend->setStunServer(backend->priv->stunServer);
+}
+
+static gchar* webkitGstWebRTCIceAgentGetStunServer(GstWebRTCICE* ice)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    return g_strdup(backend->priv->stunServer.utf8().data());
+}
+
 static gboolean webkitGstWebRTCIceAgentAddTurnServer(GstWebRTCICE* ice, const gchar* uri)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
@@ -87,13 +104,13 @@ static gboolean webkitGstWebRTCIceAgentAddTurnServer(GstWebRTCICE* ice, const gc
     return TRUE;
 }
 
-static GstWebRTCICEStream* webkitGstWebRTCIceAgentAddStream(GstWebRTCICE* ice, guint sessionId [[maybe_unused]])
+static GstWebRTCICEStream* webkitGstWebRTCIceAgentAddStream(GstWebRTCICE* ice, guint sessionId)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
     if (!backend->priv->iceBackend)
         return nullptr;
 
-    auto streamId = backend->priv->iceBackend->addStream();
+    auto streamId = backend->priv->iceBackend->addStream(sessionId);
     if (!streamId)
         return nullptr;
 
@@ -137,6 +154,8 @@ static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* kla
     auto iceClass = GST_WEBRTC_ICE_CLASS(klass);
     iceClass->set_on_ice_candidate = webkitGstWebRTCIceAgentSetOnIceCandidate;
     iceClass->set_force_relay = webkitGstWebRTCIceAgentSetForceRelay;
+    iceClass->set_stun_server = webkitGstWebRTCIceAgentSetStunServer;
+    iceClass->get_stun_server = webkitGstWebRTCIceAgentGetStunServer;
     iceClass->add_turn_server = webkitGstWebRTCIceAgentAddTurnServer;
     iceClass->add_stream = webkitGstWebRTCIceAgentAddStream;
 }

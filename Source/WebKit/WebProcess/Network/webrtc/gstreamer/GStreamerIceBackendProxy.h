@@ -40,8 +40,9 @@ private:
 
     // GStreamerIceBackend
     void setForceRelay(bool) final;
+    void setStunServer(const String&) final;
     void addTurnServer(const String&) final;
-    std::optional<unsigned> addStream() final;
+    std::optional<unsigned> addStream(unsigned) final;
     bool gatherCandidatesForStream(unsigned) final;
     void refGStreamerIceBackend() final { ref(); }
     void derefGStreamerIceBackend() final { deref(); }

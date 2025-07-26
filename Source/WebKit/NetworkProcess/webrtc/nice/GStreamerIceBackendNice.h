@@ -23,8 +23,9 @@ public:
     ~GStreamerIceBackendNice();
 
     void setForceRelay(bool);
+    void setStunServer(const String&);
     void addTurnServer(const String&);
-    void addStream(CompletionHandler<void(std::optional<unsigned>)>&&);
+    void addStream(unsigned sessionId, CompletionHandler<void(std::optional<unsigned>)>&&);
     void gatherCandidatesForStream(unsigned, CompletionHandler<void(bool)>&&);
 
 private:
@@ -37,6 +38,14 @@ private:
     GRefPtr<GMainLoop> m_loop;
     Lock m_lock;
     Condition m_condition;
+
+    String m_stunServer;
+
+    struct StreamItem {
+        unsigned sessionId;
+        unsigned streamId;
+    };
+    Vector<StreamItem> m_streams;
 };
 
 } // namespace WebKit

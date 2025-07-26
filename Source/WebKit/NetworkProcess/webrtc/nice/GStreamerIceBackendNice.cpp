@@ -49,13 +49,19 @@ void GStreamerIceBackendNice::setForceRelay(bool forceRelay)
     g_object_set(m_agent.get(), "force-relay", forceRelay, nullptr);
 }
 
+void GStreamerIceBackendNice::setStunServer(const String& uri)
+{
+    m_stunServer = uri;
+}
+
 void GStreamerIceBackendNice::addTurnServer(const String& uri)
 {
     WTFLogAlways("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
 }
 
-void GStreamerIceBackendNice::addStream(CompletionHandler<void(std::optional<unsigned>)>&& completionHandler)
+void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<void(std::optional<unsigned>)>&& completionHandler)
 {
+    // TODO: Implement as in gst_webrtc_nice_add_stream
     auto streamId = nice_agent_add_stream(m_agent.get(), 1);
     if (!streamId) {
         completionHandler(std::nullopt);

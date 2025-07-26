@@ -44,9 +44,10 @@ public:
     void deref() { derefGStreamerIceBackend(); }
 
     virtual void setForceRelay(bool) = 0;
+    virtual void setStunServer(const String&) = 0;
     virtual void addTurnServer(const String&) = 0;
 
-    virtual std::optional<unsigned> addStream() = 0;
+    virtual std::optional<unsigned> addStream(unsigned) = 0;
     virtual bool gatherCandidatesForStream(unsigned) = 0;
 
 protected:
