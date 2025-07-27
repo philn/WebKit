@@ -14,7 +14,10 @@
 #include <wtf/HashMap.h>
 #include <wtf/Lock.h>
 #include <wtf/RunLoop.h>
+#include <wtf/URL.h>
+#include <wtf/URLHash.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 namespace IPC {
 class Connection;
@@ -51,6 +54,21 @@ private:
     static void addIceCandidateToAgent(NiceAgent*, unsigned, NiceCandidate&);
     void resolveAddress(String&&, CompletionHandler<void(Expected<String, WebCore::ExceptionData>&&)>&&);
 
+    enum class ValidationErrorCode {
+        ParseError,
+        UnknownScheme,
+        UnknownTransport,
+        UnknownParameter,
+        MissingUsername,
+        MissingPassword
+    };
+    struct URLValidationError {
+        ValidationErrorCode code;
+        String data;
+    };
+    Expected<URL, URLValidationError> validateTurnServerURL(const String&);
+    void addTurnServerForStream(unsigned, const URL&);
+
     GRefPtr<NiceAgent> m_agent;
 
     RefPtr<Thread> m_thread;
@@ -66,6 +84,7 @@ private:
         unsigned streamId;
     };
     Vector<StreamItem> m_streams;
+    HashSet<URL> m_turnServers;
 };
 
 } // namespace WebKit

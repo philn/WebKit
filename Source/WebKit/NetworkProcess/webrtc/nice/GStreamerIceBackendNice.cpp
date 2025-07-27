@@ -103,7 +103,19 @@ void GStreamerIceBackendNice::setStunServer(const String& uri)
 
 void GStreamerIceBackendNice::addTurnServer(const String& uri)
 {
-    WTFLogAlways("woo %s line %d pid=%d", __FILE__, __LINE__, getpid());
+    // TODO: bubble-up errors
+    auto validationResult = validateTurnServerURL(uri);
+    if (!validationResult.has_value()) {
+        g_printerr("Error validating TURN URI: %s\n", validationResult.error().data.utf8().data());
+        return;
+    }
+    auto url = *validationResult;
+    auto wasAdded = m_turnServers.add(url).isNewEntry;
+    if (!wasAdded)
+        return;
+
+    for (const auto& item : m_streams)
+        addTurnServerForStream(item.streamId, url);
 }
 
 void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<void(std::optional<unsigned>)>&& completionHandler)
@@ -264,6 +276,73 @@ void GStreamerIceBackendNice::addCandidate(unsigned streamId, const String& cand
         addIceCandidateToAgent(agent.get(), streamId, *candidate.get());
         completionHandler(true);
     });
+}
+
+Expected<URL, GStreamerIceBackendNice::URLValidationError> GStreamerIceBackendNice::validateTurnServerURL(const String& turnUrl)
+{
+    URL url(turnUrl);
+
+    if (!url.isValid())
+        return makeUnexpected(URLValidationError { ValidationErrorCode::ParseError, { } });
+
+    bool isTLS = false;
+    if (url.protocolIs("turns"_s))
+        isTLS = true;
+    else if (url.protocol() != "turn"_s)
+        return makeUnexpected(URLValidationError { ValidationErrorCode::UnknownScheme, url.protocol().toStringWithoutCopying() });
+
+    for (const auto& [key, value] : queryParameters(url)) {
+        if (key != "transport"_s)
+            return makeUnexpected(URLValidationError { ValidationErrorCode::UnknownParameter, key });
+        if (value != "udp"_s && value != "tcp"_s)
+            return makeUnexpected(URLValidationError { ValidationErrorCode::UnknownTransport, value });
+    }
+
+    if (url.user().isEmpty())
+        return makeUnexpected(URLValidationError { ValidationErrorCode::MissingUsername, { } });
+    if (url.password().isEmpty())
+        return makeUnexpected(URLValidationError { ValidationErrorCode::MissingPassword, { } });
+
+    if (url.port())
+        return url;
+
+    if (isTLS)
+        url.setPort({ 5349 });
+    else
+        url.setPort({ 3478 });
+
+    return url;
+}
+
+void GStreamerIceBackendNice::addTurnServerForStream(unsigned streamId, const URL& url)
+{
+    if (!url.host())
+        return;
+
+    NiceRelayType relays[4] = { static_cast<NiceRelayType>(0), };
+    int nRelay = 0;
+
+    if (url.protocolIs("turns"_s))
+        relays[nRelay++] = NICE_RELAY_TYPE_TURN_TLS;
+    else {
+        ASSERT(url.protocolIs("turn"_s));
+        StringView transport;
+        for (const auto& [key, value] : queryParameters(url)) {
+            if (key == "transport"_s) {
+                transport = WTFMove(value);
+                break;
+            }
+        }
+        if (!transport || transport == "udp"_s)
+            relays[nRelay++] = NICE_RELAY_TYPE_TURN_UDP;
+        if (!transport || transport == "tcp"_s)
+            relays[nRelay++] = NICE_RELAY_TYPE_TURN_TCP;
+    }
+    for (int i = 0; i < nRelay; i++) {
+        if (!nice_agent_set_relay_info(m_agent.get(), streamId, NICE_COMPONENT_TYPE_RTP,
+            url.host().utf8().data(), *url.port(), url.user().utf8().data(), url.password().utf8().data(), relays[i]))
+            g_printerr("Unable to use TURN server %s for stream %u", url.string().utf8().data(), streamId);
+    }
 }
 
 } // namespace WebKit
