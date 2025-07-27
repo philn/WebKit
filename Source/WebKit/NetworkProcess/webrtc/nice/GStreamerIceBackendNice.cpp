@@ -5,10 +5,6 @@
 #if USE(GSTREAMER_WEBRTC) && USE(LIBNICE)
 
 #include "GStreamerIceBackendProxyMessages.h"
-#include "NetworkConnectionToWebProcessMessages.h"
-#include "NetworkProcessConnection.h"
-#include <gio/gio.h>
-#include <glib.h>
 #include <nice.h>
 #include <wtf/CompletionHandler.h>
 #include <wtf/glib/GThreadSafeWeakPtr.h>
@@ -22,7 +18,7 @@ GStreamerIceBackendNice::GStreamerIceBackendNice()
 {
     {
         Locker locker(m_lock);
-        m_thread = Thread::create("webrtc-nice", [&] {
+        m_thread = Thread::create("webrtc-nice"_s, [&] {
             Locker locker(m_lock);
             m_mainContext = adoptGRef(g_main_context_new());
             m_loop = adoptGRef(g_main_loop_new(m_mainContext.get(), FALSE));
@@ -120,14 +116,23 @@ void GStreamerIceBackendNice::addTurnServer(const String& uri)
 
 void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<void(std::optional<unsigned>)>&& completionHandler)
 {
-    // TODO: Implement as in gst_webrtc_nice_add_stream
     auto streamId = nice_agent_add_stream(m_agent.get(), 1);
     if (!streamId) {
         completionHandler(std::nullopt);
         return;
     }
 
+    if (!m_stunServer.isEmpty()) {
+        URL url(m_stunServer);
+        ASSERT(url.isValid());
+        const auto& host = url.host();
+        auto port = url.port().value_or(3478);
+        g_object_set(m_agent.get(), "stun-server", host.utf8().data(), "stun-server-port", port, nullptr);
+    }
+
     m_streams.append({ sessionId, streamId });
+    for (const auto& url : m_turnServers)
+        addTurnServerForStream(streamId, url);
     completionHandler({ streamId });
 }
 
@@ -153,7 +158,7 @@ Expected<GStreamerIceBackendNice::CandidateAddress, ExceptionData> GStreamerIceB
     if (!candidate.startsWith("a=candidate:"_s))
         return makeUnexpected(ExceptionData { ExceptionCode::NotSupportedError, "Candidate does not start with \"a=candidate:\""_s});
 
-    auto tokens = candidate.toStringWithoutCopying().substring(13).split(' ');
+    auto tokens = candidate.toStringWithoutCopying().substring(12).split(' ');
     if (tokens.size() < 6)
         return makeUnexpected(ExceptionData { ExceptionCode::DataError, makeString("Candidate \""_s, candidate, "\" tokenization resulted in not enough tokens"_s)});
 
@@ -174,10 +179,9 @@ Expected<GStreamerIceBackendNice::CandidateAddress, ExceptionData> GStreamerIceB
 
 void GStreamerIceBackendNice::addIceCandidateToAgent(NiceAgent* agent, unsigned streamId, NiceCandidate& candidate)
 {
-    if (candidate.component_id == 2) {
-        // We only support rtcp-mux so rtcp candidates are useless for us.
+    // We only support rtcp-mux so rtcp candidates are useless for us.
+    if (candidate.component_id == NICE_COMPONENT_TYPE_RTCP)
         return;
-    }
 
     GSList* candidates = nullptr;
     candidates = g_slist_append(candidates, &candidate);
@@ -307,9 +311,9 @@ Expected<URL, GStreamerIceBackendNice::URLValidationError> GStreamerIceBackendNi
         return url;
 
     if (isTLS)
-        url.setPort({ 5349 });
+        url.setPort(5349);
     else
-        url.setPort({ 3478 });
+        url.setPort(3478);
 
     return url;
 }
