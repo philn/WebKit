@@ -27,6 +27,7 @@ public:
     void addTurnServer(const String&);
     void addStream(unsigned sessionId, CompletionHandler<void(std::optional<unsigned>)>&&);
     void gatherCandidatesForStream(unsigned, CompletionHandler<void(bool)>&&);
+    void setIsController(bool);
 
 private:
     virtual IPC::Connection* connection() const = 0;

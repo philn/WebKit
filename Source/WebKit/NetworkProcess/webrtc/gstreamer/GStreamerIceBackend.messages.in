@@ -28,6 +28,7 @@ messages -> GStreamerIceBackend {
     AddTurnServer(String uri);
     AddStream(unsigned sessionId) -> (std::optional<unsigned> streamId) Synchronous
     GatherCandidatesForStream(unsigned streamId) -> (bool result) Synchronous
+    SetIsController(bool isController);
 }
 
 #endif

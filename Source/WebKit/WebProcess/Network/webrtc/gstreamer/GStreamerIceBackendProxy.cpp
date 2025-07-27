@@ -77,6 +77,11 @@ bool GStreamerIceBackendProxy::gatherCandidatesForStream(unsigned streamId)
     return result;
 }
 
+void GStreamerIceBackendProxy::setIsController(bool isController)
+{
+    MessageSender::send(Messages::GStreamerIceBackend::SetIsController { isController });
+}
+
 } // namespace WebKit
 
 #endif // USE(GSTREAMER_WEBRTC)

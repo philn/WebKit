@@ -44,6 +44,7 @@ private:
     void addTurnServer(const String&) final;
     std::optional<unsigned> addStream(unsigned) final;
     bool gatherCandidatesForStream(unsigned) final;
+    void setIsController(bool) final;
     void refGStreamerIceBackend() final { ref(); }
     void derefGStreamerIceBackend() final { deref(); }
 

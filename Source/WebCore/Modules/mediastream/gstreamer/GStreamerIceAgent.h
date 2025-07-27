@@ -46,6 +46,7 @@ public:
     virtual void setForceRelay(bool) = 0;
     virtual void setStunServer(const String&) = 0;
     virtual void addTurnServer(const String&) = 0;
+    virtual void setIsController(bool) = 0;
 
     virtual std::optional<unsigned> addStream(unsigned) = 0;
     virtual bool gatherCandidatesForStream(unsigned) = 0;

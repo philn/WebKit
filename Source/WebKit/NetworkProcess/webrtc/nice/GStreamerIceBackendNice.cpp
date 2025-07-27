@@ -83,6 +83,11 @@ void GStreamerIceBackendNice::gatherCandidatesForStream(unsigned streamId, Compl
     completionHandler(true);
 }
 
+void GStreamerIceBackendNice::setIsController(bool isController)
+{
+    g_object_set(m_agent.get(), "controlling-mode", isController, nullptr);
+}
+
 } // namespace WebKit
 
 #endif // USE(GSTREAMER_WEBRTC) && USE(LIBNICE)

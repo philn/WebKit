@@ -34,17 +34,12 @@
 using namespace WTF;
 using namespace WebCore;
 
-// typedef struct _StreamItem {
-//     unsigned sessionId;
-//     //unsigned platformStreamId;
-//     GRefPtr<WebKitGstIceStream> stream;
-// } StreamItem;
-
 typedef struct _WebKitGstIceAgentPrivate {
     RefPtr<SocketProvider> socketProvider;
     RefPtr<GStreamerIceBackend> iceBackend;
     HashMap<unsigned, GRefPtr<GstWebRTCICEStream>> streams;
     String stunServer;
+    bool isController;
 } WebKitGstIceAgentPrivate;
 
 typedef struct _WebKitGstIceAgent {
@@ -119,6 +114,21 @@ static GstWebRTCICEStream* webkitGstWebRTCIceAgentAddStream(GstWebRTCICE* ice, g
     return stream;
 }
 
+static gboolean webkitGstWebRTCIceAgentGetIsController(GstWebRTCICE* ice)
+{
+    return WEBKIT_GST_WEBRTC_ICE_BACKEND(ice)->priv->isController;
+}
+
+static void webkitGstWebRTCIceAgentSetIsController(GstWebRTCICE* ice, gboolean isController)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    if (!backend->priv->iceBackend)
+        return;
+
+    backend->priv->iceBackend->setIsController(isController);
+    backend->priv->isController = isController;
+}
+
 bool webkitGstWebRTCIceAgentGatherCandidates(WebKitGstIceAgent* agent, unsigned streamId)
 {
     if (!agent->priv->iceBackend)
@@ -158,6 +168,8 @@ static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* kla
     iceClass->get_stun_server = webkitGstWebRTCIceAgentGetStunServer;
     iceClass->add_turn_server = webkitGstWebRTCIceAgentAddTurnServer;
     iceClass->add_stream = webkitGstWebRTCIceAgentAddStream;
+    iceClass->get_is_controller = webkitGstWebRTCIceAgentGetIsController;
+    iceClass->set_is_controller = webkitGstWebRTCIceAgentSetIsController;
 }
 
 WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(const String& name, ScriptExecutionContext* context)
