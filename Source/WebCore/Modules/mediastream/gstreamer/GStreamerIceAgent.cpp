@@ -29,6 +29,7 @@
 #include <gst/webrtc/ice.h>
 #include <gst/webrtc/webrtc.h>
 #include <wtf/glib/GThreadSafeWeakPtr.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/glib/WTFGType.h>
 #include <wtf/text/WTFString.h>
 
@@ -146,6 +147,22 @@ static void webkitGstWebRTCIceAgentSetIsController(GstWebRTCICE* ice, gboolean i
     backend->priv->isController = isController;
 }
 
+static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICEStream* iceStream, const gchar* candidate, GstPromise* promise)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    auto streamId = webkitiGstWebRTCIceStreamGetId(WEBKIT_GST_WEBRTC_ICE_STREAM(iceStream));
+    backend->priv->iceBackend->addCandidate(streamId, String::fromUTF8(candidate), [promise = GRefPtr(promise)](auto&& result) mutable {
+        if (result.hasException()) {
+            auto& errorMessage = result.exception().message();
+            GUniquePtr<GError> error(g_error_new(GST_WEBRTC_ERROR, GST_WEBRTC_ERROR_INTERNAL_FAILURE, "%s", errorMessage.utf8().data()));
+
+            gst_promise_reply(promise.get(), gst_structure_new("application/x-gst-promise", "error", error.get(), nullptr));
+            return;
+        }
+        gst_promise_reply(promise.get(), nullptr);
+    });
+}
+
 bool webkitGstWebRTCIceAgentGatherCandidates(WebKitGstIceAgent* agent, unsigned streamId)
 {
     if (!agent->priv->iceBackend)
@@ -195,6 +212,7 @@ static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* kla
     iceClass->add_stream = webkitGstWebRTCIceAgentAddStream;
     iceClass->get_is_controller = webkitGstWebRTCIceAgentGetIsController;
     iceClass->set_is_controller = webkitGstWebRTCIceAgentSetIsController;
+    iceClass->add_candidate = webkitGstWebRTCIceAgentAddCandidate;
 }
 
 WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(const String& name, ScriptExecutionContext* context)

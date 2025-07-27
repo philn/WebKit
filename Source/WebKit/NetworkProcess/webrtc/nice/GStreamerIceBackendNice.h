@@ -5,7 +5,11 @@
 
 #include "GRefPtrNice.h"
 #include "GUniquePtrNice.h"
+
+#include <WebCore/ExceptionData.h>
+#include <WebCore/ExceptionOr.h>
 #include <wtf/Condition.h>
+#include <wtf/Expected.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/Lock.h>
@@ -26,9 +30,10 @@ public:
     void setForceRelay(bool);
     void setStunServer(const String&);
     void addTurnServer(const String&);
-    void addStream(unsigned sessionId, CompletionHandler<void(std::optional<unsigned>)>&&);
+    void addStream(unsigned, CompletionHandler<void(std::optional<unsigned>)>&&);
     void gatherCandidatesForStream(unsigned, CompletionHandler<void(bool)>&&);
     void setIsController(bool);
+    void addCandidate(unsigned, const String&, CompletionHandler<void(Expected<bool, WebCore::ExceptionData>&&)>&&);
 
 private:
     virtual IPC::Connection* connection() const = 0;
@@ -36,6 +41,15 @@ private:
     void notifyNewCandidate(const NiceCandidate&);
 
     void fillLocalCandidateCredentials(const NiceCandidate&, GUniqueOutPtr<NiceCandidate>&);
+
+    struct CandidateAddress {
+        String prefix;
+        String address;
+        String postfix;
+    };
+    Expected<CandidateAddress, WebCore::ExceptionData> getCandidateAddress(StringView candidate);
+    static void addIceCandidateToAgent(NiceAgent*, unsigned, NiceCandidate&);
+    void resolveAddress(String&&, CompletionHandler<void(Expected<String, WebCore::ExceptionData>&&)>&&);
 
     GRefPtr<NiceAgent> m_agent;
 

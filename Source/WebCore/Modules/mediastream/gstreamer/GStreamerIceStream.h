@@ -25,35 +25,9 @@
 #include "GStreamerIceTransport.h"
 #include <glib-object.h>
 #include <wtf/Forward.h>
-// #include <wtf/Identified.h>
-// #include <wtf/Noncopyable.h>
-// #include <wtf/ObjectIdentifier.h>
 
 typedef struct _WebKitGstIceStream WebKitGstIceStream;
 typedef struct _WebKitGstIceStreamClass WebKitGstIceStreamClass;
-
-// namespace WebCore {
-// class SocketProvider;
-// class GStreamerIceStream;
-// using GStreamerIceStreamIdentifier = AtomicObjectIdentifier<GStreamerIceStream>;
-
-// class GStreamerIceStream : public Identified<GStreamerIceStreamIdentifier> {
-//     WTF_MAKE_NONCOPYABLE(GStreamerIceStream);
-// public:
-//     void ref() { refGStreamerIceStream(); }
-//     void deref() { derefGStreamerIceStream(); }
-
-//     virtual unsigned identifier() const = 0;
-//     virtual bool gatherCandidates() = 0;
-
-// protected:
-//     GStreamerIceStream() = default;
-//     virtual ~GStreamerIceStream() = default;
-//     virtual void refGStreamerIceStream() = 0;
-//     virtual void derefGStreamerIceStream() = 0;
-// };
-
-// } // namespace WebCore
 
 #define WEBKIT_TYPE_GST_WEBRTC_ICE_STREAM (webkit_gst_webrtc_ice_stream_get_type())
 #define WEBKIT_GST_WEBRTC_ICE_STREAM(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), WEBKIT_TYPE_GST_WEBRTC_ICE_STREAM, WebKitGstIceStream))
@@ -65,6 +39,6 @@ GType webkit_gst_webrtc_ice_stream_get_type();
 
 WebKitGstIceStream* webkitGstWebRTCCreateIceStream(WebKitGstIceAgent*, unsigned);
 
-WebKitGstIceTransport* webkitGstWebRTCIceStreamFindTransport(WebKitGstIceStream*, GstWebRTCICEComponent);
+unsigned webkitiGstWebRTCIceStreamGetId(WebKitGstIceStream*);
 
 #endif // USE(GSTREAMER_WEBRTC)

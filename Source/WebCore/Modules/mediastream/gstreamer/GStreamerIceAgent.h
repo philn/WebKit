@@ -21,6 +21,7 @@
 
 #if USE(GSTREAMER_WEBRTC)
 
+#include "ExceptionOr.h"
 #include <glib-object.h>
 #include <gst/webrtc/webrtc_fwd.h>
 #include <wtf/Forward.h>
@@ -66,6 +67,9 @@ public:
     virtual void setStunServer(const String&) = 0;
     virtual void addTurnServer(const String&) = 0;
     virtual void setIsController(bool) = 0;
+
+    using AddCandidateCallback = CompletionHandler<void(ExceptionOr<bool>&&)>;
+    virtual void addCandidate(unsigned, const String&, AddCandidateCallback&&) = 0;
 
     virtual std::optional<unsigned> addStream(unsigned) = 0;
     virtual bool gatherCandidatesForStream(unsigned) = 0;

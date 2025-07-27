@@ -75,6 +75,12 @@ static GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(GstWebRTCICE
     return nullptr;
 }
 
+unsigned webkitiGstWebRTCIceStreamGetId(WebKitGstIceStream* ice)
+{
+    auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);
+    return stream->priv->streamId;
+}
+
 static gboolean webkitGstWebRTCIceStreamGatherCandidates(GstWebRTCICEStream* ice)
 {
     auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);

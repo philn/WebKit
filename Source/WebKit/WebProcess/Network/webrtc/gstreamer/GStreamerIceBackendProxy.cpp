@@ -83,6 +83,19 @@ void GStreamerIceBackendProxy::setIsController(bool isController)
     MessageSender::send(Messages::GStreamerIceBackend::SetIsController { isController });
 }
 
+void GStreamerIceBackendProxy::addCandidate(unsigned streamId, const String& candidate, GStreamerIceBackend::AddCandidateCallback&& callback)
+{
+    auto completionHandler = [callback = WTFMove(callback)](auto&& valueOrException) mutable {
+        if (!valueOrException.has_value()) {
+            callback(valueOrException.error().toException());
+            return;
+        }
+        callback(WTFMove(*valueOrException));
+    };
+
+    m_connection->sendWithAsyncReply(Messages::GStreamerIceBackend::AddCandidate { streamId, candidate }, WTFMove(completionHandler));
+}
+
 void GStreamerIceBackendProxy::notifyNewCandidate(unsigned sessionId, String&& candidate)
 {
     m_client->notifyIceCandidate(sessionId, candidate);

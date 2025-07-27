@@ -29,6 +29,7 @@ messages -> GStreamerIceBackend {
     AddStream(unsigned sessionId) -> (std::optional<unsigned> streamId) Synchronous
     GatherCandidatesForStream(unsigned streamId) -> (bool result) Synchronous
     SetIsController(bool isController);
+    AddCandidate(unsigned streamId, String candidate) -> (Expected<bool, WebCore::ExceptionData> result)
 }
 
 #endif
