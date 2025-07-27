@@ -1205,7 +1205,7 @@ public:
     Ref<WebTransportSessionPromise> initializeWebTransportSession(ScriptExecutionContext&, WebTransportSessionClient&, const URL&) { return WebTransportSessionPromise::createAndReject(); }
 
 #if USE(GSTREAMER_WEBRTC)
-    RefPtr<WebCore::GStreamerIceBackend> createGStreamerIceBackend() final { return nullptr; }
+    RefPtr<WebCore::GStreamerIceBackend> createGStreamerIceBackend(WebCore::GStreamerIceBackendClient&) final { return nullptr; }
 #endif
 };
 

@@ -22,11 +22,13 @@
 #if USE(GSTREAMER_WEBRTC)
 
 #include <glib-object.h>
+#include <gst/webrtc/webrtc_fwd.h>
 #include <wtf/Forward.h>
+#include <wtf/Function.h>
 #include <wtf/Identified.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/ObjectIdentifier.h>
-#include <gst/webrtc/webrtc_fwd.h>
+#include <wtf/RefCounted.h>
 
 typedef struct _WebKitGstIceAgent WebKitGstIceAgent;
 typedef struct _WebKitGstIceAgentClass WebKitGstIceAgentClass;
@@ -36,6 +38,23 @@ class ScriptExecutionContext;
 class SocketProvider;
 class GStreamerIce;
 using GStreamerIceBackendIdentifier = AtomicObjectIdentifier<GStreamerIce>;
+
+class GStreamerIceBackendClient : public RefCounted<GStreamerIceBackendClient> {
+    WTF_MAKE_NONCOPYABLE(GStreamerIceBackendClient);
+public:
+    static Ref<GStreamerIceBackendClient> create() { return adoptRef(*new GStreamerIceBackendClient); }
+    void ref() const { RefCounted::ref(); }
+    void deref() const { RefCounted::deref(); }
+
+    using OnIceCandidateCallback = Function<void(unsigned, const String&)>;
+    void setOnIceCandidateCallback(OnIceCandidateCallback&& callback) { m_onIceCandidateCallback = WTFMove(callback); }
+    void notifyIceCandidate(unsigned sessionId, const String& candidate) { m_onIceCandidateCallback(sessionId, candidate); }
+
+private:
+    GStreamerIceBackendClient() = default;
+
+    OnIceCandidateCallback m_onIceCandidateCallback;
+};
 
 class GStreamerIceBackend : public Identified<GStreamerIceBackendIdentifier> {
     WTF_MAKE_NONCOPYABLE(GStreamerIceBackend);

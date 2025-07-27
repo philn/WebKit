@@ -11,18 +11,19 @@
 namespace WebKit {
 using namespace WebCore;
 
-Ref<GStreamerIceBackendProxy> GStreamerIceBackendProxy::create(WebPageProxyIdentifier webPageProxyID)
+Ref<GStreamerIceBackendProxy> GStreamerIceBackendProxy::create(WebPageProxyIdentifier webPageProxyID, WebCore::GStreamerIceBackendClient& client)
 {
     Ref connection = WebProcess::singleton().ensureNetworkProcessConnection().connection();
     auto sendResult = connection->sendSync(Messages::NetworkConnectionToWebProcess::InitializeGStreamerIceBackend(webPageProxyID), 0);
     auto [identifier] = sendResult.takeReply();
-    return adoptRef(*new GStreamerIceBackendProxy(WTFMove(connection), webPageProxyID, *identifier));
+    return adoptRef(*new GStreamerIceBackendProxy(WTFMove(connection), webPageProxyID, *identifier, client));
 }
 
-GStreamerIceBackendProxy::GStreamerIceBackendProxy(Ref<IPC::Connection>&& connection, WebPageProxyIdentifier webPageProxyID, GStreamerIceBackendIdentifier identifier)
+GStreamerIceBackendProxy::GStreamerIceBackendProxy(Ref<IPC::Connection>&& connection, WebPageProxyIdentifier webPageProxyID, GStreamerIceBackendIdentifier identifier, WebCore::GStreamerIceBackendClient& client)
     : GStreamerIceBackend()
     , m_connection(WTFMove(connection))
     , m_webPageProxyID(webPageProxyID)
+    , m_client(&client)
     , m_identifier(identifier)
 {
     gst_printerrln("woo %s line %d pid=%d id=%zu", __FILE__, __LINE__, getpid(), messageSenderDestinationID());
@@ -80,6 +81,11 @@ bool GStreamerIceBackendProxy::gatherCandidatesForStream(unsigned streamId)
 void GStreamerIceBackendProxy::setIsController(bool isController)
 {
     MessageSender::send(Messages::GStreamerIceBackend::SetIsController { isController });
+}
+
+void GStreamerIceBackendProxy::notifyNewCandidate(unsigned sessionId, String&& candidate)
+{
+    m_client->notifyIceCandidate(sessionId, candidate);
 }
 
 } // namespace WebKit

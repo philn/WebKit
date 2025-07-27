@@ -23,6 +23,8 @@
     DispatchedTo=WebContent
 ]
 messages -> GStreamerIceBackendProxy {
+
+    NotifyNewCandidate(unsigned sessionId, String candidate);
 }
 
 #endif

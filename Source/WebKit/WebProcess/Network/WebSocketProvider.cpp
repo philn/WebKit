@@ -82,9 +82,9 @@ Ref<WebCore::WebTransportSessionPromise> WebSocketProvider::initializeWebTranspo
 }
 
 #if USE(GSTREAMER_WEBRTC)
-RefPtr<WebCore::GStreamerIceBackend> WebSocketProvider::createGStreamerIceBackend()
+RefPtr<WebCore::GStreamerIceBackend> WebSocketProvider::createGStreamerIceBackend(WebCore::GStreamerIceBackendClient& client)
 {
-    return WebKit::GStreamerIceBackendProxy::create(m_webPageProxyID);
+    return WebKit::GStreamerIceBackendProxy::create(m_webPageProxyID, client);
 }
 #endif
 

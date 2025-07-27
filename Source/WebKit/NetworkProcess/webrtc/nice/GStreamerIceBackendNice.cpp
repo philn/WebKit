@@ -3,6 +3,10 @@
 #include "GStreamerIceBackendNice.h"
 
 #if USE(GSTREAMER_WEBRTC) && USE(LIBNICE)
+
+#include "GStreamerIceBackendProxyMessages.h"
+#include "NetworkConnectionToWebProcessMessages.h"
+#include "NetworkProcessConnection.h"
 #include <nice.h>
 #include <wtf/CompletionHandler.h>
 
@@ -34,14 +38,51 @@ GStreamerIceBackendNice::GStreamerIceBackendNice()
 
     auto options = static_cast<NiceAgentOption>(NICE_AGENT_OPTION_ICE_TRICKLE | NICE_AGENT_OPTION_REGULAR_NOMINATION | NICE_AGENT_OPTION_CONSENT_FRESHNESS);
     m_agent = adoptGRef(nice_agent_new_full(m_mainContext.get(), NICE_COMPATIBILITY_RFC5245, options));
-    g_signal_connect(m_agent.get(), "new-candidate-full", G_CALLBACK(+[](NiceAgent*, NiceCandidate*, gpointer) {
-
+    g_signal_connect(m_agent.get(), "new-candidate-full", G_CALLBACK(+[](NiceAgent*, NiceCandidate* candidate, gpointer userData) {
+        auto self = reinterpret_cast<GStreamerIceBackendNice*>(userData);
+        self->notifyNewCandidate(*candidate);
     }), this);
 }
 
 GStreamerIceBackendNice::~GStreamerIceBackendNice()
 {
     g_signal_handlers_disconnect_by_data(m_agent.get(), this);
+}
+
+void GStreamerIceBackendNice::notifyNewCandidate(const NiceCandidate& candidate)
+{
+    std::optional<unsigned> sessionId;
+    for (const auto& stream : m_streams) {
+        if (stream.streamId == candidate.stream_id) {
+            sessionId = stream.sessionId;
+            break;
+        }
+    }
+    if (!sessionId) [[unlikely]]
+        return;
+
+    GUniqueOutPtr<NiceCandidate> filledCandidate;
+    fillLocalCandidateCredentials(candidate, filledCandidate);
+
+    GUniquePtr<char> sdp(nice_agent_generate_local_candidate_sdp(m_agent.get(), filledCandidate.get()));
+    connection()->send(Messages::GStreamerIceBackendProxy::NotifyNewCandidate { *sessionId, String::fromUTF8(sdp.get()) }, 0);
+}
+
+void GStreamerIceBackendNice::fillLocalCandidateCredentials(const NiceCandidate& candidate, GUniqueOutPtr<NiceCandidate>& result)
+{
+    result.outPtr() = nice_candidate_copy(&candidate);
+    if (candidate.username && candidate.password)
+        return;
+
+    GUniqueOutPtr<char> ufrag;
+    GUniqueOutPtr<char> password;
+    auto gotCredentials = nice_agent_get_local_credentials(m_agent.get(), candidate.stream_id, &ufrag.outPtr(), &password.outPtr());
+    ASSERT(gotCredentials);
+
+    if (!candidate.username)
+        result->username = ufrag.release();
+    if (!candidate.password)
+        result->password = password.release();
 }
 
 void GStreamerIceBackendNice::setForceRelay(bool forceRelay)
@@ -68,6 +109,7 @@ void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<vo
         return;
     }
 
+    m_streams.append({ sessionId, streamId });
     completionHandler({ streamId });
 }
 

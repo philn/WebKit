@@ -40,6 +40,7 @@ class WebTransportSessionClient;
 
 #if USE(GSTREAMER_WEBRTC)
 class GStreamerIceBackend;
+class GStreamerIceBackendClient;
 #endif
 
 using WebTransportSessionPromise = NativePromise<Ref<WebTransportSession>, void>;
@@ -50,7 +51,7 @@ public:
     virtual Ref<WebTransportSessionPromise> initializeWebTransportSession(ScriptExecutionContext&, WebTransportSessionClient&, const URL&) = 0;
 
 #if USE(GSTREAMER_WEBRTC)
-    virtual RefPtr<GStreamerIceBackend> createGStreamerIceBackend() = 0;
+    virtual RefPtr<GStreamerIceBackend> createGStreamerIceBackend(GStreamerIceBackendClient&) = 0;
 #endif
 
     virtual ~SocketProvider() { };

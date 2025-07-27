@@ -4,6 +4,7 @@
 #if USE(GSTREAMER_WEBRTC) && USE(LIBNICE)
 
 #include "GRefPtrNice.h"
+#include "GUniquePtrNice.h"
 #include <wtf/Condition.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
@@ -31,6 +32,10 @@ public:
 
 private:
     virtual IPC::Connection* connection() const = 0;
+
+    void notifyNewCandidate(const NiceCandidate&);
+
+    void fillLocalCandidateCredentials(const NiceCandidate&, GUniqueOutPtr<NiceCandidate>&);
 
     GRefPtr<NiceAgent> m_agent;
 

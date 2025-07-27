@@ -28,6 +28,7 @@
 #include "SocketProvider.h"
 #include <gst/webrtc/ice.h>
 #include <gst/webrtc/webrtc.h>
+#include <wtf/glib/GThreadSafeWeakPtr.h>
 #include <wtf/glib/WTFGType.h>
 #include <wtf/text/WTFString.h>
 
@@ -35,6 +36,12 @@ using namespace WTF;
 using namespace WebCore;
 
 typedef struct _WebKitGstIceAgentPrivate {
+    RefPtr<GStreamerIceBackendClient> backendClient;
+
+    GstWebRTCICEOnCandidateFunc onCandidate;
+    gpointer onCandidateData;
+    GDestroyNotify onCandidateNotify;
+
     RefPtr<SocketProvider> socketProvider;
     RefPtr<GStreamerIceBackend> iceBackend;
     HashMap<unsigned, GRefPtr<GstWebRTCICEStream>> streams;
@@ -56,12 +63,22 @@ GST_DEBUG_CATEGORY(webkit_webrtc_ice_agent_debug);
 
 WEBKIT_DEFINE_TYPE_WITH_CODE(WebKitGstIceAgent, webkit_gst_webrtc_ice_backend, GST_TYPE_WEBRTC_ICE, GST_DEBUG_CATEGORY_INIT(webkit_webrtc_ice_agent_debug, "webkitwebrtciceagent", 0, "WebRTC ICE agent"))
 
-static void webkitGstWebRTCIceAgentSetOnIceCandidate(GstWebRTCICE* ice,
-    GstWebRTCICEOnCandidateFunc func,
-    gpointer user_data,
-    GDestroyNotify notify)
+static void webkitGstWebRTCIceAgentSetOnIceCandidate(GstWebRTCICE* ice, GstWebRTCICEOnCandidateFunc callback, gpointer userData, GDestroyNotify notifyCallback)
 {
-    // TODO
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    auto priv = backend->priv;
+    if (priv->onCandidateNotify)
+        priv->onCandidateNotify(priv->onCandidateData);
+    priv->onCandidateNotify = notifyCallback;
+    priv->onCandidateData = userData;
+    priv->onCandidate = callback;
+    priv->backendClient->setOnIceCandidateCallback([ice = GThreadSafeWeakPtr(ice)](unsigned sessionId, const String& candidate) mutable {
+        auto self = ice.get();
+        if (!self)
+            return;
+        auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(self.get());
+        backend->priv->onCandidate(self.get(), sessionId, candidate.utf8().data(), backend->priv->onCandidateData);
+    });
 }
 
 static void webkitGstWebRTCIceAgentSetForceRelay(GstWebRTCICE* ice, gboolean forceRelay)
@@ -147,12 +164,20 @@ GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent*
 
 static void webkitGstWebRTCIceAgentFinalize(GObject* object)
 {
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(object);
+    if (backend->priv->onCandidateNotify)
+        backend->priv->onCandidateNotify(backend->priv->onCandidateData);
+
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_backend_parent_class)->finalize(object);
 }
 
 static void webkitGstWebRTCIceAgentConstructed(GObject* object)
 {
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_backend_parent_class)->constructed(object);
+
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(object);
+    backend->priv->backendClient = GStreamerIceBackendClient::create();
+    backend->priv->iceBackend = backend->priv->socketProvider->createGStreamerIceBackend(*backend->priv->backendClient);
 }
 
 static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* klass)
@@ -177,12 +202,12 @@ WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(const String& name, ScriptExecu
     if (!context)
         return nullptr;
 
+    // TODO: this might need to become a construct-only property.
     RefPtr socketProvider = context->socketProvider();
     if (!socketProvider)
         return nullptr;
 
     auto backend = reinterpret_cast<WebKitGstIceAgent*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND, "name", name.ascii().data(), nullptr));
-    backend->priv->iceBackend = socketProvider->createGStreamerIceBackend();
     backend->priv->socketProvider = WTFMove(socketProvider);
     return backend;
 }

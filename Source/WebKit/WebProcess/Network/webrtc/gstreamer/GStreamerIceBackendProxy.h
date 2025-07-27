@@ -24,7 +24,7 @@ using GStreamerIceBackendIdentifier = ObjectIdentifier<GStreamerIceBackendIdenti
 
 class GStreamerIceBackendProxy : public IPC::MessageSender, public IPC::MessageReceiver, public WebCore::GStreamerIceBackend, public RefCounted<GStreamerIceBackendProxy> {
 public:
-    static Ref<GStreamerIceBackendProxy> create(WebPageProxyIdentifier);
+    static Ref<GStreamerIceBackendProxy> create(WebPageProxyIdentifier, WebCore::GStreamerIceBackendClient&);
     ~GStreamerIceBackendProxy();
 
     void ref() const final { RefCounted::ref(); }
@@ -36,17 +36,21 @@ public:
     using RefCounted<GStreamerIceBackendProxy>::deref;
 
 private:
-    GStreamerIceBackendProxy(Ref<IPC::Connection>&&, WebPageProxyIdentifier, GStreamerIceBackendIdentifier);
+    GStreamerIceBackendProxy(Ref<IPC::Connection>&&, WebPageProxyIdentifier, GStreamerIceBackendIdentifier, WebCore::GStreamerIceBackendClient&);
 
-    // GStreamerIceBackend
+    // GStreamerIceBackend (Web -> Network)
     void setForceRelay(bool) final;
     void setStunServer(const String&) final;
     void addTurnServer(const String&) final;
     std::optional<unsigned> addStream(unsigned) final;
     bool gatherCandidatesForStream(unsigned) final;
     void setIsController(bool) final;
+
     void refGStreamerIceBackend() final { ref(); }
     void derefGStreamerIceBackend() final { deref(); }
+
+    // GStreamerIceBackendClient (Network -> Web)
+    void notifyNewCandidate(unsigned, String&&);
 
     // MessageSender
     IPC::Connection *messageSenderConnection() const final;
@@ -54,6 +58,7 @@ private:
 
     const Ref<IPC::Connection> m_connection;
     WebPageProxyIdentifier m_webPageProxyID;
+    RefPtr<WebCore::GStreamerIceBackendClient> m_client;
     const GStreamerIceBackendIdentifier m_identifier;
 };
 

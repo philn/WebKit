@@ -38,7 +38,7 @@ private:
     Ref<WebCore::WebTransportSessionPromise> initializeWebTransportSession(WebCore::ScriptExecutionContext&, WebCore::WebTransportSessionClient&, const URL&) final;
 
 #if USE(GSTREAMER_WEBRTC)
-    RefPtr<WebCore::GStreamerIceBackend> createGStreamerIceBackend() final;
+    RefPtr<WebCore::GStreamerIceBackend> createGStreamerIceBackend(WebCore::GStreamerIceBackendClient&) final;
 #endif
 
     explicit WebSocketProvider(WebPageProxyIdentifier webPageProxyID)
