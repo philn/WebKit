@@ -21,9 +21,10 @@
 
 #if USE(GSTREAMER_WEBRTC)
 
-#include "ExceptionOr.h"
+#include "ExceptionData.h"
 #include <glib-object.h>
 #include <gst/webrtc/webrtc_fwd.h>
+#include <wtf/Expected.h>
 #include <wtf/Forward.h>
 #include <wtf/Function.h>
 #include <wtf/Identified.h>
@@ -65,7 +66,7 @@ public:
 
     virtual void setForceRelay(bool) = 0;
     virtual void setStunServer(const String&) = 0;
-    virtual void addTurnServer(const String&) = 0;
+    virtual Expected<bool, ExceptionData> addTurnServer(const String&) = 0;
     virtual void setIsController(bool) = 0;
 
     using AddCandidateCallback = CompletionHandler<void(ExceptionOr<bool>&&)>;

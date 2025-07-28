@@ -41,7 +41,7 @@ private:
     // GStreamerIceBackend (Web -> Network)
     void setForceRelay(bool) final;
     void setStunServer(const String&) final;
-    void addTurnServer(const String&) final;
+    Expected<bool, WebCore::ExceptionData> addTurnServer(const String&) final;
     std::optional<unsigned> addStream(unsigned) final;
     bool gatherCandidatesForStream(unsigned) final;
     void setIsController(bool) final;

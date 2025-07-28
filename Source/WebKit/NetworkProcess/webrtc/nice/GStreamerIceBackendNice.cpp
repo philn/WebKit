@@ -97,21 +97,23 @@ void GStreamerIceBackendNice::setStunServer(const String& uri)
     m_stunServer = uri;
 }
 
-void GStreamerIceBackendNice::addTurnServer(const String& uri)
+void GStreamerIceBackendNice::addTurnServer(const String& uri, CompletionHandler<void(Expected<bool, WebCore::ExceptionData>&&)>&& completionHandler)
 {
-    // TODO: bubble-up errors
     auto validationResult = validateTurnServerURL(uri);
     if (!validationResult.has_value()) {
-        g_printerr("Error validating TURN URI: %s\n", validationResult.error().data.utf8().data());
+        completionHandler(makeUnexpected(ExceptionData { ExceptionCode::DataError, makeString("Error validating TURN URI: "_s, validationResult.error().data) }));
         return;
     }
     auto url = *validationResult;
     auto wasAdded = m_turnServers.add(url).isNewEntry;
-    if (!wasAdded)
+    if (!wasAdded) {
+        completionHandler(false);
         return;
+    }
 
     for (const auto& item : m_streams)
         addTurnServerForStream(item.streamId, url);
+    completionHandler(true);
 }
 
 void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<void(std::optional<unsigned>)>&& completionHandler)

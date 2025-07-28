@@ -25,7 +25,7 @@
 messages -> GStreamerIceBackend {
     SetForceRelay(bool forceRelay);
     SetStunServer(String uri);
-    AddTurnServer(String uri);
+    AddTurnServer(String uri) -> (Expected<bool, WebCore::ExceptionData> result) Synchronous
     AddStream(unsigned sessionId) -> (std::optional<unsigned> streamId) Synchronous
     GatherCandidatesForStream(unsigned streamId) -> (bool result) Synchronous
     SetIsController(bool isController);

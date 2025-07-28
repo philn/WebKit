@@ -113,8 +113,16 @@ static gboolean webkitGstWebRTCIceAgentAddTurnServer(GstWebRTCICE* ice, const gc
     if (!backend->priv->iceBackend)
         return FALSE;
 
-    backend->priv->iceBackend->addTurnServer(String::fromUTF8(uri));
-    return TRUE;
+    auto result = backend->priv->iceBackend->addTurnServer(String::fromUTF8(uri));
+    if (!result.has_value()) {
+        GST_ERROR_OBJECT(ice, "%s", result.error().message.utf8().data());
+        return FALSE;
+    }
+
+    bool wasAdded = *result;
+    if (!wasAdded)
+        GST_WARNING_OBJECT(ice, "%s was already registered, no need to add it again", uri);
+    return wasAdded;
 }
 
 static GstWebRTCICEStream* webkitGstWebRTCIceAgentAddStream(GstWebRTCICE* ice, guint sessionId)

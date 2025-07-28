@@ -4,6 +4,7 @@
 
 #if USE(GSTREAMER_WEBRTC)
 
+#include <WebCore/ExceptionOr.h>
 #include "NetworkConnectionToWebProcessMessages.h"
 #include "NetworkProcessConnection.h"
 #include "GStreamerIceBackendMessages.h"
@@ -54,9 +55,11 @@ void GStreamerIceBackendProxy::setStunServer(const String& uri)
     MessageSender::send(Messages::GStreamerIceBackend::SetStunServer { uri });
 }
 
-void GStreamerIceBackendProxy::addTurnServer(const String& uri)
+Expected<bool, ExceptionData> GStreamerIceBackendProxy::addTurnServer(const String& uri)
 {
-    MessageSender::send(Messages::GStreamerIceBackend::AddTurnServer { uri });
+    auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::AddTurnServer { uri }, messageSenderDestinationID());
+    auto [reply] = sendResult.takeReply();
+    return reply;
 }
 
 std::optional<unsigned> GStreamerIceBackendProxy::addStream(unsigned sessionId)
