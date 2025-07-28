@@ -52,10 +52,15 @@ public:
     void setOnIceCandidateCallback(OnIceCandidateCallback&& callback) { m_onIceCandidateCallback = WTFMove(callback); }
     void notifyIceCandidate(unsigned sessionId, const String& candidate) { m_onIceCandidateCallback(sessionId, candidate); }
 
+    using OnStreamGatheringDone = Function<void(unsigned)>;
+    void setOnStreamGatheringDone(OnStreamGatheringDone&& callback) { m_onStreamGatheringDone = WTFMove(callback); }
+    void notifyGatheringDone(unsigned streamId) { m_onStreamGatheringDone(streamId); }
+
 private:
     GStreamerIceBackendClient() = default;
 
     OnIceCandidateCallback m_onIceCandidateCallback;
+    OnStreamGatheringDone m_onStreamGatheringDone;
 };
 
 class GStreamerIceBackend : public Identified<GStreamerIceBackendIdentifier> {

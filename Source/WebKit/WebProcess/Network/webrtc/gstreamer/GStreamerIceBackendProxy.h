@@ -52,6 +52,7 @@ private:
 
     // GStreamerIceBackendClient (Network -> Web)
     void notifyNewCandidate(unsigned, String&&);
+    void notifyGatheringDone(unsigned);
 
     // MessageSender
     IPC::Connection *messageSenderConnection() const final;

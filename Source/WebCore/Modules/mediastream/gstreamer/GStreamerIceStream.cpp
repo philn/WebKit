@@ -81,9 +81,25 @@ unsigned webkitiGstWebRTCIceStreamGetId(WebKitGstIceStream* ice)
     return stream->priv->streamId;
 }
 
+void webkitGstWebRTCIceStreamGatheringDone(WebKitGstIceStream* ice)
+{
+    auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);
+    if (stream->priv->rtpTransport)
+        gst_webrtc_ice_transport_gathering_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()), GST_WEBRTC_ICE_GATHERING_STATE_COMPLETE);
+    if (stream->priv->rtcpTransport)
+        gst_webrtc_ice_transport_gathering_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()), GST_WEBRTC_ICE_GATHERING_STATE_COMPLETE);
+}
+
 static gboolean webkitGstWebRTCIceStreamGatherCandidates(GstWebRTCICEStream* ice)
 {
     auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);
+
+    if (stream->priv->rtpTransport)
+        gst_webrtc_ice_transport_gathering_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()), GST_WEBRTC_ICE_GATHERING_STATE_GATHERING);
+
+    if (stream->priv->rtcpTransport)
+        gst_webrtc_ice_transport_gathering_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()), GST_WEBRTC_ICE_GATHERING_STATE_GATHERING);
+
     auto agent = stream->priv->agent.get();
     if (!agent)
         return FALSE;

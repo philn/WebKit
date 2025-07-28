@@ -27,7 +27,6 @@ GStreamerIceBackendProxy::GStreamerIceBackendProxy(Ref<IPC::Connection>&& connec
     , m_client(&client)
     , m_identifier(identifier)
 {
-    gst_printerrln("woo %s line %d pid=%d id=%zu", __FILE__, __LINE__, getpid(), messageSenderDestinationID());
 }
 
 GStreamerIceBackendProxy::~GStreamerIceBackendProxy()
@@ -102,6 +101,11 @@ void GStreamerIceBackendProxy::addCandidate(unsigned streamId, const String& can
 void GStreamerIceBackendProxy::notifyNewCandidate(unsigned sessionId, String&& candidate)
 {
     m_client->notifyIceCandidate(sessionId, candidate);
+}
+
+void GStreamerIceBackendProxy::notifyGatheringDone(unsigned streamId)
+{
+    m_client->notifyGatheringDone(streamId);
 }
 
 } // namespace WebKit

@@ -25,6 +25,7 @@
 messages -> GStreamerIceBackendProxy {
 
     NotifyNewCandidate(unsigned sessionId, String candidate);
+    NotifyGatheringDone(unsigned streamId);
 }
 
 #endif

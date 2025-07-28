@@ -201,8 +201,15 @@ static void webkitGstWebRTCIceAgentConstructed(GObject* object)
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_backend_parent_class)->constructed(object);
 
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(object);
-    backend->priv->backendClient = GStreamerIceBackendClient::create();
-    backend->priv->iceBackend = backend->priv->socketProvider->createGStreamerIceBackend(*backend->priv->backendClient);
+    auto priv = backend->priv;
+    priv->backendClient = GStreamerIceBackendClient::create();
+    priv->iceBackend = priv->socketProvider->createGStreamerIceBackend(*priv->backendClient);
+    priv->backendClient->setOnStreamGatheringDone([&](unsigned streamId) {
+        auto stream = priv->streams.getOptional(streamId);
+        if (!stream)
+            return;
+        webkitGstWebRTCIceStreamGatheringDone(WEBKIT_GST_WEBRTC_ICE_STREAM(stream->get()));
+    });
 }
 
 static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* klass)

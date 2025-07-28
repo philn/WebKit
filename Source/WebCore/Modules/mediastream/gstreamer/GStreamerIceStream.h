@@ -40,5 +40,6 @@ GType webkit_gst_webrtc_ice_stream_get_type();
 WebKitGstIceStream* webkitGstWebRTCCreateIceStream(WebKitGstIceAgent*, unsigned);
 
 unsigned webkitiGstWebRTCIceStreamGetId(WebKitGstIceStream*);
+void webkitGstWebRTCIceStreamGatheringDone(WebKitGstIceStream*);
 
 #endif // USE(GSTREAMER_WEBRTC)

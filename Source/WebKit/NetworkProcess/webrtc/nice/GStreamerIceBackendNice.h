@@ -42,6 +42,7 @@ private:
     virtual IPC::Connection* connection() const = 0;
 
     void notifyNewCandidate(const NiceCandidate&);
+    void notifyGatheringDone(unsigned);
 
     void fillLocalCandidateCredentials(const NiceCandidate&, GUniqueOutPtr<NiceCandidate>&);
 

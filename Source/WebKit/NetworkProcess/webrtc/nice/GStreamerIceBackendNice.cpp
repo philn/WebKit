@@ -44,6 +44,10 @@ GStreamerIceBackendNice::GStreamerIceBackendNice()
         auto self = reinterpret_cast<GStreamerIceBackendNice*>(userData);
         self->notifyNewCandidate(*candidate);
     }), this);
+    g_signal_connect(m_agent.get(), "candidate-gathering-done", G_CALLBACK(+[](NiceAgent*, unsigned streamId, gpointer userData) {
+        auto self = reinterpret_cast<GStreamerIceBackendNice*>(userData);
+        self->notifyGatheringDone(streamId);
+    }), this);
 }
 
 GStreamerIceBackendNice::~GStreamerIceBackendNice()
@@ -68,6 +72,11 @@ void GStreamerIceBackendNice::notifyNewCandidate(const NiceCandidate& candidate)
 
     GUniquePtr<char> sdp(nice_agent_generate_local_candidate_sdp(m_agent.get(), filledCandidate.get()));
     connection()->send(Messages::GStreamerIceBackendProxy::NotifyNewCandidate { *sessionId, String::fromUTF8(sdp.get()) }, 0);
+}
+
+void GStreamerIceBackendNice::notifyGatheringDone(unsigned streamId)
+{
+    connection()->send(Messages::GStreamerIceBackendProxy::NotifyGatheringDone { streamId }, 0);
 }
 
 void GStreamerIceBackendNice::fillLocalCandidateCredentials(const NiceCandidate& candidate, GUniqueOutPtr<NiceCandidate>& result)
@@ -140,7 +149,6 @@ void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<vo
 
 void GStreamerIceBackendNice::gatherCandidatesForStream(unsigned streamId, CompletionHandler<void(bool)>&& completionHandler)
 {
-    // TODO: Implement as in gst_webrtc_nice_stream_gather_candidates
 
     if (!nice_agent_gather_candidates(m_agent.get(), streamId)) {
         completionHandler(false);
