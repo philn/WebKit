@@ -425,7 +425,7 @@ std::tuple<GRefPtr<GstCaps>, StreamType, FloatSize> AppendPipeline::parseDemuxer
 
     auto originalMediaType = capsMediaType(demuxerSrcPadCaps);
     auto& gstRegistryScanner = GStreamerRegistryScannerMSE::singleton();
-    if (doCapsHaveType(demuxerSrcPadCaps, GST_TEXT_CAPS_TYPE_PREFIX) || originalMediaType == "application/x-subtitle-vtt"_s || originalMediaType == "closedcaption/x-cea-608") {
+    if (doCapsHaveType(demuxerSrcPadCaps, GST_TEXT_CAPS_TYPE_PREFIX) || originalMediaType == "application/x-subtitle-vtt"_s || originalMediaType == "closedcaption/x-cea-608"_s) {
         streamType = StreamType::Text;
     } else if (!gstRegistryScanner.isCodecSupported(GStreamerRegistryScanner::Configuration::Decoding, originalMediaType.toString())) {
         streamType = StreamType::Invalid;
@@ -467,6 +467,15 @@ void AppendPipeline::appsinkCapsChanged(Track& track)
         m_sourceBufferPrivate.appendParsingFailed();
         return;
     }
+//     if (track.finalCaps && currentMediaTypeView != trackMediaTypeView) {
+// #ifndef GST_DISABLE_GST_DEBUG
+//         auto currentMediaType = currentMediaTypeView.utf8();
+//         auto trackMediaType = trackMediaTypeView.utf8();
+//         GST_WARNING_OBJECT(pipeline(), "Track received incompatible caps, received '%s' for a track previously handling '%s'. Erroring out.", currentMediaType.data(), trackMediaType.data());
+// #endif
+//         m_sourceBufferPrivate.appendParsingFailed();
+//         return;
+//     }
 
     if (doCapsHaveType(caps.get(), GST_VIDEO_CAPS_TYPE_PREFIX)) {
         if (auto size = getVideoResolutionFromCaps(caps.get()))
@@ -899,7 +908,15 @@ GRefPtr<GstElement> createOptionalParserForFormat([[maybe_unused]] GstBin* bin, 
         // Used in converting cea-608 to WebVTT.
         // qtdemux pushes captions in format: s334-1a, while cea608tott expects format: raw.
         elementClass = "ccconverter"_s;
-    }
+    } else if (mediaType == "video/x-h265"_s)
+        elementClass = "h265parse"_s;
+    // else if (mediaType == "closedcaption/x-cea-608"_s) {
+    //     auto format = gstStructureGetString(structure, "format"_s);
+    //     if (format == "s334-1a"_s)
+    //         elementClass = "ccconverter"_s;
+    // } 
+    else if (mediaType == "audio/x-eac3"_s)
+        elementClass = "ac3parse"_s;
 
     GST_DEBUG_OBJECT(bin, "Creating %s parser for stream with caps %" GST_PTR_FORMAT, elementClass.characters(), caps);
     GRefPtr<GstElement> result(makeGStreamerElement(elementClass, parserName));
@@ -923,7 +940,7 @@ GRefPtr<GstElement> createOptionalEncoderForFormat([[maybe_unused]] GstBin* bin,
     //   - SouceBuffer timestampOffset   (Media Source Extensions, 5.1 Attributes)
     if (mediaType == "text/x-raw"_s)
         elementClass = "webvttenc"_s;
-    else if (mediaType == "closedcaption/x-cea-608")
+    else if (mediaType == "closedcaption/x-cea-608"_s)
         elementClass = "cea608tott"_s;
 
     GST_DEBUG_OBJECT(bin, "Creating %s encoder for stream with caps %" GST_PTR_FORMAT, elementClass.characters(), caps);
