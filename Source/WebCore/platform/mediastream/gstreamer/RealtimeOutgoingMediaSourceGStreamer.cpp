@@ -282,9 +282,12 @@ void RealtimeOutgoingMediaSourceGStreamer::setSinkPad(GRefPtr<GstPad>&& pad)
 
     g_object_get(m_webrtcSinkPad.get(), "transceiver", &m_transceiver.outPtr(), nullptr);
 
-    g_signal_connect_swapped(m_transceiver.get(), "notify::codec-preferences", G_CALLBACK(+[](RealtimeOutgoingMediaSourceGStreamer* source) {
-        source->codecPreferencesChanged();
-    }), this);
+    auto rtpCaps = this->rtpCaps();
+    g_object_set(m_transceiver.get(), "codec-preferences", rtpCaps.get(), nullptr);
+
+    // g_signal_connect_swapped(m_transceiver.get(), "notify::codec-preferences", G_CALLBACK(+[](RealtimeOutgoingMediaSourceGStreamer* source) {
+    //     source->codecPreferencesChanged();
+    // }), this);
     g_object_get(m_transceiver.get(), "sender", &m_sender.outPtr(), nullptr);
 
     checkMid();
@@ -325,6 +328,8 @@ void RealtimeOutgoingMediaSourceGStreamer::checkMid()
     auto newCaps = adoptGRef(gst_caps_new_full(structure.release(), nullptr));
     GST_DEBUG_OBJECT(m_bin.get(), "Setting RTP funnel caps to %" GST_PTR_FORMAT, newCaps.get());
     g_object_set(m_rtpCapsfilter.get(), "caps", newCaps.get(), nullptr);
+    if (m_transceiver)
+        g_object_set(m_transceiver.get(), "codec-preferences", newCaps.get(), nullptr);
 }
 
 GUniquePtr<GstStructure> RealtimeOutgoingMediaSourceGStreamer::parameters()
@@ -441,16 +446,22 @@ void RealtimeOutgoingMediaSourceGStreamer::setParameters(GUniquePtr<GstStructure
             continue;
 
         auto packetizer = getPacketizerForRid(rid);
-        if (!packetizer)
+        if (packetizer) {
+            packetizer->reconfigure(WTFMove(encodingParameters));
             continue;
+        }
 
-        packetizer->reconfigure(WTFMove(encodingParameters));
+        // TODO: create packetizer?
+        // GUniqueOutPtr<GstStructure> codecParameters;
+        // gst_structure_get(encodingParameters.get(), "codecs", GST_TYPE_STRUCTURE, &codecParameters.outPtr(), nullptr);
+        // packetizer = createPacketizer(m_ssrcGenerator, codecParameters, nullptr);
     }
     m_parameters = WTFMove(parameters);
 }
 
 RefPtr<GStreamerRTPPacketizer> RealtimeOutgoingMediaSourceGStreamer::getPacketizerForRid(StringView rid)
 {
+    GST_DEBUG_OBJECT(m_bin.get(), "Looking for packetizer with rid %s", rid.toStringWithoutCopying().ascii().data());
     for (auto& packetizer : m_packetizers) {
         if (packetizer->rtpStreamId() == rid)
             return packetizer;
@@ -546,6 +557,7 @@ bool RealtimeOutgoingMediaSourceGStreamer::configurePacketizers(GRefPtr<GstCaps>
     }
 
     auto structure = gst_caps_get_structure(rtpCaps.get(), 0);
+    auto rtpCaps2 = adoptGRef(gst_caps_new_empty());
 
     auto payloadType = gstStructureGet<int>(structure, "payload"_s);
     if (!payloadType) {
@@ -594,8 +606,11 @@ bool RealtimeOutgoingMediaSourceGStreamer::configurePacketizers(GRefPtr<GstCaps>
         gst_structure_set(structure, extensionIdentifier.ascii().data(), G_TYPE_STRING, GST_RTP_HDREXT_BASE "sdes:mid", nullptr);
     }
 
-    GST_DEBUG_OBJECT(m_bin.get(), "Setting RTP funnel caps to %" GST_PTR_FORMAT, rtpCaps.get());
-    g_object_set(m_rtpCapsfilter.get(), "caps", rtpCaps.get(), nullptr);
+    gst_caps_append_structure(rtpCaps2.get(), gst_structure_copy(structure));
+    GST_DEBUG_OBJECT(m_bin.get(), "Setting RTP funnel caps to %" GST_PTR_FORMAT, rtpCaps2.get());
+    g_object_set(m_rtpCapsfilter.get(), "caps", rtpCaps2.get(), nullptr);
+    if (m_transceiver)
+        g_object_set(m_transceiver.get(), "codec-preferences", rtpCaps2.get(), nullptr);
     return true;
 }
 

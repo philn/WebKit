@@ -127,7 +127,7 @@ RefPtr<GStreamerVideoRTPPacketizer> GStreamerVideoRTPPacketizer::create(RefPtr<U
     }
 
     // Align MTU with libwebrtc implementation, also helping to reduce packet fragmentation.
-    g_object_set(payloader.get(), "auto-header-extension", TRUE, "mtu", 1200, nullptr);
+    g_object_set(payloader.get(), "auto-header-extension", FALSE, "mtu", 1200, nullptr);
 
     auto payloadType = gstStructureGet<int>(codecParameters.get(), "payload"_s);
     if (!payloadType)
@@ -141,7 +141,8 @@ RefPtr<GStreamerVideoRTPPacketizer> GStreamerVideoRTPPacketizer::create(RefPtr<U
 
     auto ssrc = ssrcGenerator->generateSSRC();
     if (ssrc != std::numeric_limits<uint32_t>::max())
-        gst_structure_set(codecParameters.get(), "ssrc", G_TYPE_UINT, ssrc, nullptr);
+        g_object_set(payloader.get(), "ssrc", ssrc, nullptr);
+    //gst_structure_set(codecParameters.get(), "ssrc", G_TYPE_UINT, ssrc, nullptr);
 
     auto rtpCaps = adoptGRef(gst_caps_new_empty());
     gst_caps_append_structure(rtpCaps.get(), codecParameters.release());

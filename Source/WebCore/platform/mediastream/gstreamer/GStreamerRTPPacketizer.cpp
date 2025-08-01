@@ -101,9 +101,9 @@ void GStreamerRTPPacketizer::configureExtensions(const GRefPtr<GstCaps>& rtpCaps
     }
 
     // Invalidate rid and re-cache it from encoding parameters.
-    m_rid = emptyString();
+    // m_rid = emptyString();
     auto rid = rtpStreamId();
-    m_rid = rid;
+    // m_rid = rid;
 
     if (!m_ridExtension) {
         m_ridExtension = adoptGRef(gst_rtp_header_extension_create_from_uri(GST_RTP_HDREXT_BASE "sdes:rtp-stream-id"));
@@ -121,6 +121,7 @@ void GStreamerRTPPacketizer::configureExtensions(const GRefPtr<GstCaps>& rtpCaps
         g_signal_emit_by_name(m_payloader.get(), "add-extension", m_ridExtension.get());
     }
 
+    return;
     auto extension = adoptGRef(gst_rtp_header_extension_create_from_uri(GST_RTP_HDREXT_BASE "sdes:repaired-rtp-stream-id"));
     if (lookupResults.rtpRepairedStreamIdExtension)
         gst_rtp_header_extension_set_id(extension.get(), *lookupResults.rtpRepairedStreamIdExtension);

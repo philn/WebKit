@@ -652,10 +652,10 @@ GRefPtr<GstCaps> capsFromSDPMedia(const GstSDPMedia* media)
             }
 
             // Remove ssrc- attributes that end up being accumulated in fmtp SDP media parameters.
-            gstStructureFilterAndMapInPlace(structure, [&](auto id, auto) -> bool {
-                auto fieldId = gstIdToString(id);
-                return !fieldId.startsWith("ssrc-"_s);
-            });
+            // gstStructureFilterAndMapInPlace(structure, [&](auto id, auto) -> bool {
+            //     auto fieldId = gstIdToString(id);
+            //     return !fieldId.startsWith("ssrc-"_s);
+            // });
 
             // Remove unsupported RTP header extensions.
             gstStructureFilterAndMapInPlace(structure, [&](auto id, auto value) -> bool {
