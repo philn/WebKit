@@ -18,8 +18,10 @@
 
 #include "config.h"
 
-#include "GStreamerWebRTCCommon.h"
 #include "GStreamerCommon.h"
+#include "GStreamerWebRTCCommon.h"
+#include <gst/rtp/gstrtphdrext.h>
+#include <wtf/text/StringToIntegerConversion.h>
 
 GST_DEBUG_CATEGORY(webkit_webrtc_common_debug);
 #define GST_CAT_DEFAULT webkit_webrtc_common_debug
@@ -67,6 +69,42 @@ void gstPayloaderSetPayloadType(const GRefPtr<GstElement>& payloader, int pt)
         g_object_set(payloader.get(), "pt", ptValue, nullptr);
     }
 }
+
+ExtensionLookupResults lookupRtpExtensions(const GstStructure* structure)
+{
+    ExtensionLookupResults lookupResults;
+    gstStructureForeach(structure, [&](auto id, const auto value) -> bool {
+        auto name = gstIdToString(id);
+        if (!name.startsWith("extmap-"_s))
+            return true;
+
+        auto identifier = WTF::parseInteger<uint8_t>(name.substring(7)).value_or(0);
+        if (!identifier) [[unlikely]]
+            return true;
+
+        lookupResults.lastIdentifier = std::max(lookupResults.lastIdentifier, identifier);
+
+        StringView uri;
+        if (G_VALUE_HOLDS_STRING(value))
+            uri = StringView::fromLatin1(g_value_get_string(value));
+        else if (GST_VALUE_HOLDS_ARRAY(value)) {
+            const auto uriValue = gst_value_array_get_value(value, 1);
+            uri = StringView::fromLatin1(g_value_get_string(uriValue));
+        } else
+            return true;
+
+        if (uri == GST_RTP_HDREXT_BASE "sdes:rtp-stream-id"_s)
+            lookupResults.rtpStreamIdExtension = identifier;
+        if (uri == GST_RTP_HDREXT_BASE "sdes:repaired-rtp-stream-id"_s)
+            lookupResults.rtpRepairedStreamIdExtension = identifier;
+        if (uri == GST_RTP_HDREXT_BASE "sdes:mid"_s)
+            lookupResults.midExtension = identifier;
+
+        return true;
+    });
+    return lookupResults;
+}
+
 
 } // namespace WebCore
 

@@ -71,13 +71,15 @@ GStreamerRTPPacketizer::GStreamerRTPPacketizer(GRefPtr<GstElement>&& encoder, GR
 
 GStreamerRTPPacketizer::~GStreamerRTPPacketizer() = default;
 
-void GStreamerRTPPacketizer::configureExtensions()
+void GStreamerRTPPacketizer::configureExtensions(const GRefPtr<GstCaps>& rtpCaps)
 {
     if (!webkitGstCheckVersion(1, 24, 0)) {
         GST_WARNING_OBJECT(m_bin.get(), "GStreamer 1.24 is required for configuring extensions on the RTP payloaders. Simulcast will not work.");
         return;
     }
 
+    auto structure = gst_caps_get_structure(rtpCaps.get(), 0);
+    auto lookupResults = lookupRtpExtensions(structure);
     m_lastExtensionId = 0;
 
     GValue extensions = G_VALUE_INIT;
@@ -88,9 +90,13 @@ void GStreamerRTPPacketizer::configureExtensions()
 
     if (!m_midExtension) {
         m_midExtension = adoptGRef(gst_rtp_header_extension_create_from_uri(GST_RTP_HDREXT_BASE "sdes:mid"));
-        gst_rtp_header_extension_set_id(m_midExtension.get(), m_lastExtensionId);
-        GST_DEBUG_OBJECT(m_bin.get(), "Created mid extension %" GST_PTR_FORMAT, m_midExtension.get());
-        m_lastExtensionId++;
+        if (lookupResults.midExtension)
+            gst_rtp_header_extension_set_id(m_midExtension.get(), *lookupResults.midExtension);
+        else {
+            gst_rtp_header_extension_set_id(m_midExtension.get(), m_lastExtensionId);
+            GST_DEBUG_OBJECT(m_bin.get(), "Created mid extension %" GST_PTR_FORMAT " with ID %u", m_midExtension.get(), m_lastExtensionId);
+            m_lastExtensionId++;
+        }
         g_signal_emit_by_name(m_payloader.get(), "add-extension", m_midExtension.get());
     }
 
@@ -101,18 +107,32 @@ void GStreamerRTPPacketizer::configureExtensions()
 
     if (!m_ridExtension) {
         m_ridExtension = adoptGRef(gst_rtp_header_extension_create_from_uri(GST_RTP_HDREXT_BASE "sdes:rtp-stream-id"));
-        gst_rtp_header_extension_set_id(m_ridExtension.get(), m_lastExtensionId);
-        m_lastExtensionId++;
-        if (!rid.isEmpty())
+        if (lookupResults.rtpStreamIdExtension)
+            gst_rtp_header_extension_set_id(m_ridExtension.get(), *lookupResults.rtpStreamIdExtension);
+        else {
+            gst_rtp_header_extension_set_id(m_ridExtension.get(), m_lastExtensionId);
+            GST_DEBUG_OBJECT(m_bin.get(), "Created rid extension %" GST_PTR_FORMAT " with ID %u", m_ridExtension.get(), m_lastExtensionId);
+            m_lastExtensionId++;
+        }
+        if (!rid.isEmpty()) {
+            GST_DEBUG_OBJECT(m_bin.get(), "Setting rid on extension %" GST_PTR_FORMAT " to %s", m_ridExtension.get(), rid.utf8().data());
             g_object_set(m_ridExtension.get(), "rid", rid.utf8().data(), nullptr);
+        }
         g_signal_emit_by_name(m_payloader.get(), "add-extension", m_ridExtension.get());
     }
 
     auto extension = adoptGRef(gst_rtp_header_extension_create_from_uri(GST_RTP_HDREXT_BASE "sdes:repaired-rtp-stream-id"));
-    gst_rtp_header_extension_set_id(extension.get(), m_lastExtensionId);
-    m_lastExtensionId++;
-    if (!rid.isEmpty())
+    if (lookupResults.rtpRepairedStreamIdExtension)
+        gst_rtp_header_extension_set_id(extension.get(), *lookupResults.rtpRepairedStreamIdExtension);
+    else {
+        gst_rtp_header_extension_set_id(extension.get(), m_lastExtensionId);
+        GST_DEBUG_OBJECT(m_bin.get(), "Created repaired-rtp-stream-id extension %" GST_PTR_FORMAT " with ID %u", extension.get(), m_lastExtensionId);
+        m_lastExtensionId++;
+    }
+    if (!rid.isEmpty()) {
+        GST_DEBUG_OBJECT(m_bin.get(), "Setting rid on extension %" GST_PTR_FORMAT " to %s", extension.get(), rid.utf8().data());
         g_object_set(extension.get(), "rid", rid.utf8().data(), nullptr);
+    }
     g_signal_emit_by_name(m_payloader.get(), "add-extension", extension.get());
 }
 

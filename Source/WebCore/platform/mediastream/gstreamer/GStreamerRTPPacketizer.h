@@ -40,7 +40,7 @@ public:
 
     WARN_UNUSED_RETURN GUniquePtr<GstStructure> rtpParameters() const;
 
-    void configureExtensions();
+    void configureExtensions(const GRefPtr<GstCaps>&);
     void ensureMidExtension(const String&);
 
     String rtpStreamId() const;

@@ -22,8 +22,8 @@
 
 #if USE(GSTREAMER_WEBRTC)
 
-#include "GStreamerCommon.h"
 #include "GStreamerMediaStreamSource.h"
+#include "GStreamerWebRTCCommon.h"
 #include "MediaStreamTrack.h"
 
 #define GST_USE_UNSTABLE_API
@@ -33,7 +33,6 @@
 #include <wtf/UUID.h>
 #include <wtf/glib/WTFGType.h>
 #include <wtf/text/MakeString.h>
-#include <wtf/text/StringToIntegerConversion.h>
 
 GST_DEBUG_CATEGORY(webkit_webrtc_outgoing_media_debug);
 #define GST_CAT_DEFAULT webkit_webrtc_outgoing_media_debug
@@ -316,7 +315,7 @@ void RealtimeOutgoingMediaSourceGStreamer::checkMid()
 
     GUniquePtr<GstStructure> structure(gst_structure_copy(gst_caps_get_structure(rtpCaps.get(), 0)));
     auto lookupResults = lookupRtpExtensions(structure.get());
-    if (lookupResults.hasMidExtension)
+    if (lookupResults.midExtension)
         return;
 
     lookupResults.lastIdentifier++;
@@ -569,18 +568,18 @@ bool RealtimeOutgoingMediaSourceGStreamer::configurePacketizers(GRefPtr<GstCaps>
             simulcastBuilder.append(';');
         simulcastBuilder.append(rtpStreamId);
         gst_structure_set(structure, makeString("rid-"_s, rtpStreamId).ascii().data(), G_TYPE_STRING, direction.characters(), nullptr);
-        packetizer->configureExtensions();
+        packetizer->configureExtensions(rtpCaps);
         totalStreams++;
     }
 
     auto lookupResults = lookupRtpExtensions(structure);
     if (totalStreams) {
-        if (!lookupResults.hasRtpStreamIdExtension) {
+        if (!lookupResults.rtpStreamIdExtension) {
             lookupResults.lastIdentifier++;
             auto extensionIdentifier = makeString("extmap-"_s, lookupResults.lastIdentifier);
             gst_structure_set(structure, extensionIdentifier.ascii().data(), G_TYPE_STRING, GST_RTP_HDREXT_BASE "sdes:rtp-stream-id", nullptr);
         }
-        if (!lookupResults.hasRtpRepairedStreamIdExtension) {
+        if (!lookupResults.rtpRepairedStreamIdExtension) {
             lookupResults.lastIdentifier++;
             auto extensionIdentifier = makeString("extmap-"_s, lookupResults.lastIdentifier);
             gst_structure_set(structure, extensionIdentifier.ascii().data(), G_TYPE_STRING, GST_RTP_HDREXT_BASE "sdes:repaired-rtp-stream-id", nullptr);
@@ -589,7 +588,7 @@ bool RealtimeOutgoingMediaSourceGStreamer::configurePacketizers(GRefPtr<GstCaps>
         gst_structure_set(structure, "a-simulcast", G_TYPE_STRING, simulcastBuilder.toString().ascii().data(), nullptr);
         GST_DEBUG_OBJECT(m_bin.get(), "Simulcast parameters: %" GST_PTR_FORMAT, structure);
     }
-    if (!lookupResults.hasMidExtension) {
+    if (!lookupResults.midExtension) {
         lookupResults.lastIdentifier++;
         auto extensionIdentifier = makeString("extmap-"_s, lookupResults.lastIdentifier);
         gst_structure_set(structure, extensionIdentifier.ascii().data(), G_TYPE_STRING, GST_RTP_HDREXT_BASE "sdes:mid", nullptr);
@@ -598,41 +597,6 @@ bool RealtimeOutgoingMediaSourceGStreamer::configurePacketizers(GRefPtr<GstCaps>
     GST_DEBUG_OBJECT(m_bin.get(), "Setting RTP funnel caps to %" GST_PTR_FORMAT, rtpCaps.get());
     g_object_set(m_rtpCapsfilter.get(), "caps", rtpCaps.get(), nullptr);
     return true;
-}
-
-RealtimeOutgoingMediaSourceGStreamer::ExtensionLookupResults RealtimeOutgoingMediaSourceGStreamer::lookupRtpExtensions(const GstStructure* structure)
-{
-    ExtensionLookupResults lookupResults;
-    gstStructureForeach(structure, [&](auto id, const auto value) -> bool {
-        auto name = gstIdToString(id);
-        if (!name.startsWith("extmap-"_s))
-            return true;
-
-        auto identifier = WTF::parseInteger<int>(name.substring(7)).value_or(0);
-        if (!identifier) [[unlikely]]
-            return true;
-
-        lookupResults.lastIdentifier = std::max(lookupResults.lastIdentifier, identifier);
-
-        StringView uri;
-        if (G_VALUE_HOLDS_STRING(value))
-            uri = StringView::fromLatin1(g_value_get_string(value));
-        else if (GST_VALUE_HOLDS_ARRAY(value)) {
-            const auto uriValue = gst_value_array_get_value(value, 1);
-            uri = StringView::fromLatin1(g_value_get_string(uriValue));
-        } else
-            return true;
-
-        if (uri == GST_RTP_HDREXT_BASE "sdes:rtp-stream-id"_s)
-            lookupResults.hasRtpStreamIdExtension = true;
-        if (uri == GST_RTP_HDREXT_BASE "sdes:repaired-rtp-stream-id"_s)
-            lookupResults.hasRtpRepairedStreamIdExtension = true;
-        if (uri == GST_RTP_HDREXT_BASE "sdes:mid"_s)
-            lookupResults.hasMidExtension = true;
-
-        return true;
-    });
-    return lookupResults;
 }
 
 GUniquePtr<GstStructure> RealtimeOutgoingMediaSourceGStreamer::stats()

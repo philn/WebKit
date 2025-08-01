@@ -39,6 +39,18 @@ using WebRTCTrackData = struct _WebRTCTrackData {
 
 void gstPayloaderSetPayloadType(const GRefPtr<GstElement>&, int pt);
 
+using ExtensionID = std::optional<uint8_t>;
+struct ExtensionLookupResults {
+    ExtensionID rtpStreamIdExtension;
+    ExtensionID rtpRepairedStreamIdExtension;
+    ExtensionID midExtension;
+    // bool hasRtpStreamIdExtension { false };
+    // bool hasRtpRepairedStreamIdExtension { false };
+    // bool hasMidExtension { false };
+    uint8_t lastIdentifier { 0 };
+};
+ExtensionLookupResults lookupRtpExtensions(const GstStructure*);
+
 } // namespace WebCore
 
 #endif // USE(GSTREAMER_WEBRTC)

@@ -134,14 +134,6 @@ private:
 
     void checkMid();
 
-    struct ExtensionLookupResults {
-        bool hasRtpStreamIdExtension { false };
-        bool hasRtpRepairedStreamIdExtension { false };
-        bool hasMidExtension { false };
-        int lastIdentifier { 0 };
-    };
-    ExtensionLookupResults lookupRtpExtensions(const GstStructure*);
-
     void startUpdatingStats();
     void stopUpdatingStats();
 

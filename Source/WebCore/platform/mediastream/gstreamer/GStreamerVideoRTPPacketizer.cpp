@@ -162,24 +162,6 @@ GStreamerVideoRTPPacketizer::GStreamerVideoRTPPacketizer(GRefPtr<GstElement>&& e
     m_frameRateCapsFilter = makeGStreamerElement("capsfilter"_s);
     gst_bin_add_many(GST_BIN_CAST(m_bin.get()), m_videoRate.get(), m_frameRateCapsFilter.get(), nullptr);
 
-    auto lastIdentifier = findLastExtensionId(rtpCaps.get());
-    auto rtpStreamId = this->rtpStreamId();
-    if (!rtpStreamId.isEmpty()) {
-        GST_DEBUG_OBJECT(m_bin.get(), "Configuring rtp-stream-id extension for rid: %s", rtpStreamId.ascii().data());
-        auto extension = adoptGRef(gst_rtp_header_extension_create_from_uri(GST_RTP_HDREXT_BASE "sdes:rtp-stream-id"));
-        lastIdentifier++;
-        gst_rtp_header_extension_set_id(extension.get(), lastIdentifier);
-        g_object_set(extension.get(), "rid", rtpStreamId.ascii().data(), nullptr);
-        g_signal_emit_by_name(m_payloader.get(), "add-extension", extension.get());
-    }
-
-    auto extension = adoptGRef(gst_rtp_header_extension_create_from_uri(GST_RTP_HDREXT_BASE "sdes:mid"));
-    lastIdentifier++;
-    gst_rtp_header_extension_set_id(extension.get(), lastIdentifier);
-    g_signal_emit_by_name(m_payloader.get(), "add-extension", extension.get());
-
-    // TODO: Repaired stream-id extension?
-
     if (m_encodingParameters)
         configure(m_encodingParameters.get());
 
