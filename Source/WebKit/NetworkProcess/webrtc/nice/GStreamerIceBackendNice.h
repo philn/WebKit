@@ -39,6 +39,8 @@ public:
     void gatherCandidatesForStream(unsigned, CompletionHandler<void(bool)>&&);
     void setIsController(bool);
     void addCandidate(unsigned, const String&, CompletionHandler<void(Expected<bool, WebCore::ExceptionData>&&)>&&);
+    void setLocalCredentials(unsigned, const String&, const String&, CompletionHandler<void(bool)>&&);
+    void setRemoteCredentials(unsigned, const String&, const String&, CompletionHandler<void(bool)>&&);
 
 private:
     virtual IPC::Connection* connection() const = 0;
@@ -89,6 +91,12 @@ private:
     };
     Vector<StreamItem> m_streams;
     HashSet<URL> m_turnServers;
+
+    struct StreamCredentials {
+        String ufrag;
+        String pwd;
+    };
+    HashMap<unsigned, StreamCredentials> m_streamCredentials;
 };
 
 } // namespace WebKit

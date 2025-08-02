@@ -204,6 +204,20 @@ static void webkitGstWebRTCIceAgentSetTos(GstWebRTCICE* ice, GstWebRTCICEStream*
     backend->priv->iceBackend->setTos(streamId, tos);
 }
 
+static gboolean webkitGstWebRTCIceAgentSetLocalCredentials(GstWebRTCICE* ice, GstWebRTCICEStream* stream, const gchar* ufrag, const gchar* pwd)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    auto streamId = webkitiGstWebRTCIceStreamGetId(WEBKIT_GST_WEBRTC_ICE_STREAM(stream));
+    return backend->priv->iceBackend->setLocalCredentials(streamId, String::fromLatin1(ufrag), String::fromLatin1(pwd));
+}
+
+static gboolean webkitGstWebRTCIceAgentSetRemoteCredentials(GstWebRTCICE* ice, GstWebRTCICEStream* stream, const gchar* ufrag, const gchar* pwd)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    auto streamId = webkitiGstWebRTCIceStreamGetId(WEBKIT_GST_WEBRTC_ICE_STREAM(stream));
+    return backend->priv->iceBackend->setRemoteCredentials(streamId, String::fromLatin1(ufrag), String::fromLatin1(pwd));
+}
+
 static gboolean webkitGstWebRTCIceAgentGatherCandidates(GstWebRTCICE* ice, GstWebRTCICEStream* stream)
 {
     return webkitGstWebRTCIceAgentGatherCandidates(WEBKIT_GST_WEBRTC_ICE_BACKEND(ice), stream->stream_id);
@@ -271,11 +285,11 @@ static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* kla
     iceClass->get_turn_server = webkitGstWebRTCIceAgentGetTurnServer;
     iceClass->set_turn_server = webkitGstWebRTCIceAgentSetTurnServer;
     iceClass->set_tos = webkitGstWebRTCIceAgentSetTos;
+    iceClass->set_local_credentials = webkitGstWebRTCIceAgentSetLocalCredentials;
+    iceClass->set_remote_credentials = webkitGstWebRTCIceAgentSetRemoteCredentials;
     // TODO:
     // - set_http_proxy
     // - get_http_proxy
-    // - set_local_credentials
-    // - set_remote_credentials
     // - get_local_candidates
     // - get_remote_candidates
     // - get_selected_pair

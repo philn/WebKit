@@ -71,6 +71,20 @@ void GStreamerIceBackendProxy::setTos(unsigned streamId, unsigned tos)
     MessageSender::send(Messages::GStreamerIceBackend::SetTos { streamId, tos });
 }
 
+bool GStreamerIceBackendProxy::setLocalCredentials(unsigned streamId, const String& ufrag, const String& pwd)
+{
+    auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::SetLocalCredentials { streamId, ufrag, pwd }, messageSenderDestinationID());
+    auto [result] = sendResult.takeReply();
+    return result;
+}
+
+bool GStreamerIceBackendProxy::setRemoteCredentials(unsigned streamId, const String& ufrag, const String& pwd)
+{
+    auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::SetRemoteCredentials { streamId, ufrag, pwd }, messageSenderDestinationID());
+    auto [result] = sendResult.takeReply();
+    return result;
+}
+
 std::optional<unsigned> GStreamerIceBackendProxy::addStream(unsigned sessionId)
 {
     // Called from webrtcbin PC thread, and as this is a sync message it needs to be sent from the main thread.

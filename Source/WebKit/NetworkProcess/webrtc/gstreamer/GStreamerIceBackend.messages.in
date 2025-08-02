@@ -32,6 +32,8 @@ messages -> GStreamerIceBackend {
     SetIsController(bool isController);
     AddCandidate(unsigned streamId, String candidate) -> (Expected<bool, WebCore::ExceptionData> result)
     SetTos(unsigned streamId, unsigned tos);
+    SetLocalCredentials(unsigned streamId, String ufrag, String pwd) -> (bool result) Synchronous
+    SetRemoteCredentials(unsigned streamId, String ufrag, String pwd) -> (bool result) Synchronous
 }
 
 #endif

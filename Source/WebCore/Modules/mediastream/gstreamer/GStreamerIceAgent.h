@@ -75,6 +75,8 @@ public:
     virtual void setIsController(bool) = 0;
     virtual void setTurnServer(const String&) = 0;
     virtual void setTos(unsigned, unsigned) = 0;
+    virtual bool setLocalCredentials(unsigned, const String&, const String&) = 0;
+    virtual bool setRemoteCredentials(unsigned, const String&, const String&) = 0;
 
     using AddCandidateCallback = CompletionHandler<void(ExceptionOr<bool>&&)>;
     virtual void addCandidate(unsigned, const String&, AddCandidateCallback&&) = 0;

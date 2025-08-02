@@ -135,6 +135,19 @@ void GStreamerIceBackendNice::setTos(unsigned streamId, unsigned tos)
     nice_agent_set_stream_tos(m_agent.get(), streamId, tos);
 }
 
+void GStreamerIceBackendNice::setLocalCredentials(unsigned streamId, const String& ufrag, const String& pwd, CompletionHandler<void(bool)>&& completionHandler)
+{
+    bool result = nice_agent_set_local_credentials(m_agent.get(), streamId, ufrag.ascii().data(), pwd.ascii().data());
+    completionHandler(result);
+}
+
+void GStreamerIceBackendNice::setRemoteCredentials(unsigned streamId, const String& ufrag, const String& pwd, CompletionHandler<void(bool)>&& completionHandler)
+{
+    bool result = nice_agent_set_remote_credentials(m_agent.get(), streamId, ufrag.ascii().data(), pwd.ascii().data());
+    m_streamCredentials.add(streamId, StreamCredentials { ufrag, pwd });
+    completionHandler(result);
+}
+
 void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<void(std::optional<unsigned>)>&& completionHandler)
 {
     auto streamId = nice_agent_add_stream(m_agent.get(), 1);

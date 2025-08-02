@@ -47,6 +47,8 @@ private:
     void setIsController(bool) final;
     void setTurnServer(const String&) final;
     void setTos(unsigned, unsigned) final;
+    bool setLocalCredentials(unsigned, const String&, const String&) final;
+    bool setRemoteCredentials(unsigned, const String&, const String&) final;
 
     void addCandidate(unsigned, const String&, WebCore::GStreamerIceBackend::AddCandidateCallback&&) final;
 
