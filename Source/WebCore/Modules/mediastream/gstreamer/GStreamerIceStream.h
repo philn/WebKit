@@ -42,6 +42,6 @@ WebKitGstIceStream* webkitGstWebRTCCreateIceStream(WebKitGstIceAgent*, unsigned)
 
 unsigned webkitiGstWebRTCIceStreamGetId(WebKitGstIceStream*);
 void webkitGstWebRTCIceStreamGatheringDone(WebKitGstIceStream*);
-GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(WebKitGstIceStream*, GstWebRTCICEComponent);
+GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(GstWebRTCICEStream*, GstWebRTCICEComponent);
 
 #endif // USE(GSTREAMER_WEBRTC)

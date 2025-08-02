@@ -55,7 +55,7 @@ GST_DEBUG_CATEGORY(webkit_webrtc_ice_stream_debug);
 
 WEBKIT_DEFINE_TYPE_WITH_CODE(WebKitGstIceStream, webkit_gst_webrtc_ice_stream, GST_TYPE_WEBRTC_ICE_STREAM, GST_DEBUG_CATEGORY_INIT(webkit_webrtc_ice_stream_debug, "webkitwebrtcicestream", 0, "WebRTC ICE stream"))
 
-static GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(GstWebRTCICEStream* ice, GstWebRTCICEComponent component)
+GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(GstWebRTCICEStream* ice, GstWebRTCICEComponent component)
 {
     auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);
     auto agent = stream->priv->agent.get();
@@ -90,16 +90,6 @@ void webkitGstWebRTCIceStreamGatheringDone(WebKitGstIceStream* ice)
         gst_webrtc_ice_transport_gathering_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()), GST_WEBRTC_ICE_GATHERING_STATE_COMPLETE);
     if (stream->priv->rtcpTransport)
         gst_webrtc_ice_transport_gathering_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()), GST_WEBRTC_ICE_GATHERING_STATE_COMPLETE);
-}
-
-GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(WebKitGstIceStream* ice, GstWebRTCICEComponent component)
-{
-    auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);
-    if (component == GST_WEBRTC_ICE_COMPONENT_RTP)
-        return GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get());
-    if (component == GST_WEBRTC_ICE_COMPONENT_RTCP)
-        return GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get());
-    return nullptr;
 }
 
 static gboolean webkitGstWebRTCIceStreamGatherCandidates(GstWebRTCICEStream* ice)

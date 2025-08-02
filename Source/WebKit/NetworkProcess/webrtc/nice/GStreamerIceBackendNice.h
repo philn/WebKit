@@ -33,6 +33,8 @@ public:
     void setForceRelay(bool);
     void setStunServer(const String&);
     void addTurnServer(const String&, CompletionHandler<void(Expected<bool, WebCore::ExceptionData>&&)>&&);
+    void setTurnServer(const String&);
+    void setTos(unsigned, unsigned);
     void addStream(unsigned, CompletionHandler<void(std::optional<unsigned>)>&&);
     void gatherCandidatesForStream(unsigned, CompletionHandler<void(bool)>&&);
     void setIsController(bool);
@@ -79,6 +81,7 @@ private:
     Condition m_condition;
 
     String m_stunServer;
+    String m_turnServer;
 
     struct StreamItem {
         unsigned sessionId;

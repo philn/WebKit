@@ -125,6 +125,16 @@ void GStreamerIceBackendNice::addTurnServer(const String& uri, CompletionHandler
     completionHandler(true);
 }
 
+void GStreamerIceBackendNice::setTurnServer(const String& uri)
+{
+    m_turnServer = uri;
+}
+
+void GStreamerIceBackendNice::setTos(unsigned streamId, unsigned tos)
+{
+    nice_agent_set_stream_tos(m_agent.get(), streamId, tos);
+}
+
 void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<void(std::optional<unsigned>)>&& completionHandler)
 {
     auto streamId = nice_agent_add_stream(m_agent.get(), 1);
@@ -140,6 +150,9 @@ void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<vo
         auto port = url.port().value_or(3478);
         g_object_set(m_agent.get(), "stun-server", host.utf8().data(), "stun-server-port", port, nullptr);
     }
+
+    if (!m_turnServer.isEmpty())
+        addTurnServerForStream(streamId, URL(m_turnServer));
 
     m_streams.append({ sessionId, streamId });
     for (const auto& url : m_turnServers)

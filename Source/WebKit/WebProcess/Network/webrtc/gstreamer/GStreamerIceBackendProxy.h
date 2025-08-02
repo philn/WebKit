@@ -45,6 +45,9 @@ private:
     std::optional<unsigned> addStream(unsigned) final;
     bool gatherCandidatesForStream(unsigned) final;
     void setIsController(bool) final;
+    void setTurnServer(const String&) final;
+    void setTos(unsigned, unsigned) final;
+
     void addCandidate(unsigned, const String&, WebCore::GStreamerIceBackend::AddCandidateCallback&&) final;
 
     void refGStreamerIceBackend() final { ref(); }

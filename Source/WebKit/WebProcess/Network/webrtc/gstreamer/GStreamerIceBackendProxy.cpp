@@ -61,6 +61,16 @@ Expected<bool, ExceptionData> GStreamerIceBackendProxy::addTurnServer(const Stri
     return reply;
 }
 
+void GStreamerIceBackendProxy::setTurnServer(const String& uri)
+{
+    MessageSender::send(Messages::GStreamerIceBackend::SetTurnServer { uri });
+}
+
+void GStreamerIceBackendProxy::setTos(unsigned streamId, unsigned tos)
+{
+    MessageSender::send(Messages::GStreamerIceBackend::SetTos { streamId, tos });
+}
+
 std::optional<unsigned> GStreamerIceBackendProxy::addStream(unsigned sessionId)
 {
     // Called from webrtcbin PC thread, and as this is a sync message it needs to be sent from the main thread.

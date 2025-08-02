@@ -47,6 +47,7 @@ typedef struct _WebKitGstIceAgentPrivate {
     RefPtr<GStreamerIceBackend> iceBackend;
     HashMap<unsigned, GRefPtr<GstWebRTCICEStream>> streams;
     String stunServer;
+    String turnServer;
     bool isController;
 } WebKitGstIceAgentPrivate;
 
@@ -125,6 +126,22 @@ static gboolean webkitGstWebRTCIceAgentAddTurnServer(GstWebRTCICE* ice, const gc
     return wasAdded;
 }
 
+static void webkitGstWebRTCIceAgentSetTurnServer(GstWebRTCICE* ice, const gchar* uri)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    if (!backend->priv->iceBackend)
+        return;
+
+    backend->priv->turnServer = String::fromUTF8(uri);
+    backend->priv->iceBackend->setTurnServer(backend->priv->turnServer);
+}
+
+static gchar* webkitGstWebRTCIceAgentGetTurnServer(GstWebRTCICE* ice)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    return g_strdup(backend->priv->turnServer.utf8().data());
+}
+
 static GstWebRTCICEStream* webkitGstWebRTCIceAgentAddStream(GstWebRTCICE* ice, guint sessionId)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
@@ -171,15 +188,25 @@ static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICES
     });
 }
 
-static GstWebRTCICETransport* webkitGstWebRTCIceAgentFindTransport(GstWebRTCICE* ice, GstWebRTCICEStream* stream,
-    GstWebRTCICEComponent component)
+static GstWebRTCICETransport* webkitGstWebRTCIceAgentFindTransport(GstWebRTCICE* ice, GstWebRTCICEStream* stream, GstWebRTCICEComponent component)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
-    for (auto& iceStream : backend->priv->streams.values()) {
-        if (GST_WEBRTC_ICE_STREAM(iceStream.get()) == stream)
-            return webkitGstWebRTCIceStreamFindTransport(iceStream.get(), component);
-    }
-    return nullptr;
+    auto iceStream = backend->priv->streams.getOptional(stream->stream_id);
+    if (!iceStream)
+        return nullptr;
+    return webkitGstWebRTCIceStreamFindTransport(iceStream->get(), component);
+}
+
+static void webkitGstWebRTCIceAgentSetTos(GstWebRTCICE* ice, GstWebRTCICEStream* stream, guint tos)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    auto streamId = webkitiGstWebRTCIceStreamGetId(WEBKIT_GST_WEBRTC_ICE_STREAM(stream));
+    backend->priv->iceBackend->setTos(streamId, tos);
+}
+
+static gboolean webkitGstWebRTCIceAgentGatherCandidates(GstWebRTCICE* ice, GstWebRTCICEStream* stream)
+{
+    return webkitGstWebRTCIceAgentGatherCandidates(WEBKIT_GST_WEBRTC_ICE_BACKEND(ice), stream->stream_id);
 }
 
 bool webkitGstWebRTCIceAgentGatherCandidates(WebKitGstIceAgent* agent, unsigned streamId)
@@ -240,6 +267,19 @@ static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* kla
     iceClass->set_is_controller = webkitGstWebRTCIceAgentSetIsController;
     iceClass->add_candidate = webkitGstWebRTCIceAgentAddCandidate;
     iceClass->find_transport = webkitGstWebRTCIceAgentFindTransport;
+    iceClass->gather_candidates = webkitGstWebRTCIceAgentGatherCandidates;
+    iceClass->get_turn_server = webkitGstWebRTCIceAgentGetTurnServer;
+    iceClass->set_turn_server = webkitGstWebRTCIceAgentSetTurnServer;
+    iceClass->set_tos = webkitGstWebRTCIceAgentSetTos;
+    // TODO:
+    // - set_http_proxy
+    // - get_http_proxy
+    // - set_local_credentials
+    // - set_remote_credentials
+    // - get_local_candidates
+    // - get_remote_candidates
+    // - get_selected_pair
+    // - close
 }
 
 WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(const String& name, ScriptExecutionContext* context)
