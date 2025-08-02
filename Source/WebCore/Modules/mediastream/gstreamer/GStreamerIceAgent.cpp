@@ -19,10 +19,10 @@
 
 #include "config.h"
 #include "GStreamerIceAgent.h"
-#include "GStreamerIceStream.h"
 
 #if USE(GSTREAMER_WEBRTC)
 
+#include "GStreamerIceStream.h"
 #include "GStreamerIceTransport.h"
 #include "ScriptExecutionContext.h"
 #include "SocketProvider.h"
@@ -171,6 +171,17 @@ static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICES
     });
 }
 
+static GstWebRTCICETransport* webkitGstWebRTCIceAgentFindTransport(GstWebRTCICE* ice, GstWebRTCICEStream* stream,
+    GstWebRTCICEComponent component)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    for (auto& iceStream : backend->priv->streams.values()) {
+        if (GST_WEBRTC_ICE_STREAM(iceStream.get()) == stream)
+            return webkitGstWebRTCIceStreamFindTransport(iceStream.get(), component);
+    }
+    return nullptr;
+}
+
 bool webkitGstWebRTCIceAgentGatherCandidates(WebKitGstIceAgent* agent, unsigned streamId)
 {
     if (!agent->priv->iceBackend)
@@ -228,6 +239,7 @@ static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* kla
     iceClass->get_is_controller = webkitGstWebRTCIceAgentGetIsController;
     iceClass->set_is_controller = webkitGstWebRTCIceAgentSetIsController;
     iceClass->add_candidate = webkitGstWebRTCIceAgentAddCandidate;
+    iceClass->find_transport = webkitGstWebRTCIceAgentFindTransport;
 }
 
 WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(const String& name, ScriptExecutionContext* context)

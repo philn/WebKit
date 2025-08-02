@@ -19,6 +19,8 @@
 
 #include "config.h"
 #include "GStreamerIceStream.h"
+#include <gst/webrtc/icetransport.h>
+#include <gst/webrtc/webrtc_fwd.h>
 
 #if USE(GSTREAMER_WEBRTC)
 
@@ -88,6 +90,16 @@ void webkitGstWebRTCIceStreamGatheringDone(WebKitGstIceStream* ice)
         gst_webrtc_ice_transport_gathering_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()), GST_WEBRTC_ICE_GATHERING_STATE_COMPLETE);
     if (stream->priv->rtcpTransport)
         gst_webrtc_ice_transport_gathering_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()), GST_WEBRTC_ICE_GATHERING_STATE_COMPLETE);
+}
+
+GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(WebKitGstIceStream* ice, GstWebRTCICEComponent component)
+{
+    auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);
+    if (component == GST_WEBRTC_ICE_COMPONENT_RTP)
+        return GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get());
+    if (component == GST_WEBRTC_ICE_COMPONENT_RTCP)
+        return GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get());
+    return nullptr;
 }
 
 static gboolean webkitGstWebRTCIceStreamGatherCandidates(GstWebRTCICEStream* ice)
