@@ -46,8 +46,6 @@ public:
     void ref() { refGStreamerIceTransport(); }
     void deref() { derefGStreamerIceTransport(); }
 
-    /* virtual std::optional<unsigned> addStream() = 0; */
-
 protected:
     GStreamerIceTransport() = default;
     virtual ~GStreamerIceTransport() = default;
@@ -65,6 +63,8 @@ protected:
 
 GType webkit_gst_webrtc_ice_transport_get_type();
 
-WebKitGstIceTransport* webkitGstWebRTCCreateIceTransport(WebKitGstIceAgent*, unsigned, GstWebRTCICEComponent);
+using ReadDataCallback = WTF::Function<void(unsigned, unsigned, std::span<uint8_t>&&)>;
+
+WebKitGstIceTransport* webkitGstWebRTCCreateIceTransport(WebKitGstIceAgent*, unsigned, GstWebRTCICEComponent, ReadDataCallback&&);
 
 #endif // USE(GSTREAMER_WEBRTC)

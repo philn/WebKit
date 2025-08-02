@@ -132,6 +132,11 @@ void GStreamerIceBackendProxy::notifyGatheringDone(unsigned streamId)
     m_client->notifyGatheringDone(streamId);
 }
 
+void GStreamerIceBackendProxy::send(unsigned streamId, unsigned component, std::span<uint8_t>&& data)
+{
+    MessageSender::send(Messages::GStreamerIceBackend::SendData { streamId, component, WTFMove(data) });
+}
+
 } // namespace WebKit
 
 #endif // USE(GSTREAMER_WEBRTC)

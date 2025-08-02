@@ -385,6 +385,11 @@ void GStreamerIceBackendNice::addTurnServerForStream(unsigned streamId, const UR
     }
 }
 
+void GStreamerIceBackendNice::sendData(unsigned streamId, unsigned componentId, std::span<const uint8_t>&& data)
+{
+    // TODO
+}
+
 } // namespace WebKit
 
 #endif // USE(GSTREAMER_WEBRTC) && USE(LIBNICE)

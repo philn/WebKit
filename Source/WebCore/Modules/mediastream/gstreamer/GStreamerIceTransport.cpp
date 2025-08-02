@@ -35,6 +35,7 @@ using namespace WebCore;
 typedef struct _WebKitGstIceTransportPrivate {
     GThreadSafeWeakPtr<WebKitGstIceAgent> agent;
     unsigned streamId;
+    ReadDataCallback readCallback;
 } WebKitGstIceTransportPrivate;
 
 typedef struct _WebKitGstIceTransport {
@@ -66,9 +67,12 @@ static void webkitGstWebRTCIceTransportConstructed(GObject* object)
     static Atomic<uint32_t> counter = 0;
     auto id = counter.load();
 
-    transport->sink = makeGStreamerElement("appsink"_s, makeString("ice-transport-sink-"_s, id));
-    transport->src = makeGStreamerElement("appsrc"_s, makeString("ice-transport-src-"_s, id));
+    transport->sink = makeGStreamerElement("appsink"_s, makeString("ice-sink-"_s, id));
+    transport->src = makeGStreamerElement("appsrc"_s, makeString("ice-src-"_s, id));
     counter.exchangeAdd(1);
+
+    // TODO: hook appsink to IceBackend::send()
+
 }
 
 static void webkit_gst_webrtc_ice_transport_class_init(WebKitGstIceTransportClass* klass)
@@ -78,11 +82,13 @@ static void webkit_gst_webrtc_ice_transport_class_init(WebKitGstIceTransportClas
     gobjectClass->finalize = webkitGstWebRTCIceTransportFinalize;
 }
 
-WebKitGstIceTransport* webkitGstWebRTCCreateIceTransport(WebKitGstIceAgent* agent, unsigned streamId, GstWebRTCICEComponent component)
+WebKitGstIceTransport* webkitGstWebRTCCreateIceTransport(WebKitGstIceAgent* agent, unsigned streamId, GstWebRTCICEComponent component, ReadDataCallback&& readCallback)
 {
     auto transport = reinterpret_cast<WebKitGstIceTransport*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_TRANSPORT, "component", component, nullptr));
-    transport->priv->agent.reset(agent);
-    transport->priv->streamId = streamId;
+    auto priv = transport->priv;
+    priv->agent.reset(agent);
+    priv->streamId = streamId;
+    priv->readCallback = WTFMove(readCallback);
     return transport;
 }
 

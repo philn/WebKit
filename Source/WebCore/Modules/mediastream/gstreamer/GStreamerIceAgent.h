@@ -23,7 +23,6 @@
 
 #include "ExceptionData.h"
 #include <glib-object.h>
-#include <gst/webrtc/webrtc_fwd.h>
 #include <wtf/Expected.h>
 #include <wtf/Forward.h>
 #include <wtf/Function.h>
@@ -31,6 +30,10 @@
 #include <wtf/Noncopyable.h>
 #include <wtf/ObjectIdentifier.h>
 #include <wtf/RefCounted.h>
+
+#define GST_USE_UNSTABLE_API
+#include <gst/webrtc/webrtc.h>
+#undef GST_USE_UNSTABLE_API
 
 typedef struct _WebKitGstIceAgent WebKitGstIceAgent;
 typedef struct _WebKitGstIceAgentClass WebKitGstIceAgentClass;
@@ -56,11 +59,16 @@ public:
     void setOnStreamGatheringDone(OnStreamGatheringDone&& callback) { m_onStreamGatheringDone = WTFMove(callback); }
     void notifyGatheringDone(unsigned streamId) { m_onStreamGatheringDone(streamId); }
 
+    using ReadDataCallback = WTF::Function<void(unsigned, unsigned, std::span<uint8_t>&&)>;
+    void setReadDataCallback(ReadDataCallback&& readCallback) { m_readCallback = WTFMove(readCallback); }
+    void notifyDataRead(unsigned streamId, unsigned component, std::span<uint8_t>&& data) { m_readCallback(streamId, component, WTFMove(data)); }
+
 private:
     GStreamerIceBackendClient() = default;
 
     OnIceCandidateCallback m_onIceCandidateCallback;
     OnStreamGatheringDone m_onStreamGatheringDone;
+    ReadDataCallback m_readCallback;
 };
 
 class GStreamerIceBackend : public Identified<GStreamerIceBackendIdentifier> {
@@ -83,6 +91,8 @@ public:
 
     virtual std::optional<unsigned> addStream(unsigned) = 0;
     virtual bool gatherCandidatesForStream(unsigned) = 0;
+
+    virtual void send(unsigned, unsigned, std::span<uint8_t>&& data) = 0;
 
 protected:
     GStreamerIceBackend() = default;

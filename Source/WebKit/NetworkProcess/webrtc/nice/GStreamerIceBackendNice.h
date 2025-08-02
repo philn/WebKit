@@ -41,6 +41,7 @@ public:
     void addCandidate(unsigned, const String&, CompletionHandler<void(Expected<bool, WebCore::ExceptionData>&&)>&&);
     void setLocalCredentials(unsigned, const String&, const String&, CompletionHandler<void(bool)>&&);
     void setRemoteCredentials(unsigned, const String&, const String&, CompletionHandler<void(bool)>&&);
+    void sendData(unsigned, unsigned, std::span<const uint8_t>&&);
 
 private:
     virtual IPC::Connection* connection() const = 0;

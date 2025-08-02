@@ -236,7 +236,7 @@ GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent*
     if (!agent->priv->iceBackend)
         return nullptr;
 
-    return GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCCreateIceTransport(agent, streamId, component));
+    return GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCCreateIceTransport(agent, streamId, component, [](unsigned, unsigned, std::span<uint8_t>&&) {}));
 }
 
 static void webkitGstWebRTCIceAgentFinalize(GObject* object)
