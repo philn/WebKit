@@ -23,6 +23,8 @@
 #if USE(GSTREAMER_WEBRTC)
 
 #include "GStreamerCommon.h"
+#include <gst/app/gstappsink.h>
+#include <gst/app/gstappsrc.h>
 #include <gst/webrtc/ice.h>
 #include <gst/webrtc/webrtc.h>
 #include <wtf/glib/GThreadSafeWeakPtr.h>
@@ -57,11 +59,45 @@ static void webkitGstWebRTCIceTransportFinalize(GObject* object)
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_transport_parent_class)->finalize(object);
 }
 
+static GstFlowReturn iceTransportHandleSample(WebKitGstIceTransport* self, GstAppSink* sink, bool isPreroll)
+{
+    GRefPtr<GstSample> sample;
+    if (isPreroll)
+        sample = adoptGRef(gst_app_sink_try_pull_preroll(sink, 0));
+    else
+        sample = adoptGRef(gst_app_sink_try_pull_sample(sink, 0));
+
+    if (!sample)
+        return gst_app_sink_is_eos(sink) ? GST_FLOW_EOS : GST_FLOW_ERROR;
+
+    auto agent = self->priv->agent.get();
+    if (!agent)
+        return GST_FLOW_ERROR;
+
+    GstWebRTCICEComponent component;
+    g_object_get(self, "component", &component, nullptr);
+
+    Vector<uint8_t> buffers;
+    auto bufferList = gst_sample_get_buffer_list(sample.get());
+    if (!GST_IS_BUFFER_LIST(bufferList)) {
+        GstMappedBuffer mappedBuffer(gst_sample_get_buffer(sample.get()), GST_MAP_READ);
+        buffers.append(mappedBuffer.mutableSpan<uint8_t>());
+        return webkitGstWebRTCIceAgentSend(agent.get(), self->priv->streamId, component, buffers.mutableSpan());
+    }
+
+    unsigned length = gst_buffer_list_length(bufferList);
+    for (unsigned i = 0; i < length; i++) {
+        GstMappedBuffer mappedBuffer(gst_buffer_list_get(bufferList, i), GST_MAP_READ);
+        buffers.append(mappedBuffer.mutableSpan<uint8_t>());
+    }
+    return webkitGstWebRTCIceAgentSend(agent.get(), self->priv->streamId, component, buffers.mutableSpan());
+}
+
 static void webkitGstWebRTCIceTransportConstructed(GObject* object)
 {
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_transport_parent_class)->constructed(object);
 
-    // auto self = WEBKIT_GST_WEBRTC_ICE_TRANSPORT(object);
+    auto self = WEBKIT_GST_WEBRTC_ICE_TRANSPORT(object);
     auto transport = GST_WEBRTC_ICE_TRANSPORT(object);
 
     static Atomic<uint32_t> counter = 0;
@@ -73,6 +109,26 @@ static void webkitGstWebRTCIceTransportConstructed(GObject* object)
 
     // TODO: hook appsink to IceBackend::send()
 
+    static GstAppSinkCallbacks callbacks = {
+        nullptr, // eos
+        [](GstAppSink* sink, gpointer userData) -> GstFlowReturn {
+            return iceTransportHandleSample(WEBKIT_GST_WEBRTC_ICE_TRANSPORT(userData), sink, true);
+        },
+        [](GstAppSink* sink, gpointer userData) -> GstFlowReturn {
+            return iceTransportHandleSample(WEBKIT_GST_WEBRTC_ICE_TRANSPORT(userData), sink, false);
+        },
+#if GST_CHECK_VERSION(1, 20, 0)
+        // new_event
+        nullptr,
+#endif
+#if GST_CHECK_VERSION(1, 24, 0)
+        // propose_allocation
+        nullptr,
+#endif
+        { nullptr }
+    };
+    gst_app_sink_set_callbacks(GST_APP_SINK(transport->sink), &callbacks, self, nullptr);
+    g_object_set(transport->sink, "buffer-list", TRUE, "sync", FALSE, "async", FALSE, "enable-last-sample", FALSE, nullptr);
 }
 
 static void webkit_gst_webrtc_ice_transport_class_init(WebKitGstIceTransportClass* klass)

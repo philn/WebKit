@@ -385,9 +385,10 @@ void GStreamerIceBackendNice::addTurnServerForStream(unsigned streamId, const UR
     }
 }
 
-void GStreamerIceBackendNice::sendData(unsigned streamId, unsigned componentId, std::span<const uint8_t>&& data)
+void GStreamerIceBackendNice::sendData(unsigned streamId, unsigned componentId, std::span<const uint8_t>&& data, CompletionHandler<void(bool)>&& completionHandler)
 {
-    // TODO
+    auto written = nice_agent_send(m_agent.get(), streamId, componentId, data.size_bytes(), reinterpret_cast<const char*>(data.data()));
+    completionHandler(written);
 }
 
 } // namespace WebKit

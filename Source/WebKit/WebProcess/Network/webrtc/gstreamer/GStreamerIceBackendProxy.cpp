@@ -132,9 +132,11 @@ void GStreamerIceBackendProxy::notifyGatheringDone(unsigned streamId)
     m_client->notifyGatheringDone(streamId);
 }
 
-void GStreamerIceBackendProxy::send(unsigned streamId, unsigned component, std::span<uint8_t>&& data)
+bool GStreamerIceBackendProxy::send(unsigned streamId, unsigned component, std::span<const uint8_t> data)
 {
-    MessageSender::send(Messages::GStreamerIceBackend::SendData { streamId, component, WTFMove(data) });
+    auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::SendData { streamId, component, WTFMove(data) }, messageSenderDestinationID());
+    auto [result] = sendResult.takeReply();
+    return result;
 }
 
 } // namespace WebKit

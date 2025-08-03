@@ -52,7 +52,7 @@ private:
 
     void addCandidate(unsigned, const String&, WebCore::GStreamerIceBackend::AddCandidateCallback&&) final;
 
-    void send(unsigned, unsigned, std::span<uint8_t>&&) final;
+    bool send(unsigned, unsigned, std::span<const uint8_t>) final;
 
     void refGStreamerIceBackend() final { ref(); }
     void derefGStreamerIceBackend() final { deref(); }
