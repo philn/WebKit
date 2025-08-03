@@ -43,8 +43,6 @@ typedef struct _WebKitGstIceAgentClass WebKitGstIceAgentClass;
 namespace WebCore {
 class ScriptExecutionContext;
 class SocketProvider;
-class GStreamerIce;
-using GStreamerIceBackendIdentifier = AtomicObjectIdentifier<GStreamerIce>;
 
 class GStreamerIceBackendClient : public RefCounted<GStreamerIceBackendClient> {
     WTF_MAKE_NONCOPYABLE(GStreamerIceBackendClient);
@@ -82,6 +80,8 @@ private:
     OnNewSelectedPair m_onNewSelectedPair;
     ReadDataCallback m_readCallback;
 };
+
+using GStreamerIceBackendIdentifier = AtomicObjectIdentifier<GStreamerIceBackendClient>;
 
 class GStreamerIceBackend : public Identified<GStreamerIceBackendIdentifier> {
     WTF_MAKE_NONCOPYABLE(GStreamerIceBackend);

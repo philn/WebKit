@@ -46,6 +46,7 @@ public:
 
 private:
     virtual IPC::Connection* connection() const = 0;
+    virtual uint64_t destination() const = 0;
 
     void notifyNewCandidate(const NiceCandidate&);
     void notifyGatheringDone(unsigned);

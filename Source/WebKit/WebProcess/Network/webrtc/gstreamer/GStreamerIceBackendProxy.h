@@ -12,6 +12,7 @@
 #include <WebCore/GStreamerIceAgent.h>
 #include <WebCore/RTCIceComponent.h>
 #include <WebCore/RTCIceConnectionState.h>
+#include <wtf/ThreadSafeWeakPtr.h>
 
 namespace IPC {
 class Connection;
@@ -24,18 +25,15 @@ struct GStreamerIceBackendIdentifierType { };
 
 using GStreamerIceBackendIdentifier = ObjectIdentifier<GStreamerIceBackendIdentifierType>;
 
-class GStreamerIceBackendProxy : public IPC::MessageSender, public IPC::MessageReceiver, public WebCore::GStreamerIceBackend, public RefCounted<GStreamerIceBackendProxy> {
+class GStreamerIceBackendProxy : public IPC::MessageSender, public IPC::MessageReceiver, public WebCore::GStreamerIceBackend, public ThreadSafeRefCountedAndCanMakeThreadSafeWeakPtr<GStreamerIceBackendProxy, WTF::DestructionThread::MainRunLoop> {
 public:
     static Ref<GStreamerIceBackendProxy> create(WebPageProxyIdentifier, WebCore::GStreamerIceBackendClient&);
     ~GStreamerIceBackendProxy();
 
-    void ref() const final { RefCounted::ref(); }
-    void deref() const final { RefCounted::deref(); }
+    void ref() const final { ThreadSafeRefCountedAndCanMakeThreadSafeWeakPtr::ref(); }
+    void deref() const final { ThreadSafeRefCountedAndCanMakeThreadSafeWeakPtr::deref(); }
 
     void didReceiveMessage(IPC::Connection&, IPC::Decoder&);
-
-    using RefCounted<GStreamerIceBackendProxy>::ref;
-    using RefCounted<GStreamerIceBackendProxy>::deref;
 
 private:
     GStreamerIceBackendProxy(Ref<IPC::Connection>&&, WebPageProxyIdentifier, GStreamerIceBackendIdentifier, WebCore::GStreamerIceBackendClient&);
@@ -56,6 +54,8 @@ private:
 
     bool send(unsigned, unsigned, std::span<const uint8_t>) final;
 
+    void finalizeStream(unsigned) final;
+
     void refGStreamerIceBackend() final { ref(); }
     void derefGStreamerIceBackend() final { deref(); }
 
@@ -67,7 +67,7 @@ private:
     void notifyDataRead(unsigned, WebCore::RTCIceComponent, std::span<const uint8_t>);
 
     // MessageSender
-    IPC::Connection *messageSenderConnection() const final;
+    IPC::Connection* messageSenderConnection() const final;
     uint64_t messageSenderDestinationID() const final;
 
     const Ref<IPC::Connection> m_connection;

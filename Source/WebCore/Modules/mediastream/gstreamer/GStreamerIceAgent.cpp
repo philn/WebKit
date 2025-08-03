@@ -180,8 +180,7 @@ static void webkitGstWebRTCIceAgentSetIsController(GstWebRTCICE* ice, gboolean i
 static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICEStream* iceStream, const gchar* candidate, GstPromise* promise)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
-    auto streamId = iceStream->stream_id;
-    backend->priv->iceBackend->addCandidate(streamId, String::fromUTF8(candidate), [promise = GRefPtr(promise)](auto&& result) mutable {
+    GStreamerIceBackend::AddCandidateCallback completionHandler([promise = GRefPtr(promise)](auto&& result) mutable {
         if (result.hasException()) {
             auto& errorMessage = result.exception().message();
             GUniquePtr<GError> error(g_error_new(GST_WEBRTC_ERROR, GST_WEBRTC_ERROR_INTERNAL_FAILURE, "%s", errorMessage.utf8().data()));
@@ -189,8 +188,9 @@ static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICES
             gst_promise_reply(promise.get(), gst_structure_new("application/x-gst-promise", "error", error.get(), nullptr));
             return;
         }
-        gst_promise_reply(promise.get(), nullptr);
-    });
+        //gst_promise_reply(promise.get(), nullptr);
+    }, CompletionHandlerCallThread::AnyThread);
+    backend->priv->iceBackend->addCandidate(iceStream->stream_id, String::fromUTF8(candidate), WTFMove(completionHandler));
 }
 
 static GstWebRTCICETransport* webkitGstWebRTCIceAgentFindTransport(GstWebRTCICE* ice, GstWebRTCICEStream* stream, GstWebRTCICEComponent component)
@@ -276,26 +276,38 @@ static void webkitGstWebRTCIceAgentConstructed(GObject* object)
     auto priv = backend->priv;
     priv->backendClient = GStreamerIceBackendClient::create();
     priv->iceBackend = priv->socketProvider->createGStreamerIceBackend(*priv->backendClient);
-    priv->backendClient->setOnStreamGatheringDone([&](unsigned streamId) {
-        auto stream = priv->streams.getOptional(streamId);
+    priv->backendClient->setOnStreamGatheringDone([weakThis = GThreadSafeWeakPtr(backend)](unsigned streamId) mutable {
+        auto self = weakThis.get();
+        if (!self)
+            return;
+        auto stream = self->priv->streams.getOptional(streamId);
         if (!stream)
             return;
         webkitGstWebRTCIceStreamGatheringDone(WEBKIT_GST_WEBRTC_ICE_STREAM(stream->get()));
     });
-    priv->backendClient->setOnComponentStateChanged([&](unsigned streamId, RTCIceComponent component, RTCIceConnectionState state) {
-        auto stream = priv->streams.getOptional(streamId);
+    priv->backendClient->setOnComponentStateChanged([weakThis = GThreadSafeWeakPtr(backend)](unsigned streamId, RTCIceComponent component, RTCIceConnectionState state) mutable {
+        auto self = weakThis.get();
+        if (!self)
+            return;
+        auto stream = self->priv->streams.getOptional(streamId);
         if (!stream)
             return;
         webkitGstWebRTCIceStreamComponentStateChanged(WEBKIT_GST_WEBRTC_ICE_STREAM(stream->get()), component, state);
     });
-    priv->backendClient->setOnNewSelectedPair([&](unsigned streamId, RTCIceComponent component) {
-        auto stream = priv->streams.getOptional(streamId);
+    priv->backendClient->setOnNewSelectedPair([weakThis = GThreadSafeWeakPtr(backend)](unsigned streamId, RTCIceComponent component) mutable {
+        auto self = weakThis.get();
+        if (!self)
+            return;
+        auto stream = self->priv->streams.getOptional(streamId);
         if (!stream)
             return;
         webkitGstWebRTCIceStreamNewSelectedPair(WEBKIT_GST_WEBRTC_ICE_STREAM(stream->get()), component);
     });
-    priv->backendClient->setReadDataCallback([&](unsigned streamId, RTCIceComponent component, std::span<const uint8_t>&& data) {
-        auto stream = priv->streams.getOptional(streamId);
+    priv->backendClient->setReadDataCallback([weakThis = GThreadSafeWeakPtr(backend)](unsigned streamId, RTCIceComponent component, std::span<const uint8_t>&& data) mutable {
+        auto self = weakThis.get();
+        if (!self)
+            return;
+        auto stream = self->priv->streams.getOptional(streamId);
         if (!stream)
             return;
         webkitGstWebRTCIceStreamHandleIncomingData(WEBKIT_GST_WEBRTC_ICE_STREAM(stream->get()), component, WTFMove(data));

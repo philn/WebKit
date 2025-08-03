@@ -130,10 +130,12 @@ void webkitGstWebRTCIceStreamComponentStateChanged(WebKitGstIceStream* stream, R
 
     switch (component) {
     case RTCIceComponent::Rtp:
-        gst_webrtc_ice_transport_connection_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()), gstState);
+        if (stream->priv->rtpTransport)
+            gst_webrtc_ice_transport_connection_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()), gstState);
         break;
     case RTCIceComponent::Rtcp:
-        gst_webrtc_ice_transport_connection_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()), gstState);
+        if (stream->priv->rtcpTransport)
+            gst_webrtc_ice_transport_connection_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()), gstState);
         break;
     }
 }
@@ -142,10 +144,12 @@ void webkitGstWebRTCIceStreamNewSelectedPair(WebKitGstIceStream* stream, RTCIceC
 {
     switch (component) {
     case RTCIceComponent::Rtp:
-        gst_webrtc_ice_transport_selected_pair_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()));
+        if (stream->priv->rtpTransport)
+            gst_webrtc_ice_transport_selected_pair_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()));
         break;
     case RTCIceComponent::Rtcp:
-        gst_webrtc_ice_transport_selected_pair_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()));
+        if (stream->priv->rtcpTransport)
+            gst_webrtc_ice_transport_selected_pair_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()));
         break;
     }
 }
@@ -154,10 +158,12 @@ void webkitGstWebRTCIceStreamHandleIncomingData(WebKitGstIceStream* stream, RTCI
 {
     switch (component) {
     case RTCIceComponent::Rtp:
-        webkitGstWebRTCIceTransportHandleIncomingData(WEBKIT_GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()), WTFMove(data));
+        if (stream->priv->rtpTransport)
+            webkitGstWebRTCIceTransportHandleIncomingData(WEBKIT_GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()), WTFMove(data));
         break;
     case RTCIceComponent::Rtcp:
-        webkitGstWebRTCIceTransportHandleIncomingData(WEBKIT_GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()), WTFMove(data));
+        if (stream->priv->rtcpTransport)
+            webkitGstWebRTCIceTransportHandleIncomingData(WEBKIT_GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()), WTFMove(data));
         break;
     }
 }
@@ -172,15 +178,9 @@ static void webkitGstWebRTCIceStreamFinalize(GObject* object)
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_stream_parent_class)->finalize(object);
 }
 
-static void webkitGstWebRTCIceStreamConstructed(GObject* object)
-{
-    G_OBJECT_CLASS(webkit_gst_webrtc_ice_stream_parent_class)->constructed(object);
-}
-
 static void webkit_gst_webrtc_ice_stream_class_init(WebKitGstIceStreamClass* klass)
 {
     auto gobjectClass = G_OBJECT_CLASS(klass);
-    gobjectClass->constructed = webkitGstWebRTCIceStreamConstructed;
     gobjectClass->finalize = webkitGstWebRTCIceStreamFinalize;
 
     auto iceClass = GST_WEBRTC_ICE_STREAM_CLASS(klass);

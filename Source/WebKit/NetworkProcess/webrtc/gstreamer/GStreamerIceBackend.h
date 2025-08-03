@@ -58,7 +58,8 @@ private:
     IPC::Connection *messageSenderConnection() const final;
     uint64_t messageSenderDestinationID() const final;
 
-    IPC::Connection* connection() const final { return messageSenderConnection(); };
+    IPC::Connection* connection() const final { return messageSenderConnection(); }
+    uint64_t destination() const final { return messageSenderDestinationID(); }
 
     WeakPtr<NetworkConnectionToWebProcess> m_connection;
 };

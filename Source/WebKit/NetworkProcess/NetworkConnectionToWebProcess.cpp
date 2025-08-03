@@ -1788,14 +1788,14 @@ void NetworkConnectionToWebProcess::destroyWebTransportSession(WebTransportSessi
 #if USE(GSTREAMER_WEBRTC)
 void NetworkConnectionToWebProcess::initializeGStreamerIceBackend(WebPageProxyIdentifier&& pageID, CompletionHandler<void(std::optional<GStreamerIceBackendIdentifier>)>&& completionHandler)
 {
-    GStreamerIceBackend::initialize(*this, WTFMove(pageID), [weakThis = WeakPtr { *this }, completionHandler = WTFMove(completionHandler)](RefPtr<GStreamerIceBackend>&& session) mutable {
+    GStreamerIceBackend::initialize(*this, WTFMove(pageID), [weakThis = WeakPtr { *this }, completionHandler = WTFMove(completionHandler)](RefPtr<GStreamerIceBackend>&& backend) mutable {
         RefPtr protectedThis = weakThis.get();
-        if (!session || !protectedThis)
+        if (!backend || !protectedThis)
             return completionHandler(std::nullopt);
 
-        auto identifier = session->identifier();
+        auto identifier = backend->identifier();
         ASSERT(!protectedThis->m_gstreamerIceBackends.contains(identifier));
-        protectedThis->m_gstreamerIceBackends.set(identifier, session.releaseNonNull());
+        protectedThis->m_gstreamerIceBackends.set(identifier, backend.releaseNonNull());
         completionHandler(identifier);
     });
 }

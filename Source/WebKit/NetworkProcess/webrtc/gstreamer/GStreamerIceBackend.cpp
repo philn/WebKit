@@ -5,7 +5,6 @@
 #if USE(GSTREAMER_WEBRTC)
 
 #include "NetworkConnectionToWebProcess.h"
-// #include "GStreamerIceBackendMessages.h"
 #include <wtf/TZoneMallocInlines.h>
 
 namespace WebKit {

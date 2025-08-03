@@ -27,6 +27,8 @@ GStreamerIceBackendProxy::GStreamerIceBackendProxy(Ref<IPC::Connection>&& connec
     , m_client(&client)
     , m_identifier(identifier)
 {
+    ASSERT(RunLoop::isMain());
+    WebProcess::singleton().addGStreamerIceBackend(m_identifier, *this);
 }
 
 GStreamerIceBackendProxy::~GStreamerIceBackendProxy()
@@ -134,7 +136,7 @@ void GStreamerIceBackendProxy::addCandidate(unsigned streamId, const String& can
         callback(WTFMove(*valueOrException));
     };
 
-    m_connection->sendWithAsyncReply(Messages::GStreamerIceBackend::AddCandidate { streamId, candidate }, WTFMove(completionHandler));
+    m_connection->sendWithAsyncReply(Messages::GStreamerIceBackend::AddCandidate { streamId, candidate }, WTFMove(completionHandler), messageSenderDestinationID());
 }
 
 void GStreamerIceBackendProxy::notifyNewCandidate(unsigned sessionId, String&& candidate)

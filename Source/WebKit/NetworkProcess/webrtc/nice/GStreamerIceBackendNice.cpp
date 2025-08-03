@@ -82,12 +82,16 @@ void GStreamerIceBackendNice::notifyNewCandidate(const NiceCandidate& candidate)
     fillLocalCandidateCredentials(candidate, filledCandidate);
 
     GUniquePtr<char> sdp(nice_agent_generate_local_candidate_sdp(m_agent.get(), filledCandidate.get()));
-    connection()->send(Messages::GStreamerIceBackendProxy::NotifyNewCandidate { *sessionId, String::fromUTF8(sdp.get()) }, 0);
+    callOnMainThread([&, sdp = WTFMove(sdp), sessionId = *sessionId] {
+        connection()->send(Messages::GStreamerIceBackendProxy::NotifyNewCandidate { sessionId, String::fromUTF8(sdp.get()) }, destination());
+    });
 }
 
 void GStreamerIceBackendNice::notifyGatheringDone(unsigned streamId)
 {
-    connection()->send(Messages::GStreamerIceBackendProxy::NotifyGatheringDone { streamId }, 0);
+    callOnMainThread([&] {
+        connection()->send(Messages::GStreamerIceBackendProxy::NotifyGatheringDone { streamId }, destination());
+    });
 }
 
 static WebCore::RTCIceComponent niceComponentToRTCIceComponent(NiceComponentType component)
@@ -129,12 +133,16 @@ void GStreamerIceBackendNice::notifyComponentStateChanged(unsigned streamId, Nic
     case NICE_COMPONENT_STATE_LAST:
         break;
     };
-    connection()->send(Messages::GStreamerIceBackendProxy::NotifyComponentStateChanged { streamId, niceComponentToRTCIceComponent(component), iceState }, 0);
+    callOnMainThread([&] {
+        connection()->send(Messages::GStreamerIceBackendProxy::NotifyComponentStateChanged { streamId, niceComponentToRTCIceComponent(component), iceState }, destination());
+    });
 }
 
 void GStreamerIceBackendNice::notifyNewSelectedPair(unsigned streamId, NiceComponentType component)
 {
-    connection()->send(Messages::GStreamerIceBackendProxy::NotifyNewSelectedPair { streamId, niceComponentToRTCIceComponent(component) }, 0);
+    callOnMainThread([&] {
+        connection()->send(Messages::GStreamerIceBackendProxy::NotifyNewSelectedPair { streamId, niceComponentToRTCIceComponent(component) }, destination());
+    });
 }
 
 void GStreamerIceBackendNice::fillLocalCandidateCredentials(const NiceCandidate& candidate, GUniqueOutPtr<NiceCandidate>& result)
@@ -242,7 +250,9 @@ void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<vo
 
 void GStreamerIceBackendNice::handleIncomingData(unsigned streamId, NiceComponentType component, std::span<const uint8_t>&& data)
 {
-    connection()->send(Messages::GStreamerIceBackendProxy::NotifyDataRead { streamId, niceComponentToRTCIceComponent(component), WTFMove(data) }, 0);
+    callOnMainThread([&] {
+        connection()->send(Messages::GStreamerIceBackendProxy::NotifyDataRead { streamId, niceComponentToRTCIceComponent(component), WTFMove(data) }, destination());
+    });
 }
 
 void GStreamerIceBackendNice::gatherCandidatesForStream(unsigned streamId, CompletionHandler<void(bool)>&& completionHandler)

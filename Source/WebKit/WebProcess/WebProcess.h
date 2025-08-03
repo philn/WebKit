@@ -28,6 +28,7 @@
 #include "AuxiliaryProcess.h"
 #include "CacheModel.h"
 #include "EventDispatcher.h"
+#include "GStreamerIceBackendProxy.h"
 #include "IdentifierTypes.h"
 #include "ScriptTrackingPrivacyFilter.h"
 #include "StorageAreaMapIdentifier.h"
@@ -172,6 +173,12 @@ struct WebTransportSessionIdentifierType;
 struct WebsiteData;
 struct WebsiteDataStoreParameters;
 
+#if USE(GSTREAMER_WEBRTC)
+class GStreamerIceBackendProxy;
+struct GStreamerIceBackendIdentifierType;
+using GStreamerIceBackendIdentifier = ObjectIdentifier<GStreamerIceBackendIdentifierType>;
+#endif
+
 enum class RemoteWorkerType : uint8_t;
 enum class WebsiteDataType : uint32_t;
 
@@ -286,6 +293,12 @@ public:
     RefPtr<WebTransportSession> webTransportSession(WebTransportSessionIdentifier);
     void addWebTransportSession(WebTransportSessionIdentifier, WebTransportSession&);
     void removeWebTransportSession(WebTransportSessionIdentifier);
+
+#if USE(GSTREAMER_WEBRTC)
+    RefPtr<GStreamerIceBackendProxy> gstreamerIceBackend(GStreamerIceBackendIdentifier);
+    void addGStreamerIceBackend(GStreamerIceBackendIdentifier, GStreamerIceBackendProxy&);
+    void removeGStreamerIceBackend(GStreamerIceBackendIdentifier);
+#endif
 
 #if ENABLE(GPU_PROCESS)
     GPUProcessConnection& ensureGPUProcessConnection();
@@ -935,6 +948,11 @@ private:
     FileSystem::Salt m_mediaKeysStorageSalt;
 
     HashMap<WebTransportSessionIdentifier, ThreadSafeWeakPtr<WebTransportSession>> m_webTransportSessions;
+
+#if USE(GSTREAMER_WEBRTC)
+    HashMap<GStreamerIceBackendIdentifier, ThreadSafeWeakPtr<GStreamerIceBackendProxy>> m_gstreamerIceBackends;
+#endif
+
     HashSet<WebCore::RegistrableDomain> m_domainsWithStorageAccessQuirks;
     std::unique_ptr<ScriptTrackingPrivacyFilter> m_scriptTrackingPrivacyFilter;
     bool m_mediaPlaybackEnabled { false };
