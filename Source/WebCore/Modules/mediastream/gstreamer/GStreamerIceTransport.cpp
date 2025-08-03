@@ -110,9 +110,23 @@ static void webkitGstWebRTCIceTransportConstructed(GObject* object)
     transport->src = makeGStreamerElement("appsrc"_s, makeString("ice-src-"_s, id));
     counter.exchangeAdd(1);
 
-    // TODO: hook appsink to IceBackend::send()
+    static GstAppSrcCallbacks srcCallbacks = {
+        // need_data
+        [](GstAppSrc*, unsigned, gpointer userData) {
+            // auto self = reinterpret_cast<InternalSource*>(userData);
+            // self->m_enoughData = false;
+        },
+        // enough_data
+        [](GstAppSrc*, gpointer userData) {
+            // auto self = reinterpret_cast<InternalSource*>(userData);
+            // self->m_enoughData = true;
+        },
+        nullptr,
+        { nullptr }
+    };
+    gst_app_src_set_callbacks(GST_APP_SRC(transport->src), &srcCallbacks, self, nullptr);
 
-    static GstAppSinkCallbacks callbacks = {
+    static GstAppSinkCallbacks sinkCallbacks = {
         nullptr, // eos
         [](GstAppSink* sink, gpointer userData) -> GstFlowReturn {
             return iceTransportHandleSample(WEBKIT_GST_WEBRTC_ICE_TRANSPORT(userData), sink, true);
@@ -130,7 +144,7 @@ static void webkitGstWebRTCIceTransportConstructed(GObject* object)
 #endif
         { nullptr }
     };
-    gst_app_sink_set_callbacks(GST_APP_SINK(transport->sink), &callbacks, self, nullptr);
+    gst_app_sink_set_callbacks(GST_APP_SINK(transport->sink), &sinkCallbacks, self, nullptr);
     g_object_set(transport->sink, "buffer-list", TRUE, "sync", FALSE, "async", FALSE, "enable-last-sample", FALSE, nullptr);
 }
 
