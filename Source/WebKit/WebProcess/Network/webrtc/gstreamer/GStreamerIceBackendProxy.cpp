@@ -132,6 +132,16 @@ void GStreamerIceBackendProxy::notifyGatheringDone(unsigned streamId)
     m_client->notifyGatheringDone(streamId);
 }
 
+void GStreamerIceBackendProxy::notifyComponentStateChanged(unsigned streamId, RTCIceComponent component, RTCIceConnectionState state)
+{
+    m_client->notifyComponentStateChanged(streamId, component, state);
+}
+
+void GStreamerIceBackendProxy::notifyNewSelectedPair(unsigned streamId, RTCIceComponent component)
+{
+    m_client->notifyNewSelectedPair(streamId, component);
+}
+
 bool GStreamerIceBackendProxy::send(unsigned streamId, unsigned component, std::span<const uint8_t> data)
 {
     auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::SendData { streamId, component, WTFMove(data) }, messageSenderDestinationID());

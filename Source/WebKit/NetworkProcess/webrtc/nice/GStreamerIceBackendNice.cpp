@@ -5,6 +5,8 @@
 #if USE(GSTREAMER_WEBRTC) && USE(LIBNICE)
 
 #include "GStreamerIceBackendProxyMessages.h"
+#include <WebCore/RTCIceComponent.h>
+#include <WebCore/RTCIceConnectionState.h>
 #include <nice.h>
 #include <wtf/CompletionHandler.h>
 #include <wtf/glib/GThreadSafeWeakPtr.h>
@@ -48,6 +50,15 @@ GStreamerIceBackendNice::GStreamerIceBackendNice()
         auto self = reinterpret_cast<GStreamerIceBackendNice*>(userData);
         self->notifyGatheringDone(streamId);
     }), this);
+
+    g_signal_connect(m_agent.get(), "component-state-changed", G_CALLBACK(+[](NiceAgent*, unsigned streamId, NiceComponentType component, NiceComponentState state, gpointer userData) {
+        auto self = reinterpret_cast<GStreamerIceBackendNice*>(userData);
+        self->notifyComponentStateChanged(streamId, component, state);
+    }), this);
+    g_signal_connect(m_agent.get(), "new-selected-pair-full", G_CALLBACK(+[](NiceAgent*, unsigned streamId, NiceComponentType component, NiceCandidate*, NiceCandidate*, gpointer userData) {
+        auto self = reinterpret_cast<GStreamerIceBackendNice*>(userData);
+        self->notifyNewSelectedPair(streamId, component);
+    }), this);
 }
 
 GStreamerIceBackendNice::~GStreamerIceBackendNice()
@@ -77,6 +88,53 @@ void GStreamerIceBackendNice::notifyNewCandidate(const NiceCandidate& candidate)
 void GStreamerIceBackendNice::notifyGatheringDone(unsigned streamId)
 {
     connection()->send(Messages::GStreamerIceBackendProxy::NotifyGatheringDone { streamId }, 0);
+}
+
+static WebCore::RTCIceComponent niceComponentToRTCIceComponent(NiceComponentType component)
+{
+    WebCore::RTCIceComponent iceComponent;
+    switch (component) {
+    case NICE_COMPONENT_TYPE_RTCP:
+        iceComponent = WebCore::RTCIceComponent::Rtcp;
+        break;
+    case NICE_COMPONENT_TYPE_RTP:
+        iceComponent = WebCore::RTCIceComponent::Rtp;
+        break;
+    };
+    return iceComponent;
+}
+
+void GStreamerIceBackendNice::notifyComponentStateChanged(unsigned streamId, NiceComponentType component, NiceComponentState state)
+{
+    WebCore::RTCIceConnectionState iceState;
+    switch (state) {
+    case NICE_COMPONENT_STATE_CONNECTING:
+        iceState = WebCore::RTCIceConnectionState::Checking;
+        break;
+    case NICE_COMPONENT_STATE_CONNECTED:
+        iceState = WebCore::RTCIceConnectionState::Connected;
+        break;
+    case NICE_COMPONENT_STATE_DISCONNECTED:
+        iceState = WebCore::RTCIceConnectionState::Disconnected;
+        break;
+    case NICE_COMPONENT_STATE_GATHERING:
+        iceState = WebCore::RTCIceConnectionState::New;
+        break;
+    case NICE_COMPONENT_STATE_READY:
+        iceState = WebCore::RTCIceConnectionState::Completed;
+        break;
+    case NICE_COMPONENT_STATE_FAILED:
+        iceState = WebCore::RTCIceConnectionState::Failed;
+        break;
+    case NICE_COMPONENT_STATE_LAST:
+        break;
+    };
+    connection()->send(Messages::GStreamerIceBackendProxy::NotifyComponentStateChanged { streamId, niceComponentToRTCIceComponent(component), iceState }, 0);
+}
+
+void GStreamerIceBackendNice::notifyNewSelectedPair(unsigned streamId, NiceComponentType component)
+{
+    connection()->send(Messages::GStreamerIceBackendProxy::NotifyNewSelectedPair { streamId, niceComponentToRTCIceComponent(component) }, 0);
 }
 
 void GStreamerIceBackendNice::fillLocalCandidateCredentials(const NiceCandidate& candidate, GUniqueOutPtr<NiceCandidate>& result)

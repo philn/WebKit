@@ -19,8 +19,6 @@
 
 #include "config.h"
 #include "GStreamerIceStream.h"
-#include <gst/webrtc/icetransport.h>
-#include <gst/webrtc/webrtc_fwd.h>
 
 #if USE(GSTREAMER_WEBRTC)
 
@@ -107,6 +105,56 @@ static gboolean webkitGstWebRTCIceStreamGatherCandidates(GstWebRTCICEStream* ice
         return FALSE;
 
     return webkitGstWebRTCIceAgentGatherCandidates(agent.get(), stream->priv->streamId);
+}
+
+void webkitGstWebRTCIceStreamComponentStateChanged(WebKitGstIceStream* stream, RTCIceComponent component, RTCIceConnectionState state)
+{
+    GstWebRTCICEConnectionState gstState;
+
+    switch (state) {
+    case RTCIceConnectionState::New:
+        gstState = GST_WEBRTC_ICE_CONNECTION_STATE_NEW;
+        break;
+    case RTCIceConnectionState::Checking:
+        gstState = GST_WEBRTC_ICE_CONNECTION_STATE_CHECKING;
+        break;
+    case RTCIceConnectionState::Connected:
+        gstState = GST_WEBRTC_ICE_CONNECTION_STATE_CONNECTED;
+        break;
+    case RTCIceConnectionState::Completed:
+        gstState = GST_WEBRTC_ICE_CONNECTION_STATE_COMPLETED;
+        break;
+    case RTCIceConnectionState::Failed:
+        gstState = GST_WEBRTC_ICE_CONNECTION_STATE_FAILED;
+        break;
+    case RTCIceConnectionState::Disconnected:
+        gstState = GST_WEBRTC_ICE_CONNECTION_STATE_DISCONNECTED;
+        break;
+    case RTCIceConnectionState::Closed:
+        gstState = GST_WEBRTC_ICE_CONNECTION_STATE_CLOSED;
+        break;
+    }
+
+    switch (component) {
+    case RTCIceComponent::Rtp:
+        gst_webrtc_ice_transport_connection_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()), gstState);
+        break;
+    case RTCIceComponent::Rtcp:
+        gst_webrtc_ice_transport_connection_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()), gstState);
+        break;
+    }
+}
+
+void webkitGstWebRTCIceStreamNewSelectedPair(WebKitGstIceStream* stream, RTCIceComponent component)
+{
+    switch (component) {
+    case RTCIceComponent::Rtp:
+        gst_webrtc_ice_transport_selected_pair_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()));
+        break;
+    case RTCIceComponent::Rtcp:
+        gst_webrtc_ice_transport_selected_pair_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()));
+        break;
+    }
 }
 
 static void webkitGstWebRTCIceStreamFinalize(GObject* object)

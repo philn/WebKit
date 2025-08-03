@@ -571,6 +571,8 @@ def types_that_cannot_be_forward_declared():
         'WebCore::PlaybackTargetClientContextIdentifier',
         'WebCore::PointerID',
         'WebCore::RTCDataChannelIdentifier',
+        'WebCore::RTCIceComponent',
+        'WebCore::RTCIceConnectionState',
         'WebCore::RenderingMode',
         'WebCore::RenderingPurpose',
         'WebCore::SandboxFlags',

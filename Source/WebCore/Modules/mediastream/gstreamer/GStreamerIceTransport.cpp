@@ -37,6 +37,7 @@ using namespace WebCore;
 typedef struct _WebKitGstIceTransportPrivate {
     GThreadSafeWeakPtr<WebKitGstIceAgent> agent;
     unsigned streamId;
+    bool isController;
     ReadDataCallback readCallback;
 } WebKitGstIceTransportPrivate;
 
@@ -100,6 +101,8 @@ static void webkitGstWebRTCIceTransportConstructed(GObject* object)
     auto self = WEBKIT_GST_WEBRTC_ICE_TRANSPORT(object);
     auto transport = GST_WEBRTC_ICE_TRANSPORT(object);
 
+    transport->role = self->priv->isController ? GST_WEBRTC_ICE_ROLE_CONTROLLING : GST_WEBRTC_ICE_ROLE_CONTROLLED;
+
     static Atomic<uint32_t> counter = 0;
     auto id = counter.load();
 
@@ -138,12 +141,13 @@ static void webkit_gst_webrtc_ice_transport_class_init(WebKitGstIceTransportClas
     gobjectClass->finalize = webkitGstWebRTCIceTransportFinalize;
 }
 
-WebKitGstIceTransport* webkitGstWebRTCCreateIceTransport(WebKitGstIceAgent* agent, unsigned streamId, GstWebRTCICEComponent component, ReadDataCallback&& readCallback)
+WebKitGstIceTransport* webkitGstWebRTCCreateIceTransport(WebKitGstIceAgent* agent, unsigned streamId, GstWebRTCICEComponent component, bool isController, ReadDataCallback&& readCallback)
 {
     auto transport = reinterpret_cast<WebKitGstIceTransport*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_TRANSPORT, "component", component, nullptr));
     auto priv = transport->priv;
     priv->agent.reset(agent);
     priv->streamId = streamId;
+    priv->isController = isController;
     priv->readCallback = WTFMove(readCallback);
     return transport;
 }

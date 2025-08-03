@@ -19,11 +19,12 @@
 
 #pragma once
 
-#include <gst/webrtc/webrtc_fwd.h>
 #if USE(GSTREAMER_WEBRTC)
 
 #include "GStreamerIceAgent.h"
 #include "GStreamerIceTransport.h"
+#include "RTCIceComponent.h"
+#include "RTCIceConnectionState.h"
 #include <glib-object.h>
 #include <wtf/Forward.h>
 
@@ -43,5 +44,7 @@ WebKitGstIceStream* webkitGstWebRTCCreateIceStream(WebKitGstIceAgent*, unsigned)
 unsigned webkitiGstWebRTCIceStreamGetId(WebKitGstIceStream*);
 void webkitGstWebRTCIceStreamGatheringDone(WebKitGstIceStream*);
 GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(GstWebRTCICEStream*, GstWebRTCICEComponent);
+void webkitGstWebRTCIceStreamComponentStateChanged(WebKitGstIceStream*, WebCore::RTCIceComponent, WebCore::RTCIceConnectionState);
+void webkitGstWebRTCIceStreamNewSelectedPair(WebKitGstIceStream*, WebCore::RTCIceComponent);
 
 #endif // USE(GSTREAMER_WEBRTC)

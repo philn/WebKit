@@ -48,6 +48,8 @@ private:
 
     void notifyNewCandidate(const NiceCandidate&);
     void notifyGatheringDone(unsigned);
+    void notifyComponentStateChanged(unsigned, NiceComponentType, NiceComponentState);
+    void notifyNewSelectedPair(unsigned, NiceComponentType);
 
     void fillLocalCandidateCredentials(const NiceCandidate&, GUniqueOutPtr<NiceCandidate>&);
 

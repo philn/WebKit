@@ -22,6 +22,8 @@
 #if USE(GSTREAMER_WEBRTC)
 
 #include "ExceptionData.h"
+#include "RTCIceComponent.h"
+#include "RTCIceConnectionState.h"
 #include <glib-object.h>
 #include <wtf/Expected.h>
 #include <wtf/Forward.h>
@@ -59,6 +61,14 @@ public:
     void setOnStreamGatheringDone(OnStreamGatheringDone&& callback) { m_onStreamGatheringDone = WTFMove(callback); }
     void notifyGatheringDone(unsigned streamId) { m_onStreamGatheringDone(streamId); }
 
+    using OnComponentStateChanged = Function<void(unsigned, RTCIceComponent, RTCIceConnectionState)>;
+    void setOnComponentStateChanged(OnComponentStateChanged&& callback) { m_onComponentStateChanged = WTFMove(callback); }
+    void notifyComponentStateChanged(unsigned streamId, RTCIceComponent component, RTCIceConnectionState state) { m_onComponentStateChanged(streamId, component, state); }
+
+    using OnNewSelectedPair = Function<void(unsigned, RTCIceComponent)>;
+    void setOnNewSelectedPair(OnNewSelectedPair&& callback) { m_onNewSelectedPair = WTFMove(callback); }
+    void notifyNewSelectedPair(unsigned streamId, RTCIceComponent component) { m_onNewSelectedPair(streamId, component); }
+
     using ReadDataCallback = WTF::Function<void(unsigned, unsigned, std::span<uint8_t>&&)>;
     void setReadDataCallback(ReadDataCallback&& readCallback) { m_readCallback = WTFMove(readCallback); }
     void notifyDataRead(unsigned streamId, unsigned component, std::span<uint8_t>&& data) { m_readCallback(streamId, component, WTFMove(data)); }
@@ -68,6 +78,8 @@ private:
 
     OnIceCandidateCallback m_onIceCandidateCallback;
     OnStreamGatheringDone m_onStreamGatheringDone;
+    OnComponentStateChanged m_onComponentStateChanged;
+    OnNewSelectedPair m_onNewSelectedPair;
     ReadDataCallback m_readCallback;
 };
 

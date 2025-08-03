@@ -10,6 +10,8 @@
 #include "WebProcess.h"
 #include <WebCore/Document.h>
 #include <WebCore/GStreamerIceAgent.h>
+#include <WebCore/RTCIceComponent.h>
+#include <WebCore/RTCIceConnectionState.h>
 
 namespace IPC {
 class Connection;
@@ -60,6 +62,8 @@ private:
     // GStreamerIceBackendClient (Network -> Web)
     void notifyNewCandidate(unsigned, String&&);
     void notifyGatheringDone(unsigned);
+    void notifyComponentStateChanged(unsigned, WebCore::RTCIceComponent, WebCore::RTCIceConnectionState);
+    void notifyNewSelectedPair(unsigned, WebCore::RTCIceComponent);
 
     // MessageSender
     IPC::Connection *messageSenderConnection() const final;
