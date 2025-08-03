@@ -38,7 +38,6 @@ typedef struct _WebKitGstIceTransportPrivate {
     GThreadSafeWeakPtr<WebKitGstIceAgent> agent;
     unsigned streamId;
     bool isController;
-    ReadDataCallback readCallback;
 } WebKitGstIceTransportPrivate;
 
 typedef struct _WebKitGstIceTransport {
@@ -110,22 +109,6 @@ static void webkitGstWebRTCIceTransportConstructed(GObject* object)
     transport->src = makeGStreamerElement("appsrc"_s, makeString("ice-src-"_s, id));
     counter.exchangeAdd(1);
 
-    static GstAppSrcCallbacks srcCallbacks = {
-        // need_data
-        [](GstAppSrc*, unsigned, gpointer userData) {
-            // auto self = reinterpret_cast<InternalSource*>(userData);
-            // self->m_enoughData = false;
-        },
-        // enough_data
-        [](GstAppSrc*, gpointer userData) {
-            // auto self = reinterpret_cast<InternalSource*>(userData);
-            // self->m_enoughData = true;
-        },
-        nullptr,
-        { nullptr }
-    };
-    gst_app_src_set_callbacks(GST_APP_SRC(transport->src), &srcCallbacks, self, nullptr);
-
     static GstAppSinkCallbacks sinkCallbacks = {
         nullptr, // eos
         [](GstAppSink* sink, gpointer userData) -> GstFlowReturn {
@@ -148,6 +131,12 @@ static void webkitGstWebRTCIceTransportConstructed(GObject* object)
     g_object_set(transport->sink, "buffer-list", TRUE, "sync", FALSE, "async", FALSE, "enable-last-sample", FALSE, nullptr);
 }
 
+void webkitGstWebRTCIceTransportHandleIncomingData(WebKitGstIceTransport* transport, std::span<const uint8_t>&& data)
+{
+    auto buffer = wrapSpanData(data);
+    gst_app_src_push_buffer(GST_APP_SRC(GST_WEBRTC_ICE_TRANSPORT(transport)->src), buffer.leakRef());
+}
+
 static void webkit_gst_webrtc_ice_transport_class_init(WebKitGstIceTransportClass* klass)
 {
     auto gobjectClass = G_OBJECT_CLASS(klass);
@@ -155,14 +144,13 @@ static void webkit_gst_webrtc_ice_transport_class_init(WebKitGstIceTransportClas
     gobjectClass->finalize = webkitGstWebRTCIceTransportFinalize;
 }
 
-WebKitGstIceTransport* webkitGstWebRTCCreateIceTransport(WebKitGstIceAgent* agent, unsigned streamId, GstWebRTCICEComponent component, bool isController, ReadDataCallback&& readCallback)
+WebKitGstIceTransport* webkitGstWebRTCCreateIceTransport(WebKitGstIceAgent* agent, unsigned streamId, GstWebRTCICEComponent component, bool isController)
 {
     auto transport = reinterpret_cast<WebKitGstIceTransport*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_TRANSPORT, "component", component, nullptr));
     auto priv = transport->priv;
     priv->agent.reset(agent);
     priv->streamId = streamId;
     priv->isController = isController;
-    priv->readCallback = WTFMove(readCallback);
     return transport;
 }
 

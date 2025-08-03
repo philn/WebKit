@@ -65,6 +65,7 @@ GType webkit_gst_webrtc_ice_transport_get_type();
 
 using ReadDataCallback = WTF::Function<void(unsigned, unsigned, std::span<uint8_t>&&)>;
 
-WebKitGstIceTransport* webkitGstWebRTCCreateIceTransport(WebKitGstIceAgent*, unsigned, GstWebRTCICEComponent, bool, ReadDataCallback&&);
+WebKitGstIceTransport* webkitGstWebRTCCreateIceTransport(WebKitGstIceAgent*, unsigned, GstWebRTCICEComponent, bool);
+void webkitGstWebRTCIceTransportHandleIncomingData(WebKitGstIceTransport*, std::span<const uint8_t>&&);
 
 #endif // USE(GSTREAMER_WEBRTC)

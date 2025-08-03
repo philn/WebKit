@@ -69,9 +69,9 @@ public:
     void setOnNewSelectedPair(OnNewSelectedPair&& callback) { m_onNewSelectedPair = WTFMove(callback); }
     void notifyNewSelectedPair(unsigned streamId, RTCIceComponent component) { m_onNewSelectedPair(streamId, component); }
 
-    using ReadDataCallback = WTF::Function<void(unsigned, unsigned, std::span<uint8_t>&&)>;
+    using ReadDataCallback = WTF::Function<void(unsigned, RTCIceComponent, std::span<const uint8_t>&&)>;
     void setReadDataCallback(ReadDataCallback&& readCallback) { m_readCallback = WTFMove(readCallback); }
-    void notifyDataRead(unsigned streamId, unsigned component, std::span<uint8_t>&& data) { m_readCallback(streamId, component, WTFMove(data)); }
+    void notifyDataRead(unsigned streamId, RTCIceComponent component, std::span<const uint8_t>&& data) { m_readCallback(streamId, component, WTFMove(data)); }
 
 private:
     GStreamerIceBackendClient() = default;

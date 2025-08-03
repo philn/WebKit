@@ -23,11 +23,11 @@
     DispatchedTo=WebContent
 ]
 messages -> GStreamerIceBackendProxy {
-
     NotifyNewCandidate(unsigned sessionId, String candidate);
     NotifyGatheringDone(unsigned streamId);
     NotifyComponentStateChanged(unsigned streamId, WebCore::RTCIceComponent component, WebCore::RTCIceConnectionState state);
     NotifyNewSelectedPair(unsigned streamId, WebCore::RTCIceComponent component);
+    NotifyDataRead(unsigned streamId, WebCore::RTCIceComponent component, std::span<const uint8_t> data);
 }
 
 #endif

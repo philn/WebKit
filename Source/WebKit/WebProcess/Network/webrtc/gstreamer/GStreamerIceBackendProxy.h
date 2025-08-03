@@ -64,6 +64,7 @@ private:
     void notifyGatheringDone(unsigned);
     void notifyComponentStateChanged(unsigned, WebCore::RTCIceComponent, WebCore::RTCIceConnectionState);
     void notifyNewSelectedPair(unsigned, WebCore::RTCIceComponent);
+    void notifyDataRead(unsigned, WebCore::RTCIceComponent, std::span<const uint8_t>);
 
     // MessageSender
     IPC::Connection *messageSenderConnection() const final;

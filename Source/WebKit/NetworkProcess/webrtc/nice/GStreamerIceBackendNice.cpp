@@ -228,6 +228,9 @@ void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<vo
     m_streams.append({ sessionId, streamId });
     for (const auto& url : m_turnServers)
         addTurnServerForStream(streamId, url);
+
+    // TODO: nice_agent_attach_recv()
+
     completionHandler({ streamId });
 }
 

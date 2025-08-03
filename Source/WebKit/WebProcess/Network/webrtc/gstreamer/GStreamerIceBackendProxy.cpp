@@ -142,6 +142,11 @@ void GStreamerIceBackendProxy::notifyNewSelectedPair(unsigned streamId, RTCIceCo
     m_client->notifyNewSelectedPair(streamId, component);
 }
 
+void GStreamerIceBackendProxy::notifyDataRead(unsigned streamId, RTCIceComponent component, std::span<const uint8_t> data)
+{
+    m_client->notifyDataRead(streamId, component, WTFMove(data));
+}
+
 bool GStreamerIceBackendProxy::send(unsigned streamId, unsigned component, std::span<const uint8_t> data)
 {
     auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::SendData { streamId, component, WTFMove(data) }, messageSenderDestinationID());

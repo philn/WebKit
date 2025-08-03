@@ -157,6 +157,18 @@ void webkitGstWebRTCIceStreamNewSelectedPair(WebKitGstIceStream* stream, RTCIceC
     }
 }
 
+void webkitGstWebRTCIceStreamHandleIncomingData(WebKitGstIceStream* stream, RTCIceComponent component, std::span<const uint8_t>&& data)
+{
+    switch (component) {
+    case RTCIceComponent::Rtp:
+        webkitGstWebRTCIceTransportHandleIncomingData(WEBKIT_GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()), WTFMove(data));
+        break;
+    case RTCIceComponent::Rtcp:
+        webkitGstWebRTCIceTransportHandleIncomingData(WEBKIT_GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()), WTFMove(data));
+        break;
+    }
+}
+
 static void webkitGstWebRTCIceStreamFinalize(GObject* object)
 {
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_stream_parent_class)->finalize(object);

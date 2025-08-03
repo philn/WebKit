@@ -236,7 +236,7 @@ GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent*
     if (!agent->priv->iceBackend)
         return nullptr;
 
-    return GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCCreateIceTransport(agent, streamId, component, agent->priv->isController, [](unsigned, unsigned, std::span<uint8_t>&&) {}));
+    return GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCCreateIceTransport(agent, streamId, component, agent->priv->isController));
 }
 
 GstFlowReturn webkitGstWebRTCIceAgentSend(WebKitGstIceAgent* agent, unsigned streamId, unsigned component, std::span<const uint8_t> buffers)
@@ -283,6 +283,12 @@ static void webkitGstWebRTCIceAgentConstructed(GObject* object)
         if (!stream)
             return;
         webkitGstWebRTCIceStreamNewSelectedPair(WEBKIT_GST_WEBRTC_ICE_STREAM(stream->get()), component);
+    });
+    priv->backendClient->setReadDataCallback([&](unsigned streamId, RTCIceComponent component, std::span<const uint8_t>&& data) {
+        auto stream = priv->streams.getOptional(streamId);
+        if (!stream)
+            return;
+        webkitGstWebRTCIceStreamHandleIncomingData(WEBKIT_GST_WEBRTC_ICE_STREAM(stream->get()), component, WTFMove(data));
     });
 }
 

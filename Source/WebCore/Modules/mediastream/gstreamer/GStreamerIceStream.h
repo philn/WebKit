@@ -46,5 +46,6 @@ void webkitGstWebRTCIceStreamGatheringDone(WebKitGstIceStream*);
 GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(GstWebRTCICEStream*, GstWebRTCICEComponent);
 void webkitGstWebRTCIceStreamComponentStateChanged(WebKitGstIceStream*, WebCore::RTCIceComponent, WebCore::RTCIceConnectionState);
 void webkitGstWebRTCIceStreamNewSelectedPair(WebKitGstIceStream*, WebCore::RTCIceComponent);
+void webkitGstWebRTCIceStreamHandleIncomingData(WebKitGstIceStream*, WebCore::RTCIceComponent, std::span<const uint8_t>&&);
 
 #endif // USE(GSTREAMER_WEBRTC)
