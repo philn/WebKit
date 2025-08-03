@@ -34,7 +34,6 @@ using namespace WebCore;
 
 typedef struct _WebKitGstIceStreamPrivate {
     GThreadSafeWeakPtr<WebKitGstIceAgent> agent;
-    unsigned streamId;
     GRefPtr<GstWebRTCICETransport> rtpTransport;
     GRefPtr<GstWebRTCICETransport> rtcpTransport;
 } WebKitGstIceStreamPrivate;
@@ -63,22 +62,16 @@ GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(GstWebRTCICEStream*
     switch (component) {
     case GST_WEBRTC_ICE_COMPONENT_RTP:
         if (!stream->priv->rtpTransport)
-            stream->priv->rtpTransport = adoptGRef(GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCIceAgentCreateTransport(agent.get(), stream->priv->streamId, component)));
+            stream->priv->rtpTransport = adoptGRef(GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCIceAgentCreateTransport(agent.get(), ice->stream_id, component)));
         return stream->priv->rtpTransport.get();
     case GST_WEBRTC_ICE_COMPONENT_RTCP:
         if (!stream->priv->rtcpTransport)
-            stream->priv->rtcpTransport = adoptGRef(GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCIceAgentCreateTransport(agent.get(), stream->priv->streamId, component)));
+            stream->priv->rtcpTransport = adoptGRef(GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCIceAgentCreateTransport(agent.get(), ice->stream_id, component)));
         return stream->priv->rtcpTransport.get();
     }
 
     ASSERT_NOT_REACHED();
     return nullptr;
-}
-
-unsigned webkitiGstWebRTCIceStreamGetId(WebKitGstIceStream* ice)
-{
-    auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);
-    return stream->priv->streamId;
 }
 
 void webkitGstWebRTCIceStreamGatheringDone(WebKitGstIceStream* ice)
@@ -104,7 +97,7 @@ static gboolean webkitGstWebRTCIceStreamGatherCandidates(GstWebRTCICEStream* ice
     if (!agent)
         return FALSE;
 
-    return webkitGstWebRTCIceAgentGatherCandidates(agent.get(), stream->priv->streamId);
+    return webkitGstWebRTCIceAgentGatherCandidates(agent.get(), ice->stream_id);
 }
 
 void webkitGstWebRTCIceStreamComponentStateChanged(WebKitGstIceStream* stream, RTCIceComponent component, RTCIceConnectionState state)
@@ -171,6 +164,11 @@ void webkitGstWebRTCIceStreamHandleIncomingData(WebKitGstIceStream* stream, RTCI
 
 static void webkitGstWebRTCIceStreamFinalize(GObject* object)
 {
+    auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(object);
+    auto agent = stream->priv->agent.get();
+    if (agent)
+        webkitGstWebRTCIceAgentFinalizeStream(agent.get(), GST_WEBRTC_ICE_STREAM(object)->stream_id);
+
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_stream_parent_class)->finalize(object);
 }
 
@@ -181,8 +179,6 @@ static void webkitGstWebRTCIceStreamConstructed(GObject* object)
 
 static void webkit_gst_webrtc_ice_stream_class_init(WebKitGstIceStreamClass* klass)
 {
-    // TODO: identifier readonly-property?
-
     auto gobjectClass = G_OBJECT_CLASS(klass);
     gobjectClass->constructed = webkitGstWebRTCIceStreamConstructed;
     gobjectClass->finalize = webkitGstWebRTCIceStreamFinalize;
@@ -194,9 +190,8 @@ static void webkit_gst_webrtc_ice_stream_class_init(WebKitGstIceStreamClass* kla
 
 WebKitGstIceStream* webkitGstWebRTCCreateIceStream(WebKitGstIceAgent* agent, unsigned streamId)
 {
-    auto stream = reinterpret_cast<WebKitGstIceStream*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_STREAM, nullptr));
+    auto stream = reinterpret_cast<WebKitGstIceStream*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_STREAM, "stream-id", streamId, nullptr));
     stream->priv->agent.reset(agent);
-    stream->priv->streamId = streamId;
     return stream;
 }
 

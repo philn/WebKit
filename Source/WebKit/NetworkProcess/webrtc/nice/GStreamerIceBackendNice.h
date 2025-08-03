@@ -42,6 +42,7 @@ public:
     void setLocalCredentials(unsigned, const String&, const String&, CompletionHandler<void(bool)>&&);
     void setRemoteCredentials(unsigned, const String&, const String&, CompletionHandler<void(bool)>&&);
     void sendData(unsigned, unsigned, std::span<const uint8_t>&&, CompletionHandler<void(bool)>&&);
+    void finalizeStream(unsigned);
 
 private:
     virtual IPC::Connection* connection() const = 0;
@@ -50,6 +51,8 @@ private:
     void notifyGatheringDone(unsigned);
     void notifyComponentStateChanged(unsigned, NiceComponentType, NiceComponentState);
     void notifyNewSelectedPair(unsigned, NiceComponentType);
+
+    void handleIncomingData(unsigned, NiceComponentType, std::span<const uint8_t>&&);
 
     void fillLocalCandidateCredentials(const NiceCandidate&, GUniqueOutPtr<NiceCandidate>&);
 

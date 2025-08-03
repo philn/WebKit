@@ -41,7 +41,6 @@ GType webkit_gst_webrtc_ice_stream_get_type();
 
 WebKitGstIceStream* webkitGstWebRTCCreateIceStream(WebKitGstIceAgent*, unsigned);
 
-unsigned webkitiGstWebRTCIceStreamGetId(WebKitGstIceStream*);
 void webkitGstWebRTCIceStreamGatheringDone(WebKitGstIceStream*);
 GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(GstWebRTCICEStream*, GstWebRTCICEComponent);
 void webkitGstWebRTCIceStreamComponentStateChanged(WebKitGstIceStream*, WebCore::RTCIceComponent, WebCore::RTCIceConnectionState);

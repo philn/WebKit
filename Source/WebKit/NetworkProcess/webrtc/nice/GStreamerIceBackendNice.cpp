@@ -208,7 +208,7 @@ void GStreamerIceBackendNice::setRemoteCredentials(unsigned streamId, const Stri
 
 void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<void(std::optional<unsigned>)>&& completionHandler)
 {
-    auto streamId = nice_agent_add_stream(m_agent.get(), 1);
+    auto streamId = nice_agent_add_stream(m_agent.get(), 2);
     if (!streamId) {
         completionHandler(std::nullopt);
         return;
@@ -229,9 +229,20 @@ void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<vo
     for (const auto& url : m_turnServers)
         addTurnServerForStream(streamId, url);
 
-    // TODO: nice_agent_attach_recv()
+    auto readCallback = [](NiceAgent*, unsigned streamId, unsigned component, unsigned size, char* buffer, gpointer userData) {
+        auto self = reinterpret_cast<GStreamerIceBackendNice*>(userData);
+        auto data = WTF::unsafeMakeSpan(reinterpret_cast<const uint8_t*>(buffer), size);
+        self->handleIncomingData(streamId, static_cast<NiceComponentType>(component), WTFMove(data));
+    };
+    nice_agent_attach_recv(m_agent.get(), streamId, NICE_COMPONENT_TYPE_RTP, m_mainContext.get(), readCallback, this);
+    nice_agent_attach_recv(m_agent.get(), streamId, NICE_COMPONENT_TYPE_RTCP, m_mainContext.get(), readCallback, this);
 
     completionHandler({ streamId });
+}
+
+void GStreamerIceBackendNice::handleIncomingData(unsigned streamId, NiceComponentType component, std::span<const uint8_t>&& data)
+{
+    connection()->send(Messages::GStreamerIceBackendProxy::NotifyDataRead { streamId, niceComponentToRTCIceComponent(component), WTFMove(data) }, 0);
 }
 
 void GStreamerIceBackendNice::gatherCandidatesForStream(unsigned streamId, CompletionHandler<void(bool)>&& completionHandler)
@@ -450,6 +461,12 @@ void GStreamerIceBackendNice::sendData(unsigned streamId, unsigned componentId, 
 {
     auto written = nice_agent_send(m_agent.get(), streamId, componentId, data.size_bytes(), reinterpret_cast<const char*>(data.data()));
     completionHandler(written);
+}
+
+void GStreamerIceBackendNice::finalizeStream(unsigned streamId)
+{
+    nice_agent_attach_recv(m_agent.get(), streamId, NICE_COMPONENT_TYPE_RTP, m_mainContext.get(), nullptr, nullptr);
+    nice_agent_attach_recv(m_agent.get(), streamId, NICE_COMPONENT_TYPE_RTCP, m_mainContext.get(), nullptr, nullptr);
 }
 
 } // namespace WebKit

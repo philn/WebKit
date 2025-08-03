@@ -106,6 +106,8 @@ public:
 
     virtual bool send(unsigned, unsigned, std::span<const uint8_t>) = 0;
 
+    virtual void finalizeStream(unsigned) = 0;
+
 protected:
     GStreamerIceBackend() = default;
     virtual ~GStreamerIceBackend() = default;
@@ -129,5 +131,6 @@ bool webkitGstWebRTCIceAgentGatherCandidates(WebKitGstIceAgent*, unsigned);
 GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent*, unsigned, GstWebRTCICEComponent);
 
 GstFlowReturn webkitGstWebRTCIceAgentSend(WebKitGstIceAgent*, unsigned, unsigned, std::span<const uint8_t>);
+void webkitGstWebRTCIceAgentFinalizeStream(WebKitGstIceAgent*, unsigned);
 
 #endif // USE(GSTREAMER_WEBRTC)

@@ -60,6 +60,11 @@ typedef struct _WebKitGstIceAgentClass {
     GstWebRTCICEClass parentClass;
 } WebKitGstIceAgentClass;
 
+enum {
+    PROP_0,
+    PROP_SOCKET_PROVIDER,
+};
+
 GST_DEBUG_CATEGORY(webkit_webrtc_ice_agent_debug);
 #define GST_CAT_DEFAULT webkit_webrtc_ice_agent_debug
 
@@ -175,7 +180,7 @@ static void webkitGstWebRTCIceAgentSetIsController(GstWebRTCICE* ice, gboolean i
 static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICEStream* iceStream, const gchar* candidate, GstPromise* promise)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
-    auto streamId = webkitiGstWebRTCIceStreamGetId(WEBKIT_GST_WEBRTC_ICE_STREAM(iceStream));
+    auto streamId = iceStream->stream_id;
     backend->priv->iceBackend->addCandidate(streamId, String::fromUTF8(candidate), [promise = GRefPtr(promise)](auto&& result) mutable {
         if (result.hasException()) {
             auto& errorMessage = result.exception().message();
@@ -200,22 +205,19 @@ static GstWebRTCICETransport* webkitGstWebRTCIceAgentFindTransport(GstWebRTCICE*
 static void webkitGstWebRTCIceAgentSetTos(GstWebRTCICE* ice, GstWebRTCICEStream* stream, guint tos)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
-    auto streamId = webkitiGstWebRTCIceStreamGetId(WEBKIT_GST_WEBRTC_ICE_STREAM(stream));
-    backend->priv->iceBackend->setTos(streamId, tos);
+    backend->priv->iceBackend->setTos(stream->stream_id, tos);
 }
 
 static gboolean webkitGstWebRTCIceAgentSetLocalCredentials(GstWebRTCICE* ice, GstWebRTCICEStream* stream, const gchar* ufrag, const gchar* pwd)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
-    auto streamId = webkitiGstWebRTCIceStreamGetId(WEBKIT_GST_WEBRTC_ICE_STREAM(stream));
-    return backend->priv->iceBackend->setLocalCredentials(streamId, String::fromLatin1(ufrag), String::fromLatin1(pwd));
+    return backend->priv->iceBackend->setLocalCredentials(stream->stream_id, String::fromLatin1(ufrag), String::fromLatin1(pwd));
 }
 
 static gboolean webkitGstWebRTCIceAgentSetRemoteCredentials(GstWebRTCICE* ice, GstWebRTCICEStream* stream, const gchar* ufrag, const gchar* pwd)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
-    auto streamId = webkitiGstWebRTCIceStreamGetId(WEBKIT_GST_WEBRTC_ICE_STREAM(stream));
-    return backend->priv->iceBackend->setRemoteCredentials(streamId, String::fromLatin1(ufrag), String::fromLatin1(pwd));
+    return backend->priv->iceBackend->setRemoteCredentials(stream->stream_id, String::fromLatin1(ufrag), String::fromLatin1(pwd));
 }
 
 static gboolean webkitGstWebRTCIceAgentGatherCandidates(GstWebRTCICE* ice, GstWebRTCICEStream* stream)
@@ -247,6 +249,14 @@ GstFlowReturn webkitGstWebRTCIceAgentSend(WebKitGstIceAgent* agent, unsigned str
     if (!agent->priv->iceBackend->send(streamId, component, buffers))
         return GST_FLOW_ERROR;
     return GST_FLOW_OK;
+}
+
+void webkitGstWebRTCIceAgentFinalizeStream(WebKitGstIceAgent* agent, unsigned streamId)
+{
+    if (!agent->priv->iceBackend)
+        return;
+
+    agent->priv->iceBackend->finalizeStream(streamId);
 }
 
 static void webkitGstWebRTCIceAgentFinalize(GObject* object)
@@ -292,11 +302,46 @@ static void webkitGstWebRTCIceAgentConstructed(GObject* object)
     });
 }
 
+static void webkitGstWebRTCIceAgentSetProperty(GObject* object, unsigned propertyId, const GValue* value, GParamSpec* paramSpec)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(object);
+
+    switch (propertyId) {
+    case PROP_SOCKET_PROVIDER:
+        backend->priv->socketProvider = adoptRef(reinterpret_cast<SocketProvider*>(g_value_get_pointer(value)));
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propertyId, paramSpec);
+        break;
+    }
+}
+
+static void
+webkitGstWebRTCIceAgentGetProperty(GObject* object, unsigned propertyId, GValue* value, GParamSpec* paramSpec)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(object);
+
+    switch (propertyId) {
+    case PROP_SOCKET_PROVIDER:
+        g_value_set_pointer(value, backend->priv->socketProvider.get());
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propertyId, paramSpec);
+        break;
+    }
+}
+
 static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* klass)
 {
     auto gobjectClass = G_OBJECT_CLASS(klass);
     gobjectClass->constructed = webkitGstWebRTCIceAgentConstructed;
     gobjectClass->finalize = webkitGstWebRTCIceAgentFinalize;
+    gobjectClass->get_property = webkitGstWebRTCIceAgentGetProperty;
+    gobjectClass->set_property = webkitGstWebRTCIceAgentSetProperty;
+
+    g_object_class_install_property(gobjectClass, PROP_SOCKET_PROVIDER,
+        g_param_spec_pointer("socket-provider", "Socket Provider", "Socket provider associated with this ICE agent",
+            static_cast<GParamFlags>(G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS)));
 
     auto iceClass = GST_WEBRTC_ICE_CLASS(klass);
     iceClass->set_on_ice_candidate = webkitGstWebRTCIceAgentSetOnIceCandidate;
@@ -329,13 +374,11 @@ WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(const String& name, ScriptExecu
     if (!context)
         return nullptr;
 
-    // TODO: this might need to become a construct-only property.
     RefPtr socketProvider = context->socketProvider();
     if (!socketProvider)
         return nullptr;
 
-    auto backend = reinterpret_cast<WebKitGstIceAgent*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND, "name", name.ascii().data(), nullptr));
-    backend->priv->socketProvider = WTFMove(socketProvider);
+    auto backend = reinterpret_cast<WebKitGstIceAgent*>(g_object_new(WEBKIT_TYPE_GST_WEBRTC_ICE_BACKEND, "name", name.ascii().data(), "socket-provider", socketProvider.leakRef(), nullptr));
     return backend;
 }
 
