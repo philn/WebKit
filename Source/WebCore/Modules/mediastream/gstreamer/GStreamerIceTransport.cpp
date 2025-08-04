@@ -23,6 +23,7 @@
 #if USE(GSTREAMER_WEBRTC)
 
 #include "GStreamerCommon.h"
+#include "RTCIceComponent.h"
 #include <gst/app/gstappsink.h>
 #include <gst/app/gstappsrc.h>
 #include <gst/webrtc/ice.h>
@@ -54,11 +55,6 @@ GST_DEBUG_CATEGORY(webkit_webrtc_ice_transport_debug);
 
 WEBKIT_DEFINE_TYPE_WITH_CODE(WebKitGstIceTransport, webkit_gst_webrtc_ice_transport, GST_TYPE_WEBRTC_ICE_TRANSPORT, GST_DEBUG_CATEGORY_INIT(webkit_webrtc_ice_transport_debug, "webkitwebrtcicetransport", 0, "WebRTC ICE transport"))
 
-static void webkitGstWebRTCIceTransportFinalize(GObject* object)
-{
-    G_OBJECT_CLASS(webkit_gst_webrtc_ice_transport_parent_class)->finalize(object);
-}
-
 static GstFlowReturn iceTransportHandleSample(WebKitGstIceTransport* self, GstAppSink* sink, bool isPreroll)
 {
     GRefPtr<GstSample> sample;
@@ -74,8 +70,18 @@ static GstFlowReturn iceTransportHandleSample(WebKitGstIceTransport* self, GstAp
     if (!agent)
         return GST_FLOW_ERROR;
 
-    GstWebRTCICEComponent component;
-    g_object_get(self, "component", &component, nullptr);
+    GstWebRTCICEComponent gstComponent;
+    g_object_get(self, "component", &gstComponent, nullptr);
+
+    RTCIceComponent component;
+    switch (gstComponent) {
+    case GST_WEBRTC_ICE_COMPONENT_RTP:
+        component = RTCIceComponent::Rtp;
+        break;
+    case GST_WEBRTC_ICE_COMPONENT_RTCP:
+        component = RTCIceComponent::Rtcp;
+        break;
+    };
 
     Vector<uint8_t> buffers;
     auto bufferList = gst_sample_get_buffer_list(sample.get());
@@ -141,7 +147,6 @@ static void webkit_gst_webrtc_ice_transport_class_init(WebKitGstIceTransportClas
 {
     auto gobjectClass = G_OBJECT_CLASS(klass);
     gobjectClass->constructed = webkitGstWebRTCIceTransportConstructed;
-    gobjectClass->finalize = webkitGstWebRTCIceTransportFinalize;
 }
 
 WebKitGstIceTransport* webkitGstWebRTCCreateIceTransport(WebKitGstIceAgent* agent, unsigned streamId, GstWebRTCICEComponent component, bool isController)

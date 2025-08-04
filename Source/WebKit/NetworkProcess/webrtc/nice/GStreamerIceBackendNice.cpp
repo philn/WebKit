@@ -5,7 +5,6 @@
 #if USE(GSTREAMER_WEBRTC) && USE(LIBNICE)
 
 #include "GStreamerIceBackendProxyMessages.h"
-#include <WebCore/RTCIceComponent.h>
 #include <WebCore/RTCIceConnectionState.h>
 #include <nice.h>
 #include <wtf/CompletionHandler.h>
@@ -131,17 +130,18 @@ void GStreamerIceBackendNice::notifyComponentStateChanged(unsigned streamId, Nic
         iceState = WebCore::RTCIceConnectionState::Failed;
         break;
     case NICE_COMPONENT_STATE_LAST:
-        break;
+        ASSERT_NOT_REACHED();
+        return;
     };
-    callOnMainThread([&] {
-        connection()->send(Messages::GStreamerIceBackendProxy::NotifyComponentStateChanged { streamId, niceComponentToRTCIceComponent(component), iceState }, destination());
+    callOnMainThreadAndWait([&, component = niceComponentToRTCIceComponent(component), iceState] {
+        connection()->send(Messages::GStreamerIceBackendProxy::NotifyComponentStateChanged { streamId, component, iceState }, destination());
     });
 }
 
 void GStreamerIceBackendNice::notifyNewSelectedPair(unsigned streamId, NiceComponentType component)
 {
-    callOnMainThread([&] {
-        connection()->send(Messages::GStreamerIceBackendProxy::NotifyNewSelectedPair { streamId, niceComponentToRTCIceComponent(component) }, destination());
+    callOnMainThreadAndWait([&, component = niceComponentToRTCIceComponent(component)] {
+        connection()->send(Messages::GStreamerIceBackendProxy::NotifyNewSelectedPair { streamId, component }, destination());
     });
 }
 
@@ -216,7 +216,7 @@ void GStreamerIceBackendNice::setRemoteCredentials(unsigned streamId, const Stri
 
 void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<void(std::optional<unsigned>)>&& completionHandler)
 {
-    auto streamId = nice_agent_add_stream(m_agent.get(), 2);
+    auto streamId = nice_agent_add_stream(m_agent.get(), 1);
     if (!streamId) {
         completionHandler(std::nullopt);
         return;
@@ -237,21 +237,19 @@ void GStreamerIceBackendNice::addStream(unsigned sessionId, CompletionHandler<vo
     for (const auto& url : m_turnServers)
         addTurnServerForStream(streamId, url);
 
-    auto readCallback = [](NiceAgent*, unsigned streamId, unsigned component, unsigned size, char* buffer, gpointer userData) {
+    nice_agent_attach_recv(m_agent.get(), streamId, NICE_COMPONENT_TYPE_RTP, m_mainContext.get(), [](NiceAgent*, unsigned streamId, unsigned component, unsigned size, char* buffer, gpointer userData) {
         auto self = reinterpret_cast<GStreamerIceBackendNice*>(userData);
         auto data = WTF::unsafeMakeSpan(reinterpret_cast<const uint8_t*>(buffer), size);
         self->handleIncomingData(streamId, static_cast<NiceComponentType>(component), WTFMove(data));
-    };
-    nice_agent_attach_recv(m_agent.get(), streamId, NICE_COMPONENT_TYPE_RTP, m_mainContext.get(), readCallback, this);
-    nice_agent_attach_recv(m_agent.get(), streamId, NICE_COMPONENT_TYPE_RTCP, m_mainContext.get(), readCallback, this);
+    }, this);
 
     completionHandler({ streamId });
 }
 
 void GStreamerIceBackendNice::handleIncomingData(unsigned streamId, NiceComponentType component, std::span<const uint8_t>&& data)
 {
-    callOnMainThread([&] {
-        connection()->send(Messages::GStreamerIceBackendProxy::NotifyDataRead { streamId, niceComponentToRTCIceComponent(component), WTFMove(data) }, destination());
+    callOnMainThreadAndWait([&, component = niceComponentToRTCIceComponent(component)] {
+        connection()->send(Messages::GStreamerIceBackendProxy::NotifyDataRead { streamId, component, WTFMove(data) }, destination());
     });
 }
 
@@ -467,16 +465,24 @@ void GStreamerIceBackendNice::addTurnServerForStream(unsigned streamId, const UR
     }
 }
 
-void GStreamerIceBackendNice::sendData(unsigned streamId, unsigned componentId, std::span<const uint8_t>&& data, CompletionHandler<void(bool)>&& completionHandler)
+void GStreamerIceBackendNice::sendData(unsigned streamId, RTCIceComponent component, std::span<const uint8_t>&& data, CompletionHandler<void(bool)>&& completionHandler)
 {
-    auto written = nice_agent_send(m_agent.get(), streamId, componentId, data.size_bytes(), reinterpret_cast<const char*>(data.data()));
+    NiceComponentType niceComponent;
+    switch (component) {
+    case RTCIceComponent::Rtp:
+        niceComponent = NICE_COMPONENT_TYPE_RTP;
+        break;
+    case RTCIceComponent::Rtcp:
+        niceComponent = NICE_COMPONENT_TYPE_RTCP;
+        break;
+    };
+    auto written = nice_agent_send(m_agent.get(), streamId, niceComponent, data.size_bytes(), reinterpret_cast<const char*>(data.data()));
     completionHandler(written);
 }
 
 void GStreamerIceBackendNice::finalizeStream(unsigned streamId)
 {
     nice_agent_attach_recv(m_agent.get(), streamId, NICE_COMPONENT_TYPE_RTP, m_mainContext.get(), nullptr, nullptr);
-    nice_agent_attach_recv(m_agent.get(), streamId, NICE_COMPONENT_TYPE_RTCP, m_mainContext.get(), nullptr, nullptr);
 }
 
 } // namespace WebKit

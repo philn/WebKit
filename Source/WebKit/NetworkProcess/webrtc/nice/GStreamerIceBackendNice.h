@@ -8,6 +8,7 @@
 
 #include <WebCore/ExceptionData.h>
 #include <WebCore/ExceptionOr.h>
+#include <WebCore/RTCIceComponent.h>
 #include <wtf/Condition.h>
 #include <wtf/Expected.h>
 #include <wtf/Forward.h>
@@ -41,7 +42,7 @@ public:
     void addCandidate(unsigned, const String&, CompletionHandler<void(Expected<bool, WebCore::ExceptionData>&&)>&&);
     void setLocalCredentials(unsigned, const String&, const String&, CompletionHandler<void(bool)>&&);
     void setRemoteCredentials(unsigned, const String&, const String&, CompletionHandler<void(bool)>&&);
-    void sendData(unsigned, unsigned, std::span<const uint8_t>&&, CompletionHandler<void(bool)>&&);
+    void sendData(unsigned, WebCore::RTCIceComponent, std::span<const uint8_t>&&, CompletionHandler<void(bool)>&&);
     void finalizeStream(unsigned);
 
 private:

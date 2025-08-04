@@ -24,6 +24,7 @@
 
 #include "GStreamerIceStream.h"
 #include "GStreamerIceTransport.h"
+#include "NotImplemented.h"
 #include "ScriptExecutionContext.h"
 #include "SocketProvider.h"
 #include <gst/webrtc/ice.h>
@@ -225,6 +226,17 @@ static gboolean webkitGstWebRTCIceAgentGatherCandidates(GstWebRTCICE* ice, GstWe
     return webkitGstWebRTCIceAgentGatherCandidates(WEBKIT_GST_WEBRTC_ICE_BACKEND(ice), stream->stream_id);
 }
 
+static void webkitGstWebRTCIceAgentSetHttpProxy(GstWebRTCICE*, const gchar*)
+{
+    notImplemented();
+}
+
+static gchar* webkitGstWebRTCIceAgentGetHttpProxy(GstWebRTCICE*)
+{
+    notImplemented();
+    return nullptr;
+}
+
 bool webkitGstWebRTCIceAgentGatherCandidates(WebKitGstIceAgent* agent, unsigned streamId)
 {
     if (!agent->priv->iceBackend)
@@ -241,7 +253,7 @@ GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent*
     return GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCCreateIceTransport(agent, streamId, component, agent->priv->isController));
 }
 
-GstFlowReturn webkitGstWebRTCIceAgentSend(WebKitGstIceAgent* agent, unsigned streamId, unsigned component, std::span<const uint8_t> buffers)
+GstFlowReturn webkitGstWebRTCIceAgentSend(WebKitGstIceAgent* agent, unsigned streamId, RTCIceComponent component, std::span<const uint8_t> buffers)
 {
     if (!agent->priv->iceBackend)
         return GST_FLOW_ERROR;
@@ -372,9 +384,9 @@ static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* kla
     iceClass->set_tos = webkitGstWebRTCIceAgentSetTos;
     iceClass->set_local_credentials = webkitGstWebRTCIceAgentSetLocalCredentials;
     iceClass->set_remote_credentials = webkitGstWebRTCIceAgentSetRemoteCredentials;
+    iceClass->set_http_proxy = webkitGstWebRTCIceAgentSetHttpProxy;
+    iceClass->get_http_proxy = webkitGstWebRTCIceAgentGetHttpProxy;
     // TODO:
-    // - set_http_proxy
-    // - get_http_proxy
     // - get_local_candidates
     // - get_remote_candidates
     // - get_selected_pair

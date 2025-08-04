@@ -34,7 +34,7 @@ messages -> GStreamerIceBackend {
     SetTos(unsigned streamId, unsigned tos);
     SetLocalCredentials(unsigned streamId, String ufrag, String pwd) -> (bool result) Synchronous
     SetRemoteCredentials(unsigned streamId, String ufrag, String pwd) -> (bool result) Synchronous
-    SendData(unsigned streamId, unsigned componentId, std::span<const uint8_t> data) -> (bool result) Synchronous
+    SendData(unsigned streamId, enum:uint8_t WebCore::RTCIceComponent component, std::span<const uint8_t> data) -> (bool result) Synchronous
     FinalizeStream(unsigned streamId);
 }
 
