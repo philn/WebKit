@@ -88,7 +88,8 @@ static GstFlowReturn iceTransportHandleSample(WebKitGstIceTransport* self, GstAp
     if (!GST_IS_BUFFER_LIST(bufferList)) {
         GstMappedBuffer mappedBuffer(gst_sample_get_buffer(sample.get()), GST_MAP_READ);
         buffers.append(mappedBuffer.mutableSpan<uint8_t>());
-        return webkitGstWebRTCIceAgentSend(agent.get(), self->priv->streamId, component, buffers.mutableSpan());
+        webkitGstWebRTCIceAgentSend(agent.get(), self->priv->streamId, component, buffers.mutableSpan());
+        return GST_FLOW_OK;
     }
 
     unsigned length = gst_buffer_list_length(bufferList);
@@ -96,7 +97,8 @@ static GstFlowReturn iceTransportHandleSample(WebKitGstIceTransport* self, GstAp
         GstMappedBuffer mappedBuffer(gst_buffer_list_get(bufferList, i), GST_MAP_READ);
         buffers.append(mappedBuffer.mutableSpan<uint8_t>());
     }
-    return webkitGstWebRTCIceAgentSend(agent.get(), self->priv->streamId, component, buffers.mutableSpan());
+    webkitGstWebRTCIceAgentSend(agent.get(), self->priv->streamId, component, buffers.mutableSpan());
+    return GST_FLOW_OK;
 }
 
 static void webkitGstWebRTCIceTransportConstructed(GObject* object)

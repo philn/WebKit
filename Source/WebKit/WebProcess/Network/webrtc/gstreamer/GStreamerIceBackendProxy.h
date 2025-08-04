@@ -52,7 +52,7 @@ private:
 
     void addCandidate(unsigned, const String&, WebCore::GStreamerIceBackend::AddCandidateCallback&&) final;
 
-    bool send(unsigned, WebCore::RTCIceComponent, std::span<const uint8_t>) final;
+    void send(unsigned, WebCore::RTCIceComponent, std::span<const uint8_t>) final;
 
     void finalizeStream(unsigned) final;
 

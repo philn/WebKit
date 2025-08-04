@@ -255,7 +255,6 @@ void GStreamerIceBackendNice::handleIncomingData(unsigned streamId, NiceComponen
 
 void GStreamerIceBackendNice::gatherCandidatesForStream(unsigned streamId, CompletionHandler<void(bool)>&& completionHandler)
 {
-
     if (!nice_agent_gather_candidates(m_agent.get(), streamId)) {
         completionHandler(false);
         return;
@@ -465,7 +464,7 @@ void GStreamerIceBackendNice::addTurnServerForStream(unsigned streamId, const UR
     }
 }
 
-void GStreamerIceBackendNice::sendData(unsigned streamId, RTCIceComponent component, std::span<const uint8_t>&& data, CompletionHandler<void(bool)>&& completionHandler)
+void GStreamerIceBackendNice::sendData(unsigned streamId, RTCIceComponent component, std::span<const uint8_t>&& data)
 {
     NiceComponentType niceComponent;
     switch (component) {
@@ -476,8 +475,7 @@ void GStreamerIceBackendNice::sendData(unsigned streamId, RTCIceComponent compon
         niceComponent = NICE_COMPONENT_TYPE_RTCP;
         break;
     };
-    auto written = nice_agent_send(m_agent.get(), streamId, niceComponent, data.size_bytes(), reinterpret_cast<const char*>(data.data()));
-    completionHandler(written);
+    nice_agent_send(m_agent.get(), streamId, niceComponent, data.size_bytes(), reinterpret_cast<const char*>(data.data()));
 }
 
 void GStreamerIceBackendNice::finalizeStream(unsigned streamId)

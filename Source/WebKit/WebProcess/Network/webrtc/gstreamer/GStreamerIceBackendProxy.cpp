@@ -146,6 +146,8 @@ void GStreamerIceBackendProxy::notifyNewCandidate(unsigned sessionId, String&& c
 
 void GStreamerIceBackendProxy::notifyGatheringDone(unsigned streamId)
 {
+    if (!streamId)
+        return;
     m_client->notifyGatheringDone(streamId);
 }
 
@@ -164,16 +166,9 @@ void GStreamerIceBackendProxy::notifyDataRead(unsigned streamId, RTCIceComponent
     m_client->notifyDataRead(streamId, component, WTFMove(data));
 }
 
-bool GStreamerIceBackendProxy::send(unsigned streamId, RTCIceComponent component, std::span<const uint8_t> data)
+void GStreamerIceBackendProxy::send(unsigned streamId, RTCIceComponent component, std::span<const uint8_t> data)
 {
-    // Called from webrtcbin PC thread, and as this is a sync message it needs to be sent from the main thread.
-    bool result;
-    callOnMainThreadAndWait([&] {
-        auto sendResult = m_connection->sendSync(Messages::GStreamerIceBackend::SendData { streamId, component, WTFMove(data) }, messageSenderDestinationID());
-        auto [reply] = sendResult.takeReply();
-        result = reply;
-    });
-    return result;
+    MessageSender::send(Messages::GStreamerIceBackend::SendData { streamId, component, WTFMove(data) });
 }
 
 void GStreamerIceBackendProxy::finalizeStream(unsigned streamId)

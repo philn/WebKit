@@ -253,14 +253,12 @@ GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent*
     return GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCCreateIceTransport(agent, streamId, component, agent->priv->isController));
 }
 
-GstFlowReturn webkitGstWebRTCIceAgentSend(WebKitGstIceAgent* agent, unsigned streamId, RTCIceComponent component, std::span<const uint8_t> buffers)
+void webkitGstWebRTCIceAgentSend(WebKitGstIceAgent* agent, unsigned streamId, RTCIceComponent component, std::span<const uint8_t> buffers)
 {
     if (!agent->priv->iceBackend)
-        return GST_FLOW_ERROR;
+        return;
 
-    if (!agent->priv->iceBackend->send(streamId, component, buffers))
-        return GST_FLOW_ERROR;
-    return GST_FLOW_OK;
+    agent->priv->iceBackend->send(streamId, component, buffers);
 }
 
 void webkitGstWebRTCIceAgentFinalizeStream(WebKitGstIceAgent* agent, unsigned streamId)
