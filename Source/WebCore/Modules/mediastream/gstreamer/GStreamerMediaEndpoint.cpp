@@ -171,7 +171,7 @@ bool GStreamerMediaEndpoint::initializePipeline()
 
     connectSimpleBusMessageCallback(m_pipeline.get(), [this](GstMessage* message) {
         handleMessage(message);
-    });
+    }, AsynchronousPipelineDumping::Yes);
 
     auto binName = makeString("webkit-webrtcbin-"_s, nPipeline);
 
@@ -366,9 +366,9 @@ bool GStreamerMediaEndpoint::handleMessage(GstMessage* message)
 {
     GST_TRACE_OBJECT(m_pipeline.get(), "Received message %s from %s", GST_MESSAGE_TYPE_NAME(message), GST_MESSAGE_SRC_NAME(message));
     switch (GST_MESSAGE_TYPE(message)) {
-    case GST_MESSAGE_EOS:
-        GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN_CAST(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, "eos");
-        break;
+    // case GST_MESSAGE_EOS:
+    //     GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN_CAST(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, "eos");
+    //     break;
     case GST_MESSAGE_ELEMENT: {
         const auto* data = gst_message_get_structure(message);
         if (gstStructureGetName(data) == "GstBinForwarded"_s) {
