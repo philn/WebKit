@@ -121,6 +121,13 @@ if (ENABLE_VIDEO)
             ${GSTREAMER_SDP_INCLUDE_DIRS}
             ${GSTREAMER_WEBRTC_INCLUDE_DIRS}
         )
+        list(APPEND WebCore_PRIVATE_FRAMEWORK_HEADERS
+            Modules/mediastream/gstreamer/GStreamerIceAgent.h
+            Modules/mediastream/gstreamer/GStreamerIceBuffer.h
+            Modules/mediastream/gstreamer/GStreamerIceCandidateStats.h
+            Modules/mediastream/gstreamer/GStreamerIceCandidateStatsPair.h
+        )
+
         if (NOT USE_GSTREAMER_FULL)
             list(APPEND WebCore_LIBRARIES
                 ${GSTREAMER_RTP_LIBRARIES}

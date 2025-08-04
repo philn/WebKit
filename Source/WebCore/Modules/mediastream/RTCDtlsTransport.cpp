@@ -38,6 +38,7 @@
 #include "RTCIceTransport.h"
 #include "RTCPeerConnection.h"
 #include "ScriptExecutionContext.h"
+#include "ScriptExecutionContextInlines.h"
 #include <wtf/TZoneMallocInlines.h>
 
 namespace WebCore {

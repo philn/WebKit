@@ -208,6 +208,7 @@ enum class WebCore::MediaSessionReadyState : uint8_t {
 };
 #endif // ENABLE(MEDIA_SESSION_COORDINATOR)
 
+#if ENABLE(WEB_RTC)
 header: <WebCore/RTCErrorDetailType.h>
 enum class WebCore::RTCErrorDetailType : uint8_t {
     DataChannelFailure,
@@ -216,6 +217,45 @@ enum class WebCore::RTCErrorDetailType : uint8_t {
     SctpFailure,
     SdpSyntaxError
 };
+
+header: <WebCore/RTCIceComponent.h>
+enum class WebCore::RTCIceComponent : uint8_t {
+     Rtp,
+     Rtcp
+};
+
+header: <WebCore/RTCIceConnectionState.h>
+enum class WebCore::RTCIceConnectionState : uint8_t {
+    New,
+    Checking,
+    Connected,
+    Completed,
+    Failed,
+    Disconnected,
+    Closed
+};
+
+header: <WebCore/RTCIceProtocol.h>
+enum class WebCore::RTCIceProtocol : uint8_t {
+    Udp,
+    Tcp
+};
+
+header: <WebCore/RTCIceCandidateType.h>
+enum class WebCore::RTCIceCandidateType : uint8_t {
+    Host,
+    Srflx,
+    Prflx,
+    Relay
+};
+
+header: <WebCore/RTCIceTcpCandidateType.h>
+enum class WebCore::RTCIceTcpCandidateType : uint8_t {
+    Active,
+    Passive,
+    So
+};
+#endif // ENABLE(WEB_RTC)
 
 enum class WebCore::NotificationEventType : bool;
 
@@ -6132,6 +6172,35 @@ header: <WebCore/RTCDataChannelHandler.h>
 };
 
 #endif // ENABLE(WEB_RTC)
+
+#if USE(GSTREAMER_WEBRTC)
+header: <WebCore/GStreamerIceBuffer.h>
+[CustomHeader] struct WebCore::GStreamerIceBuffer {
+    std::span<const uint8_t> data;
+};
+
+header: <WebCore/GStreamerIceCandidateStats.h>
+[CustomHeader] struct WebCore::GStreamerIceCandidateStats {
+    String ipAddress;
+    unsigned port;
+    unsigned streamId;
+    WebCore::RTCIceCandidateType type;
+    WebCore::RTCIceProtocol protocol;
+    String relayProtocol;
+    unsigned priority;
+    String url;
+    String foundation;
+    String relatedAddress;
+    unsigned relatedPort;
+    String usernameFragment;
+    std::optional<WebCore::RTCIceTcpCandidateType> tcpType;
+};
+header: <WebCore/GStreamerIceCandidateStatsPair.h>
+[CustomHeader] struct WebCore::GStreamerIceCandidateStatsPair {
+    WebCore::GStreamerIceCandidateStats local;
+    WebCore::GStreamerIceCandidateStats remote;
+};
+#endif // USE(GSTREAMER_WEBRTC)
 
 #if ENABLE(CONTENT_EXTENSIONS)
 
