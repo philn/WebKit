@@ -908,14 +908,15 @@ GRefPtr<GstElement> createOptionalParserForFormat([[maybe_unused]] GstBin* bin, 
         // Used in converting cea-608 to WebVTT.
         // qtdemux pushes captions in format: s334-1a, while cea608tott expects format: raw.
         elementClass = "ccconverter"_s;
-    } else if (mediaType == "video/x-h265"_s)
+    } else if (mediaType == "video/x-h265"_s) {
         elementClass = "h265parse"_s;
-    // else if (mediaType == "closedcaption/x-cea-608"_s) {
-    //     auto format = gstStructureGetString(structure, "format"_s);
-    //     if (format == "s334-1a"_s)
-    //         elementClass = "ccconverter"_s;
-    // } 
-    else if (mediaType == "audio/x-eac3"_s)
+        GRefPtr<GstElement> result = gst_parse_bin_from_description("h265parse disable-passthrough=1 ! capsfilter caps=video/x-h265,stream-format=byte-stream", true, nullptr);
+        return result;
+        // else if (mediaType == "closedcaption/x-cea-608"_s) {
+        //     auto format = gstStructureGetString(structure, "format"_s);
+        //     if (format == "s334-1a"_s)
+        //         elementClass = "ccconverter"_s;
+    } else if (mediaType == "audio/x-eac3"_s)
         elementClass = "ac3parse"_s;
 
     GST_DEBUG_OBJECT(bin, "Creating %s parser for stream with caps %" GST_PTR_FORMAT, elementClass.characters(), caps);
