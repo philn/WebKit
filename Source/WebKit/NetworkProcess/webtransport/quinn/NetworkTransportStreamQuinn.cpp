@@ -35,12 +35,24 @@
 namespace WebKit {
 
 NetworkTransportStream::NetworkTransportStream()
-    : m_identifier(WebTransportStreamIdentifier::generate())
+    : m_identifier(WebCore::WebTransportStreamIdentifier::generate())
     , m_streamType(NetworkTransportStreamType::Bidirectional)
 {
 }
 
-void NetworkTransportStream::sendBytes(std::span<const uint8_t> data, bool withFin)
+void NetworkTransportStream::sendBytes(std::span<const uint8_t>, bool, CompletionHandler<void(std::optional<WebCore::Exception>&&)>&& completionHandler)
+{
+}
+
+void NetworkTransportStream::cancelReceive(std::optional<WebCore::WebTransportStreamErrorCode>)
+{
+}
+
+void NetworkTransportStream::cancelSend(std::optional<WebCore::WebTransportStreamErrorCode>)
+{
+}
+
+void NetworkTransportStream::cancel(std::optional<WebCore::WebTransportStreamErrorCode>)
 {
 }
 

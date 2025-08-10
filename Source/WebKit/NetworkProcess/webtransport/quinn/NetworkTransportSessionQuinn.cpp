@@ -28,7 +28,7 @@
 
 #if USE(QUINN)
 
-#include "CoroutineUtilities.h"
+//#include "CoroutineUtilities.h"
 #include "NetworkConnectionToWebProcess.h"
 #include "NetworkTransportStream.h"
 #include "rust/cxx.h"
@@ -40,7 +40,7 @@ namespace WebKit {
 void NetworkTransportSession::initialize(NetworkConnectionToWebProcess& connectionToWebProcess, URL&& url, WebKit::WebPageProxyIdentifier&& pageID, WebCore::ClientOrigin&& clientOrigin, CompletionHandler<void(RefPtr<NetworkTransportSession>&&)>&& completionHandler)
 {
 
-    auto client = org::webkit::create_client();
+    //auto client = org::webkit::create_client();
     //client->create_session(url.string().utf8().data(), WTFMove(completionHandler));
     // callCoroutine([url = WTFMove(url), connectionToWebProcess = Ref { connectionToWebProcess }, completionHandler = WTFMove(completionHandler)]() mutable -> Lazy<void> {
     //     try {
@@ -60,15 +60,15 @@ NetworkTransportSession::NetworkTransportSession(NetworkConnectionToWebProcess&,
 
 void NetworkTransportSession::sendDatagram(std::span<const uint8_t>, CompletionHandler<void(std::optional<WebCore::Exception>&&)>&& completionHandler)
 {
-    completionHandler();
+    completionHandler(std::nullopt);
 }
 
-void NetworkTransportSession::createOutgoingUnidirectionalStream(CompletionHandler<void(std::optional<WebTransportStreamIdentifier>)>&& completionHandler)
+void NetworkTransportSession::createOutgoingUnidirectionalStream(CompletionHandler<void(std::optional<WebCore::WebTransportStreamIdentifier>)>&& completionHandler)
 {
     completionHandler(std::nullopt);
 }
 
-void NetworkTransportSession::createBidirectionalStream(CompletionHandler<void(std::optional<WebTransportStreamIdentifier>)>&& completionHandler)
+void NetworkTransportSession::createBidirectionalStream(CompletionHandler<void(std::optional<WebCore::WebTransportStreamIdentifier>)>&& completionHandler)
 {
     completionHandler(std::nullopt);
 }

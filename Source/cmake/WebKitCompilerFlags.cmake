@@ -157,7 +157,7 @@ if (COMPILER_IS_GCC_OR_CLANG)
     # represented using cl.exe's options and should not be passed as flags, so
     # we do not add -fno-rtti or -fno-exceptions for clang-cl
     if (NOT COMPILER_IS_CLANG_CL)
-        #WEBKIT_APPEND_GLOBAL_COMPILER_FLAGS(-fno-exceptions)
+        WEBKIT_APPEND_GLOBAL_COMPILER_FLAGS(-fno-exceptions)
         WEBKIT_APPEND_GLOBAL_CXX_FLAGS(-fno-rtti)
         WEBKIT_APPEND_GLOBAL_CXX_FLAGS(-fcoroutines)
         WEBKIT_PREPEND_GLOBAL_CXX_FLAGS(-fasynchronous-unwind-tables)

@@ -19,17 +19,17 @@ pub struct WKQuinnSession(web_transport_quinn::Session);
 
 #[cxx::bridge(namespace = "org::webkit")]
 mod ffi {
-    //     extern "Rust" {
-    //         // type WKQuinnEndPoint;
-    //         // fn create_endpoint() -> Result<Box<WKQuinnEndPoint>>;
+    extern "Rust" {
+        //         // type WKQuinnEndPoint;
+        //         // fn create_endpoint() -> Result<Box<WKQuinnEndPoint>>;
 
-    //         type WKQuinnClient;
-    //         fn create_client() -> Box<WKQuinnClient>;
+        //         type WKQuinnClient;
+        //         fn create_client() -> Box<WKQuinnClient>;
 
-    //         type WKQuinnSession;
-    //         type WKQuinnSessionFuture;
-    //         fn create_session(self: &WKQuinnClient, url: String) -> Result<()>;
-    //     }
+        type WKQuinnSession;
+        //         type WKQuinnSessionFuture;
+        //         fn create_session(self: &WKQuinnClient, url: String) -> Result<()>;
+    }
 
     //     // extern "C++" {
     //     //     type CompletionHandler;
