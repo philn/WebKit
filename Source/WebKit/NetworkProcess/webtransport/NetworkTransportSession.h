@@ -98,7 +98,7 @@ private:
     NetworkTransportSession(NetworkConnectionToWebProcess&, nw_connection_group_t, nw_endpoint_t);
 #endif
 #if USE(QUINN)
-    NetworkTransportSession(NetworkConnectionToWebProcess&, rust::Box<org::webkit::WKQuinnSession>&&);
+    NetworkTransportSession(NetworkConnectionToWebProcess&, rust::Box<org::webkit::WKQuinnEndPoint>&&, rust::Box<org::webkit::WKQuinnConnection>&&);
 #endif
 
     IPC::Connection* messageSenderConnection() const final;
@@ -117,7 +117,8 @@ private:
     RetainPtr<nw_connection_t> m_datagramConnection;
 #endif
 #if USE(QUINN)
-    rust::Box<org::webkit::WKQuinnSession> m_session;
+    rust::Box<org::webkit::WKQuinnEndPoint> m_endpoint;
+    rust::Box<org::webkit::WKQuinnConnection> m_connection;
 #endif
 };
 

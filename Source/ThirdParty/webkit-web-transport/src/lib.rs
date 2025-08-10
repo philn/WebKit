@@ -1,61 +1,50 @@
-//use futures::channel::oneshot;
-use quinn::Endpoint;
+use quinn_proto::{ClientConfig, Connection, ConnectionHandle, Endpoint, EndpointConfig};
+use rand::RngCore;
+use ring::hmac;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex;
-use url::Url;
-use web_transport_quinn;
+use std::time::Instant;
 
-// struct WKQuinnEndPoint(Endpoint);
-struct WKQuinnClient(Arc<web_transport_quinn::Client>);
-pub struct WKQuinnSession(web_transport_quinn::Session);
-
-//struct WKQuinnSessionFuture;
-
-// The inner type is the Rust type that this future yields.
-// #[cxx_async::bridge]
-// unsafe impl Future for WKQuinnSessionFuture {
-//     type Output = WKQuinnSession;
-// }
+struct WKQuinnEndPoint(Endpoint);
+pub struct WKQuinnConnection {
+    connection: Connection,
+    handle: ConnectionHandle,
+}
 
 #[cxx::bridge(namespace = "org::webkit")]
 mod ffi {
     extern "Rust" {
-        //         // type WKQuinnEndPoint;
-        //         // fn create_endpoint() -> Result<Box<WKQuinnEndPoint>>;
+        type WKQuinnEndPoint;
+        fn create_endpoint() -> Box<WKQuinnEndPoint>;
 
-        //         type WKQuinnClient;
-        //         fn create_client() -> Box<WKQuinnClient>;
-
-        type WKQuinnSession;
-        //         type WKQuinnSessionFuture;
-        //         fn create_session(self: &WKQuinnClient, url: String) -> Result<()>;
+        type WKQuinnConnection;
+        fn create_connection(
+            self: &mut WKQuinnEndPoint,
+            url: String,
+        ) -> Result<Box<WKQuinnConnection>>;
     }
-
-    //     // extern "C++" {
-    //     //     type CompletionHandler;
-    //     // }
 }
 
-// // fn create_endpoint() -> anyhow::Result<Box<WKQuinnEndPoint>> {
-// //     let endpoint = quinn::Endpoint::client("[::]:0".parse()?)?;
-// //     Ok(Box::new(WKQuinnEndPoint(endpoint)))
-// // }
+fn create_endpoint() -> Box<WKQuinnEndPoint> {
+    let mut key_material = vec![0; 64];
+    let mut rng = rand::rng();
+    rng.fill_bytes(&mut key_material);
+    let reset_key = Arc::new(hmac::Key::new(hmac::HMAC_SHA256, &key_material));
 
-// fn create_client() -> Box<WKQuinnClient> {
-//     Box::new(WKQuinnClient(Arc::new(web_transport_quinn::Client::new())))
-// }
+    let config = Arc::new(EndpointConfig::new(reset_key));
+    let endpoint = Endpoint::new(config, None, false, None);
+    Box::new(WKQuinnEndPoint(endpoint))
+}
 
-// impl WKQuinnClient {
-//     async fn create_session(
-//         &self,
-//         url_string: String,
-//         // completion_handler: CompletionHandler,
-//     ) -> Result<()> {
-//         Ok(())
-//         // let (tx, rx) = oneshot::channel();
-//         // let url = Url::parse(&url_string)?;
-//         // //let client = Arc::clone(&self.0);
-//         // let session = self.0.connect(&url).await?;
-//         // Ok(Box::new(session))
-//     }
-// }
+impl WKQuinnEndPoint {
+    fn create_connection(&mut self, url: String) -> anyhow::Result<Box<WKQuinnConnection>> {
+        let config = ClientConfig::with_platform_verifier();
+        let addr: SocketAddr = url.parse()?;
+        let (handle, connection) = self.0.connect(Instant::now(), config, addr, "foo")?;
+        Ok(Box::new(WKQuinnConnection {
+            connection: connection,
+            handle: handle,
+        }))
+    }
+}

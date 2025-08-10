@@ -73,7 +73,7 @@ public:
         };
         std::suspend_always initial_suspend() { return { }; }
         final_awaitable final_suspend() noexcept { return { }; }
-        template<typename Promise>
+        //template<typename Promise>
         void unhandled_exception() { }
         void setHandle(std::coroutine_handle<> handle) { m_handle = handle; }
         std::coroutine_handle<> handle() { return m_handle; }

@@ -28,7 +28,6 @@
 
 #if USE(QUINN)
 
-//#include "CoroutineUtilities.h"
 #include "NetworkConnectionToWebProcess.h"
 #include "NetworkTransportStream.h"
 #include "rust/cxx.h"
@@ -39,21 +38,18 @@ namespace WebKit {
 
 void NetworkTransportSession::initialize(NetworkConnectionToWebProcess& connectionToWebProcess, URL&& url, WebKit::WebPageProxyIdentifier&& pageID, WebCore::ClientOrigin&& clientOrigin, CompletionHandler<void(RefPtr<NetworkTransportSession>&&)>&& completionHandler)
 {
-
-    //auto client = org::webkit::create_client();
-    //client->create_session(url.string().utf8().data(), WTFMove(completionHandler));
-    // callCoroutine([url = WTFMove(url), connectionToWebProcess = Ref { connectionToWebProcess }, completionHandler = WTFMove(completionHandler)]() mutable -> Lazy<void> {
-    //     try {
-    //         auto session = client->create_session(url.string().utf8().data());
-    //         completionHandler(NetworkTransportSession::create(connectionToWebProcess, WTFMove(session)));
-    //     } catch (rust::cxxbridge1::Error exception) {
-    //         completionHandler(nullptr);
-    //     }
-    // });
+    auto endpoint = org::webkit::create_endpoint();
+    try {
+        auto connection = endpoint->create_connection(url.string().utf8().data());
+        completionHandler(NetworkTransportSession::create(connectionToWebProcess, WTFMove(endpoint), WTFMove(connection)));
+    } catch (rust::cxxbridge1::Error exception) {
+        completionHandler(nullptr);
+    }
 }
 
-NetworkTransportSession::NetworkTransportSession(NetworkConnectionToWebProcess&, rust::Box<org::webkit::WKQuinnSession>&& session)
-    : m_session(WTFMove(session))
+NetworkTransportSession::NetworkTransportSession(NetworkConnectionToWebProcess&, rust::Box<org::webkit::WKQuinnEndPoint>&& endpoint, rust::Box<org::webkit::WKQuinnConnection>&& connection)
+    : m_endpoint(WTFMove(endpoint))
+    , m_connection(WTFMove(connection))
 {
 
 }
