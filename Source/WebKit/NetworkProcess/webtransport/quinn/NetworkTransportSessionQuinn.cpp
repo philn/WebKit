@@ -41,7 +41,7 @@ void NetworkTransportSession::initialize(NetworkConnectionToWebProcess& connecti
 {
 
     auto client = org::webkit::create_client();
-    client->create_session(url.string().utf8().data(), WTFMove(completionHandler));
+    //client->create_session(url.string().utf8().data(), WTFMove(completionHandler));
     // callCoroutine([url = WTFMove(url), connectionToWebProcess = Ref { connectionToWebProcess }, completionHandler = WTFMove(completionHandler)]() mutable -> Lazy<void> {
     //     try {
     //         auto session = client->create_session(url.string().utf8().data());
