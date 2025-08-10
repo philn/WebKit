@@ -33,9 +33,8 @@ namespace Style {
 // https://drafts.csswg.org/css-box/#margin-physical
 struct MarginEdge : LengthWrapperBase<LengthPercentage<>, CSS::Keyword::Auto> {
     using Base::Base;
-    using Base::hasQuirk;
 
-    ALWAYS_INLINE bool isAuto() const { return holdsAlternative<CSS::Keyword::Auto>(); }
+    ALWAYS_INLINE bool hasQuirk() const { return m_value.hasQuirk(); }
 };
 
 // <'margin'> = <'margin-top'>{1,4}

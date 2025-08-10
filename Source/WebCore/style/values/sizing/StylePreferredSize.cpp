@@ -33,20 +33,12 @@ namespace Style {
 
 MinimumSize PreferredSize::asMinimumSize() const
 {
-    return WTF::switchOn(*this,
-        [&](const auto& value) {
-            return MinimumSize { value };
-        }
-    );
+    return MinimumSize { m_value };
 }
 
 FlexBasis PreferredSize::asFlexBasis() const
 {
-    return WTF::switchOn(*this,
-        [&](const auto& value) {
-            return FlexBasis { value };
-        }
-    );
+    return FlexBasis { m_value };
 }
 
 } // namespace Style

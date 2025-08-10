@@ -4973,8 +4973,6 @@
 		BC34D3442E3E8C31001EAD95 /* StyleMaskBorderRepeat.h in Headers */ = {isa = PBXBuildFile; fileRef = BC34D3392E3E8C15001EAD95 /* StyleMaskBorderRepeat.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		BC34D3452E3E8C31001EAD95 /* StyleMaskBorderSlice.h in Headers */ = {isa = PBXBuildFile; fileRef = BC34D33B2E3E8C15001EAD95 /* StyleMaskBorderSlice.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		BC34D3462E3E8C31001EAD95 /* StyleMaskBorder.h in Headers */ = {isa = PBXBuildFile; fileRef = BC34D3352E3E8C15001EAD95 /* StyleMaskBorder.h */; settings = {ATTRIBUTES = (Private, ); }; };
-		BC34D37E2E428981001EAD95 /* StyleLengthWrapper+Blending.h in Headers */ = {isa = PBXBuildFile; fileRef = BC34D37D2E428981001EAD95 /* StyleLengthWrapper+Blending.h */; settings = {ATTRIBUTES = (Private, ); }; };
-		BC34D3802E4289B1001EAD95 /* StyleLengthWrapper+Platform.h in Headers */ = {isa = PBXBuildFile; fileRef = BC34D37F2E4289B1001EAD95 /* StyleLengthWrapper+Platform.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		BC3A00C82754496D0047C0E5 /* ColorInterpolation.h in Headers */ = {isa = PBXBuildFile; fileRef = BCDC642527517B040038FB39 /* ColorInterpolation.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		BC3AA25C2DA2DD2F00BC27C6 /* CSSURLModifiers.h in Headers */ = {isa = PBXBuildFile; fileRef = BC3AA25A2DA2DD2300BC27C6 /* CSSURLModifiers.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		BC3AA25E2DA2F14700BC27C6 /* LoadedFromOpaqueSource.h in Headers */ = {isa = PBXBuildFile; fileRef = BC3AA25D2DA2F14700BC27C6 /* LoadedFromOpaqueSource.h */; settings = {ATTRIBUTES = (Private, ); }; };
@@ -18377,8 +18375,6 @@
 		BC34D33E2E3E8C15001EAD95 /* StyleMaskBorderSource.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StyleMaskBorderSource.cpp; sourceTree = "<group>"; };
 		BC34D33F2E3E8C15001EAD95 /* StyleMaskBorderWidth.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StyleMaskBorderWidth.h; sourceTree = "<group>"; };
 		BC34D3402E3E8C15001EAD95 /* StyleMaskBorderWidth.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StyleMaskBorderWidth.cpp; sourceTree = "<group>"; };
-		BC34D37D2E428981001EAD95 /* StyleLengthWrapper+Blending.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "StyleLengthWrapper+Blending.h"; sourceTree = "<group>"; };
-		BC34D37F2E4289B1001EAD95 /* StyleLengthWrapper+Platform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "StyleLengthWrapper+Platform.h"; sourceTree = "<group>"; };
 		BC38D4F22D480063004BE2FF /* StyleUnevaluatedCalculation.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StyleUnevaluatedCalculation.cpp; sourceTree = "<group>"; };
 		BC394A362C765BE8001A629A /* CSSResolvedColor.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CSSResolvedColor.cpp; sourceTree = "<group>"; };
 		BC394A372C765BE8001A629A /* CSSResolvedColor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CSSResolvedColor.h; sourceTree = "<group>"; };
@@ -36269,9 +36265,7 @@
 			children = (
 				BCD67C652D2477D80079EB9C /* StyleLengthResolution.cpp */,
 				BCD67C642D2477CA0079EB9C /* StyleLengthResolution.h */,
-				BC34D37D2E428981001EAD95 /* StyleLengthWrapper+Blending.h */,
 				BC2A0DF02E0A2BCE003CBA0E /* StyleLengthWrapper+CSSValueConversion.h */,
-				BC34D37F2E4289B1001EAD95 /* StyleLengthWrapper+Platform.h */,
 				BC22AAFB2E37F866009AC0C3 /* StyleLengthWrapper.h */,
 				BC22AAF32E37F6CD009AC0C3 /* StyleLengthWrapperData.cpp */,
 				BC2A0D592E0791C7003CBA0E /* StyleLengthWrapperData.h */,
@@ -45609,8 +45603,6 @@
 				713171341FBE78DB00F758DE /* StyleInterpolationClient.h in Headers */,
 				E46C794B1F13E82B00F371E1 /* StyleInvalidationFunctions.h in Headers */,
 				E47127CB163438AE00ED6F5A /* StyleInvalidator.h in Headers */,
-				BC34D37E2E428981001EAD95 /* StyleLengthWrapper+Blending.h in Headers */,
-				BC34D3802E4289B1001EAD95 /* StyleLengthWrapper+Platform.h in Headers */,
 				BC22AAFC2E37F879009AC0C3 /* StyleLengthWrapper.h in Headers */,
 				BC2A0D5A2E0791C7003CBA0E /* StyleLengthWrapperData.h in Headers */,
 				BC2A0D5A2E0791C7003CBA0E /* StyleLengthWrapperData.h in Headers */,

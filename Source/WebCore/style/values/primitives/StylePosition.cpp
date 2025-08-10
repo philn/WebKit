@@ -31,7 +31,6 @@
 #include "LengthPoint.h"
 #include "RenderStyle.h"
 #include "StyleBuilderChecking.h"
-#include "StyleLengthWrapper+Platform.h"
 #include "StylePrimitiveNumericTypes+Conversions.h"
 #include "StylePrimitiveNumericTypes+Evaluation.h"
 #include "StylePrimitiveNumericTypes+Platform.h"

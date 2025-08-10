@@ -32,14 +32,9 @@ namespace Style {
 
 std::optional<PreferredSize> FlexBasis::tryPreferredSize() const
 {
-    return WTF::switchOn(*this,
-        [&](const CSS::Keyword::Content&) -> std::optional<PreferredSize> {
-            return { };
-        },
-        [&](const auto& value) -> std::optional<PreferredSize> {
-            return PreferredSize { value };
-        }
-    );
+    if (isContent())
+        return { };
+    return PreferredSize { m_value };
 }
 
 } // namespace Style

@@ -29,32 +29,69 @@
 namespace WebCore {
 namespace Style {
 
-enum class LengthWrapperDataKind : uint8_t {
-    Default,
-    Calculation,
-    Empty,
-    HashTableEmpty,
-    HashTableDeleted
-};
+// Currently this is a copy of `WebCore::Length`. It is in the process of being refactored to be more general.
 
-enum class LengthWrapperDataEvaluationKind : uint8_t {
+enum class LengthWrapperDataType : uint8_t {
+    Auto,
+    Normal,
+    Relative,
+    Percent,
     Fixed,
-    Percentage,
-    Calculation,
-    Flag
+    Intrinsic,
+    MinIntrinsic,
+    MinContent,
+    MaxContent,
+    FillAvailable,
+    FitContent,
+    Calculated,
+    Content,
+    Undefined
 };
 
 struct LengthWrapperData {
-    LengthWrapperData(uint8_t opaqueType);
-    LengthWrapperData(uint8_t opaqueType, float value, bool hasQuirk = false);
-    WEBCORE_EXPORT explicit LengthWrapperData(uint8_t opaqueType, Ref<CalculationValue>&&);
+    LengthWrapperData(LengthWrapperDataType = LengthWrapperDataType::Auto);
 
-    // Special constructor for use by LengthWrapperBase when constructing a calculation value from a WebCore::Length.
-    struct LengthCalculation { WebCore::Length length; };
-    WEBCORE_EXPORT explicit LengthWrapperData(uint8_t opaqueType, LengthCalculation&&);
+    struct AutoData { };
+    struct NormalData { };
+    struct FixedData {
+        float value;
+        bool hasQuirk;
+    };
+    struct RelativeData {
+        float value;
+    };
+    struct PercentData {
+        float value;
+    };
+    struct IntrinsicData { };
+    struct MinIntrinsicData { };
+    struct MinContentData { };
+    struct MaxContentData { };
+    struct FillAvailableData { };
+    struct FitContentData { };
+    struct ContentData { };
+    struct UndefinedData { };
+    using IPCData = Variant<
+        AutoData,
+        NormalData,
+        RelativeData,
+        PercentData,
+        FixedData,
+        IntrinsicData,
+        MinIntrinsicData,
+        MinContentData,
+        MaxContentData,
+        FillAvailableData,
+        FitContentData,
+        ContentData,
+        UndefinedData
+        // LengthWrapperDataType::Calculated is intentionally not serialized.
+    >;
 
+    WEBCORE_EXPORT LengthWrapperData(IPCData&&);
+    LengthWrapperData(float value, LengthWrapperDataType, bool hasQuirk = false);
+    WEBCORE_EXPORT explicit LengthWrapperData(Ref<CalculationValue>&&);
     explicit LengthWrapperData(WTF::HashTableEmptyValueType);
-    explicit LengthWrapperData(WTF::HashTableDeletedValueType);
 
     LengthWrapperData(const LengthWrapperData&);
     LengthWrapperData(LengthWrapperData&&);
@@ -65,32 +102,42 @@ struct LengthWrapperData {
 
     bool operator==(const LengthWrapperData&) const;
 
-    uint8_t type() const { return m_opaqueType; }
-    bool hasQuirk() const { return m_hasQuirk; }
+    LengthWrapperDataType type() const;
 
-    float value() const { ASSERT(m_kind != LengthWrapperDataKind::Calculation); return m_floatValue; }
+    float value() const;
     CalculationValue& calculationValue() const;
     Ref<CalculationValue> protectedCalculationValue() const;
 
-    struct IPCData {
-        float value;
-        uint8_t opaqueType;
-        bool hasQuirk;
-    };
-    WEBCORE_EXPORT LengthWrapperData(IPCData&&);
+    struct Fixed { float value; };
+    std::optional<Fixed> tryFixed() const { return m_type == LengthWrapperDataType::Fixed ? std::make_optional(Fixed { value() }) : std::nullopt; }
+
+    struct Percentage { float value; };
+    std::optional<Percentage> tryPercentage() const { return m_type == LengthWrapperDataType::Percent ? std::make_optional(Percentage { value() }) : std::nullopt; }
+
+    explicit LengthWrapperData(const WebCore::Length&);
+    explicit LengthWrapperData(WebCore::Length&&);
+    WebCore::Length toPlatform() const;
+
     WEBCORE_EXPORT IPCData ipcData() const;
+
+    bool isEmptyValue() const { return m_isEmptyValue; }
+
+    bool hasQuirk() const;
 
     bool isZero() const;
     bool isPositive() const;
     bool isNegative() const;
 
-    template<typename ReturnType, typename MaximumType>
-    ReturnType minimumValueForLengthWrapperDataWithLazyMaximum(LengthWrapperDataEvaluationKind, NOESCAPE const Invocable<MaximumType()> auto& lazyMaximumValueFunctor) const;
-    template<typename ReturnType, typename MaximumType>
-    ReturnType valueForLengthWrapperDataWithLazyMaximum(LengthWrapperDataEvaluationKind, NOESCAPE const Invocable<MaximumType()> auto& lazyMaximumValueFunctor) const;
+    WEBCORE_EXPORT float nonNanCalculatedValue(float maxValue) const;
 
 private:
-    WEBCORE_EXPORT float nonNanCalculatedValue(float maxValue) const;
+    static LengthWrapperData createEmptyValue()
+    {
+        auto result = LengthWrapperData(LengthWrapperDataType::Undefined);
+        result.m_isEmptyValue = true;
+        return result;
+    }
+
     bool isCalculatedEqual(const LengthWrapperData&) const;
 
     void initialize(const LengthWrapperData&);
@@ -98,39 +145,34 @@ private:
 
     WEBCORE_EXPORT void ref() const;
     WEBCORE_EXPORT void deref() const;
+    static LengthWrapperDataType typeFromIndex(const IPCData&);
 
     union {
         float m_floatValue { 0.0f };
         unsigned m_calculationValueHandle;
     };
-    uint8_t m_opaqueType { 0 };
-    LengthWrapperDataKind m_kind;
+    LengthWrapperDataType m_type;
     bool m_hasQuirk { false };
+    bool m_isEmptyValue { false };
 };
 
-inline LengthWrapperData::LengthWrapperData(uint8_t opaqueType)
-    : m_floatValue { 0.0f }
-    , m_opaqueType { opaqueType }
-    , m_kind { LengthWrapperDataKind::Default }
-    , m_hasQuirk { false }
+inline LengthWrapperData::LengthWrapperData(LengthWrapperDataType type)
+    : m_type(type)
 {
+    ASSERT(type != LengthWrapperDataType::Calculated);
 }
 
-inline LengthWrapperData::LengthWrapperData(uint8_t opaqueType, float value, bool hasQuirk)
-    : m_floatValue { value }
-    , m_opaqueType { opaqueType }
-    , m_kind { LengthWrapperDataKind::Default }
-    , m_hasQuirk { hasQuirk }
+inline LengthWrapperData::LengthWrapperData(float value, LengthWrapperDataType type, bool hasQuirk)
+    : m_floatValue(value)
+    , m_type(type)
+    , m_hasQuirk(hasQuirk)
 {
+    ASSERT(type != LengthWrapperDataType::Calculated);
 }
 
 inline LengthWrapperData::LengthWrapperData(WTF::HashTableEmptyValueType)
-    : m_kind { LengthWrapperDataKind::HashTableEmpty }
-{
-}
-
-inline LengthWrapperData::LengthWrapperData(WTF::HashTableDeletedValueType)
-    : m_kind { LengthWrapperDataKind::HashTableDeleted }
+    : m_type(LengthWrapperDataType::Undefined)
+    , m_isEmptyValue(true)
 {
 }
 
@@ -149,7 +191,7 @@ inline LengthWrapperData& LengthWrapperData::operator=(const LengthWrapperData& 
     if (this == &other)
         return *this;
 
-    if (m_kind == LengthWrapperDataKind::Calculation)
+    if (m_type == LengthWrapperDataType::Calculated)
         deref();
 
     initialize(other);
@@ -161,7 +203,7 @@ inline LengthWrapperData& LengthWrapperData::operator=(LengthWrapperData&& other
     if (this == &other)
         return *this;
 
-    if (m_kind == LengthWrapperDataKind::Calculation)
+    if (m_type == LengthWrapperDataType::Calculated)
         deref();
 
     initialize(WTFMove(other));
@@ -170,118 +212,179 @@ inline LengthWrapperData& LengthWrapperData::operator=(LengthWrapperData&& other
 
 inline void LengthWrapperData::initialize(const LengthWrapperData& other)
 {
-    m_opaqueType = other.m_opaqueType;
+    m_type = other.m_type;
     m_hasQuirk = other.m_hasQuirk;
-    m_kind = other.m_kind;
+    m_isEmptyValue = other.m_isEmptyValue;
 
-    switch (m_kind) {
-    case LengthWrapperDataKind::Calculation:
+    switch (m_type) {
+    case LengthWrapperDataType::Auto:
+    case LengthWrapperDataType::Normal:
+    case LengthWrapperDataType::Content:
+    case LengthWrapperDataType::Undefined:
+    case LengthWrapperDataType::Fixed:
+    case LengthWrapperDataType::Relative:
+    case LengthWrapperDataType::Intrinsic:
+    case LengthWrapperDataType::MinIntrinsic:
+    case LengthWrapperDataType::MinContent:
+    case LengthWrapperDataType::MaxContent:
+    case LengthWrapperDataType::FillAvailable:
+    case LengthWrapperDataType::FitContent:
+    case LengthWrapperDataType::Percent:
+        m_floatValue = other.m_floatValue;
+        break;
+    case LengthWrapperDataType::Calculated:
         m_calculationValueHandle = other.m_calculationValueHandle;
         ref();
-        break;
-    case LengthWrapperDataKind::Default:
-    case LengthWrapperDataKind::Empty:
-    case LengthWrapperDataKind::HashTableEmpty:
-    case LengthWrapperDataKind::HashTableDeleted:
-        m_floatValue = other.m_floatValue;
         break;
     }
 }
 
 inline void LengthWrapperData::initialize(LengthWrapperData&& other)
 {
-    m_opaqueType = other.m_opaqueType;
+    m_type = other.m_type;
     m_hasQuirk = other.m_hasQuirk;
-    m_kind = other.m_kind;
+    m_isEmptyValue = other.m_isEmptyValue;
 
-    switch (m_kind) {
-    case LengthWrapperDataKind::Calculation:
-        m_calculationValueHandle = std::exchange(other.m_calculationValueHandle, 0);
-        break;
-    case LengthWrapperDataKind::Default:
-    case LengthWrapperDataKind::Empty:
-    case LengthWrapperDataKind::HashTableEmpty:
-    case LengthWrapperDataKind::HashTableDeleted:
+    switch (m_type) {
+    case LengthWrapperDataType::Auto:
+    case LengthWrapperDataType::Normal:
+    case LengthWrapperDataType::Content:
+    case LengthWrapperDataType::Undefined:
+    case LengthWrapperDataType::Fixed:
+    case LengthWrapperDataType::Relative:
+    case LengthWrapperDataType::Intrinsic:
+    case LengthWrapperDataType::MinIntrinsic:
+    case LengthWrapperDataType::MinContent:
+    case LengthWrapperDataType::MaxContent:
+    case LengthWrapperDataType::FillAvailable:
+    case LengthWrapperDataType::FitContent:
+    case LengthWrapperDataType::Percent:
         m_floatValue = other.m_floatValue;
+        break;
+    case LengthWrapperDataType::Calculated:
+        m_calculationValueHandle = std::exchange(other.m_calculationValueHandle, 0);
         break;
     }
 
-    other.m_kind = LengthWrapperDataKind::Default;
+    other.m_type = LengthWrapperDataType::Auto;
 }
 
 inline LengthWrapperData::~LengthWrapperData()
 {
-    if (m_kind == LengthWrapperDataKind::Calculation)
+    if (m_type == LengthWrapperDataType::Calculated)
         deref();
 }
 
 inline bool LengthWrapperData::operator==(const LengthWrapperData& other) const
 {
+    // FIXME: This might be too long to be inline.
     if (type() != other.type() || hasQuirk() != other.hasQuirk())
         return false;
-    if (m_kind == LengthWrapperDataKind::Calculation)
+    if (isEmptyValue() || other.isEmptyValue())
+        return isEmptyValue() && other.isEmptyValue();
+    if (m_type == LengthWrapperDataType::Undefined)
+        return true;
+    if (m_type == LengthWrapperDataType::Calculated)
         return isCalculatedEqual(other);
     return value() == other.value();
 }
 
+inline float LengthWrapperData::value() const
+{
+    ASSERT(!isEmptyValue());
+    return m_floatValue;
+}
+
+inline LengthWrapperDataType LengthWrapperData::type() const
+{
+    return static_cast<LengthWrapperDataType>(m_type);
+}
+
+inline bool LengthWrapperData::hasQuirk() const
+{
+    return m_hasQuirk;
+}
+
 inline bool LengthWrapperData::isPositive() const
 {
-    if (m_kind == LengthWrapperDataKind::Calculation)
+    ASSERT(!isEmptyValue());
+    if (m_type == LengthWrapperDataType::Calculated)
         return true;
     return m_floatValue > 0;
 }
 
 inline bool LengthWrapperData::isNegative() const
 {
-    if (m_kind == LengthWrapperDataKind::Calculation)
+    ASSERT(!isEmptyValue());
+    if (m_type == LengthWrapperDataType::Calculated)
         return false;
     return m_floatValue < 0;
 }
 
 inline bool LengthWrapperData::isZero() const
 {
-    if (m_kind == LengthWrapperDataKind::Calculation)
+    ASSERT(!isEmptyValue());
+    if (m_type == LengthWrapperDataType::Calculated)
         return false;
     return !m_floatValue;
 }
 
+LengthWrapperData blendLengthWrapperData(const LengthWrapperData& from, const LengthWrapperData& to, const BlendingContext&);
+LengthWrapperData blendLengthWrapperData(const LengthWrapperData& from, const LengthWrapperData& to, const BlendingContext&, ValueRange);
+
+WTF::TextStream& operator<<(WTF::TextStream&, const LengthWrapperData&);
+
 template<typename ReturnType, typename MaximumType>
-ReturnType LengthWrapperData::minimumValueForLengthWrapperDataWithLazyMaximum(LengthWrapperDataEvaluationKind evaluationKind, NOESCAPE const Invocable<MaximumType()> auto& lazyMaximumValueFunctor) const
+ReturnType minimumValueForLengthWrapperDataWithLazyMaximum(const LengthWrapperData& length, NOESCAPE const Invocable<MaximumType()> auto& lazyMaximumValueFunctor)
 {
-    switch (evaluationKind) {
-    case LengthWrapperDataEvaluationKind::Fixed:
-        ASSERT(m_kind == LengthWrapperDataKind::Default);
-        return ReturnType(m_floatValue);
-    case LengthWrapperDataEvaluationKind::Percentage:
-        ASSERT(m_kind == LengthWrapperDataKind::Default);
-        return ReturnType(static_cast<float>(lazyMaximumValueFunctor() * m_floatValue / 100.0f));
-    case LengthWrapperDataEvaluationKind::Calculation:
-        ASSERT(m_kind == LengthWrapperDataKind::Calculation);
-        return ReturnType(nonNanCalculatedValue(lazyMaximumValueFunctor()));
-    case LengthWrapperDataEvaluationKind::Flag:
-        ASSERT(m_kind == LengthWrapperDataKind::Default);
+    switch (length.type()) {
+    case LengthWrapperDataType::Fixed:
+        return ReturnType(length.value());
+    case LengthWrapperDataType::Percent:
+        return ReturnType(static_cast<float>(lazyMaximumValueFunctor() * length.value() / 100.0f));
+    case LengthWrapperDataType::Calculated:
+        return ReturnType(length.nonNanCalculatedValue(lazyMaximumValueFunctor()));
+    case LengthWrapperDataType::FillAvailable:
+    case LengthWrapperDataType::Auto:
+    case LengthWrapperDataType::Normal:
+    case LengthWrapperDataType::Content:
         return ReturnType(0);
+    case LengthWrapperDataType::Relative:
+    case LengthWrapperDataType::Intrinsic:
+    case LengthWrapperDataType::MinIntrinsic:
+    case LengthWrapperDataType::MinContent:
+    case LengthWrapperDataType::MaxContent:
+    case LengthWrapperDataType::FitContent:
+    case LengthWrapperDataType::Undefined:
+        break;
     }
     ASSERT_NOT_REACHED();
     return ReturnType(0);
 }
 
 template<typename ReturnType, typename MaximumType>
-ReturnType LengthWrapperData::valueForLengthWrapperDataWithLazyMaximum(LengthWrapperDataEvaluationKind evaluationKind, NOESCAPE const Invocable<MaximumType()> auto& lazyMaximumValueFunctor) const
+ReturnType valueForLengthWrapperDataWithLazyMaximum(const LengthWrapperData& length, NOESCAPE const Invocable<MaximumType()> auto& lazyMaximumValueFunctor)
 {
-    switch (evaluationKind) {
-    case LengthWrapperDataEvaluationKind::Fixed:
-        ASSERT(m_kind == LengthWrapperDataKind::Default);
-        return ReturnType(m_floatValue);
-    case LengthWrapperDataEvaluationKind::Percentage:
-        ASSERT(m_kind == LengthWrapperDataKind::Default);
-        return ReturnType(static_cast<float>(lazyMaximumValueFunctor() * m_floatValue / 100.0f));
-    case LengthWrapperDataEvaluationKind::Calculation:
-        ASSERT(m_kind == LengthWrapperDataKind::Calculation);
-        return ReturnType(nonNanCalculatedValue(lazyMaximumValueFunctor()));
-    case LengthWrapperDataEvaluationKind::Flag:
-        ASSERT(m_kind == LengthWrapperDataKind::Default);
+    switch (length.type()) {
+    case LengthWrapperDataType::Fixed:
+        return ReturnType(length.value());
+    case LengthWrapperDataType::Percent:
+        return ReturnType(static_cast<float>(lazyMaximumValueFunctor() * length.value() / 100.0f));
+    case LengthWrapperDataType::Calculated:
+        return ReturnType(length.nonNanCalculatedValue(lazyMaximumValueFunctor()));
+    case LengthWrapperDataType::FillAvailable:
+    case LengthWrapperDataType::Auto:
+    case LengthWrapperDataType::Normal:
         return ReturnType(lazyMaximumValueFunctor());
+    case LengthWrapperDataType::Content:
+    case LengthWrapperDataType::Relative:
+    case LengthWrapperDataType::Intrinsic:
+    case LengthWrapperDataType::MinIntrinsic:
+    case LengthWrapperDataType::MinContent:
+    case LengthWrapperDataType::MaxContent:
+    case LengthWrapperDataType::FitContent:
+    case LengthWrapperDataType::Undefined:
+        break;
     }
     ASSERT_NOT_REACHED();
     return ReturnType(0);

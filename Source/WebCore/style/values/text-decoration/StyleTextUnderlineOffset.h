@@ -34,8 +34,6 @@ namespace Style {
 struct TextUnderlineOffset : LengthWrapperBase<LengthPercentage<>, CSS::Keyword::Auto> {
     using Base::Base;
 
-    ALWAYS_INLINE bool isAuto() const { return holdsAlternative<CSS::Keyword::Auto>(); }
-
     float resolve(const RenderStyle&, float autoValue = 0.0f) const;
     float resolve(float fontSize, float autoValue = 0.0f) const;
 };
