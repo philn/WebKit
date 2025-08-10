@@ -3,7 +3,6 @@ use rand::RngCore;
 use ring::hmac;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::time::Instant;
 
 struct WKQuinnEndPoint(Endpoint);
