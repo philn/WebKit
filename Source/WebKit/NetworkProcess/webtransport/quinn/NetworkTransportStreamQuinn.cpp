@@ -30,30 +30,41 @@
 
 #include "rust/cxx.h"
 #include "webkit-web-transport/src/lib.rs.h"
+#include <WebCore/Exception.h>
 #include <wtf/CompletionHandler.h>
 
 namespace WebKit {
 
-NetworkTransportStream::NetworkTransportStream()
+NetworkTransportStream::NetworkTransportStream(NetworkTransportSession& session, rust::Box<org::webkit::WKQuinnStream>&& stream, NetworkTransportStreamType streamType)
     : m_identifier(WebCore::WebTransportStreamIdentifier::generate())
-    , m_streamType(NetworkTransportStreamType::Bidirectional)
+    , m_stream(WTFMove(stream))
+    , m_streamType(streamType)
 {
 }
 
-void NetworkTransportStream::sendBytes(std::span<const uint8_t>, bool, CompletionHandler<void(std::optional<WebCore::Exception>&&)>&& completionHandler)
+void NetworkTransportStream::sendBytes(std::span<const uint8_t> data, bool withFin, CompletionHandler<void(std::optional<WebCore::Exception>&&)>&& completionHandler)
 {
+    try {
+        m_stream->send_bytes(rust::Slice(data.data(), data.size_bytes()), withFin);
+        completionHandler(std::nullopt);
+    } catch (rust::cxxbridge1::Error exception) {
+        completionHandler(WebCore::Exception(WebCore::ExceptionCode::NetworkError));
+    }
 }
 
 void NetworkTransportStream::cancelReceive(std::optional<WebCore::WebTransportStreamErrorCode>)
 {
+    m_stream->cancel_receive();
 }
 
 void NetworkTransportStream::cancelSend(std::optional<WebCore::WebTransportStreamErrorCode>)
 {
+    m_stream->cancel_send();
 }
 
 void NetworkTransportStream::cancel(std::optional<WebCore::WebTransportStreamErrorCode>)
 {
+    m_stream->cancel();
 }
 
 } // namespace WebKit

@@ -36,6 +36,11 @@
 #include <wtf/RetainPtr.h>
 #endif
 
+#if USE(QUINN)
+#include "rust/cxx.h"
+#include "webkit-web-transport/src/lib.rs.h"
+#endif
+
 namespace WebCore {
 class Exception;
 struct WebTransportStreamIdentifierType;
@@ -63,6 +68,8 @@ public:
 protected:
 #if PLATFORM(COCOA)
     NetworkTransportStream(NetworkTransportSession&, nw_connection_t, NetworkTransportStreamType);
+#elif USE(QUINN)
+    NetworkTransportStream(NetworkTransportSession&, rust::Box<org::webkit::WKQuinnStream>&&, NetworkTransportStreamType);
 #else
     NetworkTransportStream();
 #endif
@@ -75,6 +82,9 @@ private:
     WeakPtr<NetworkTransportSession> m_session;
 #if PLATFORM(COCOA)
     const RetainPtr<nw_connection_t> m_connection;
+#endif
+#if USE(QUINN)
+    rust::Box<org::webkit::WKQuinnStream> m_stream;
 #endif
     const NetworkTransportStreamType m_streamType;
     NetworkTransportStreamState m_streamState;

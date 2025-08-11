@@ -32,14 +32,15 @@
 #include "NetworkTransportStream.h"
 #include "rust/cxx.h"
 #include "webkit-web-transport/src/lib.rs.h"
+#include <WebCore/Exception.h>
 #include <wtf/CompletionHandler.h>
 
 namespace WebKit {
 
 void NetworkTransportSession::initialize(NetworkConnectionToWebProcess& connectionToWebProcess, URL&& url, WebKit::WebPageProxyIdentifier&& pageID, WebCore::ClientOrigin&& clientOrigin, CompletionHandler<void(RefPtr<NetworkTransportSession>&&)>&& completionHandler)
 {
-    auto endpoint = org::webkit::create_endpoint();
     try {
+        auto endpoint = org::webkit::create_endpoint();
         auto connection = endpoint->create_connection(url.string().utf8().data());
         completionHandler(NetworkTransportSession::create(connectionToWebProcess, WTFMove(endpoint), WTFMove(connection)));
     } catch (rust::cxxbridge1::Error exception) {
@@ -54,19 +55,47 @@ NetworkTransportSession::NetworkTransportSession(NetworkConnectionToWebProcess&,
 
 }
 
-void NetworkTransportSession::sendDatagram(std::span<const uint8_t>, CompletionHandler<void(std::optional<WebCore::Exception>&&)>&& completionHandler)
+void NetworkTransportSession::sendDatagram(std::span<const uint8_t> data, CompletionHandler<void(std::optional<WebCore::Exception>&&)>&& completionHandler)
 {
-    completionHandler(std::nullopt);
+    try {
+        m_connection->send_datagram(rust::Slice(data.data(), data.size_bytes()));
+        completionHandler(std::nullopt);
+    } catch (rust::cxxbridge1::Error exception) {
+        completionHandler(WebCore::Exception(WebCore::ExceptionCode::NetworkError));
+    }
 }
 
-void NetworkTransportSession::createOutgoingUnidirectionalStream(CompletionHandler<void(std::optional<WebCore::WebTransportStreamIdentifier>)>&& completionHandler)
+void NetworkTransportSession::createStream(NetworkTransportStreamType streamType, CompletionHandler<void(std::optional<WebCore::WebTransportStreamIdentifier>)>&& completionHandler)
 {
-    completionHandler(std::nullopt);
+    RefPtr<NetworkTransportStream> stream;
+    org::webkit::StreamType type;
+    switch (streamType) {
+    case NetworkTransportStreamType::OutgoingUnidirectional:
+        type = org::webkit::StreamType::Unidirectional;
+        break;
+    case NetworkTransportStreamType::Bidirectional:
+        type = org::webkit::StreamType::Bidirectional;
+        break;
+    case NetworkTransportStreamType::IncomingUnidirectional:
+        ASSERT_NOT_REACHED();
+        return;
+    };
+    try {
+        auto quinnStream = m_connection->create_stream(type);
+        Ref stream = NetworkTransportStream::create(*this, WTFMove(quinnStream), streamType);
+    } catch (rust::cxxbridge1::Error exception) {
+        completionHandler(std::nullopt);
+    }
 }
 
-void NetworkTransportSession::createBidirectionalStream(CompletionHandler<void(std::optional<WebCore::WebTransportStreamIdentifier>)>&& completionHandler)
+void NetworkTransportSession::createOutgoingUnidirectionalStream(CompletionHandler<void(std::optional<WebCore::WebTransportStreamIdentifier>)> && completionHandler)
 {
-    completionHandler(std::nullopt);
+    createStream(NetworkTransportStreamType::OutgoingUnidirectional, WTFMove(completionHandler));
+}
+
+void NetworkTransportSession::createBidirectionalStream(CompletionHandler<void(std::optional<WebCore::WebTransportStreamIdentifier>)> && completionHandler)
+{
+    createStream(NetworkTransportStreamType::Bidirectional, WTFMove(completionHandler));
 }
 
 } // namespace WebKit
