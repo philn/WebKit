@@ -204,19 +204,19 @@ static void populateCandidateStats(const RiceCandidate* candidate, GstWebRTCICEC
     gstStats->prio = candidate->priority;
 
 #if GST_CHECK_VERSION(1, 27, 0)
-    gstStats->foundation = g_strdup(candidate->foundation);
+    GST_WEBRTC_ICE_CANDIDATE_STATS_FOUNDATION(gstStats) = g_strdup(candidate->foundation);
     auto relatedAddress = riceAddressToString(candidate->related_address, false);
-    gstStats->related_address = g_strdup(relatedAddress.ascii().data());
-    gstStats->related_port = rice_address_get_port(candidate->related_address);
+    GST_WEBRTC_ICE_CANDIDATE_STATS_RELATED_ADDRESS(gstStats) = g_strdup(relatedAddress.ascii().data());
+    GST_WEBRTC_ICE_CANDIDATE_STATS_RELATED_PORT(gstStats) = rice_address_get_port(candidate->related_address);
     switch (candidate->tcp_type) {
     case RICE_TCP_TYPE_ACTIVE:
-        gstStats->tcp_type = GST_WEBRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE;
+        GST_WEBRTC_ICE_CANDIDATE_STATS_TCP_TYPE(gstStats) = GST_WEBRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE;
         break;
     case RICE_TCP_TYPE_PASSIVE:
-        gstStats->tcp_type = GST_WEBRTC_ICE_TCP_CANDIDATE_TYPE_PASSIVE;
+        GST_WEBRTC_ICE_CANDIDATE_STATS_TCP_TYPE(gstStats) = GST_WEBRTC_ICE_TCP_CANDIDATE_TYPE_PASSIVE;
         break;
     case RICE_TCP_TYPE_SO:
-        gstStats->tcp_type = GST_WEBRTC_ICE_TCP_CANDIDATE_TYPE_SO;
+        GST_WEBRTC_ICE_CANDIDATE_STATS_TCP_TYPE(gstStats) = GST_WEBRTC_ICE_TCP_CANDIDATE_TYPE_SO;
         break;
     case RICE_TCP_TYPE_NONE:
         break;

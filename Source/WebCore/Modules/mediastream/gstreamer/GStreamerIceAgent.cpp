@@ -35,6 +35,7 @@
 #include <wtf/Condition.h>
 #include <wtf/HashSet.h>
 #include <wtf/Lock.h>
+#include <wtf/MonotonicTime.h>
 #include <wtf/RunLoop.h>
 #include <wtf/URL.h>
 #include <wtf/URLHash.h>
@@ -64,6 +65,9 @@ typedef struct _WebKitGstIceAgentPrivate {
     GRefPtr<GMainLoop> loop;
     Lock lock;
     Condition condition;
+
+    bool agentIsClosed;
+    GRefPtr<GstPromise> closePromise;
 
     GstWebRTCICEOnCandidateFunc onCandidate;
     gpointer onCandidateData;
@@ -481,6 +485,32 @@ static gboolean webkitGstWebRTCIceAgentGetSelectedPair(GstWebRTCICE* ice,
     return TRUE;
 }
 
+void webkitGstWebRTCIceAgentClosed(WebKitGstIceAgent* agent)
+{
+    agent->priv->agentIsClosed = true;
+
+    if (!agent->priv->closePromise)
+        return;
+
+    gst_promise_reply(agent->priv->closePromise.get(), nullptr);
+    agent->priv->closePromise.clear();
+}
+
+static void webkitGstWebRTCIceAgentClose(GstWebRTCICE* ice, GstPromise* promise)
+{
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+
+    backend->priv->closePromise = adoptGRef(promise);
+    auto now = WTF::MonotonicTime::now().secondsSinceEpoch();
+    rice_agent_close(backend->priv->agent.get(), now.nanoseconds());
+
+    if (backend->priv->closePromise)
+        return;
+
+    while (!backend->priv->agentIsClosed)
+        g_main_context_iteration(backend->priv->mainContext.get(), TRUE);
+}
+
 static void webkitGstWebRTCIceAgentFinalize(GObject* object)
 {
     gst_printerrln("finalize agent %p", object);
@@ -503,6 +533,8 @@ static void webkitGstWebRTCIceAgentConstructed(GObject* object)
 
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(object);
     auto priv = backend->priv;
+
+    priv->agentIsClosed = false;
 
     static Atomic<uint32_t> counter = 0;
     auto id = counter.load();
@@ -591,7 +623,9 @@ static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* kla
     // TODO:
     // - get_local_candidates
     // - get_remote_candidates
-    // - close (pending https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/9379)
+#if GST_CHECK_VERSION(1, 27, 0)
+    iceClass->close = webkitGstWebRTCIceAgentClose;
+#endif
 }
 
 WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(StringView name, ScriptExecutionContext* context)
@@ -623,13 +657,22 @@ Vector<String> webkitGstWebRTCIceAgentGatherSocketAddresses(WebKitGstIceAgent* a
     return backend->gatherSocketAddresses(streamId);
 }
 
-GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent* agent, GThreadSafeWeakPtr<WebKitGstIceStream>&& stream, GstWebRTCICEComponent component)
+GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent* agent, GThreadSafeWeakPtr<WebKitGstIceStream>&& stream, RTCIceComponent component)
 {
     if (!agent->priv->iceBackend)
         return nullptr;
 
+    GstWebRTCICEComponent gstComponent;
+    switch (component) {
+    case RTCIceComponent::Rtp:
+        gstComponent = GST_WEBRTC_ICE_COMPONENT_RTP;
+        break;
+    case RTCIceComponent::Rtcp:
+        gstComponent = GST_WEBRTC_ICE_COMPONENT_RTCP;
+        break;
+    };
     auto isController = webkitGstWebRTCIceAgentGetIsController(GST_WEBRTC_ICE(agent));
-    return GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCCreateIceTransport(agent, WTFMove(stream), component, isController));
+    return GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCCreateIceTransport(agent, WTFMove(stream), gstComponent, isController));
 }
 
 void webkitGstWebRTCIceAgentSend(WebKitGstIceAgent* agent, unsigned streamId, RTCIceProtocol protocol, String from, String to, std::span<const uint8_t> data)

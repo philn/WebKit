@@ -40,10 +40,6 @@
 #include <wtf/RefCounted.h>
 #include <wtf/glib/GThreadSafeWeakPtr.h>
 
-#define GST_USE_UNSTABLE_API
-#include <gst/webrtc/webrtc.h>
-#undef GST_USE_UNSTABLE_API
-
 typedef struct _WebKitGstIceAgent WebKitGstIceAgent;
 typedef struct _WebKitGstIceAgentClass WebKitGstIceAgentClass;
 
@@ -109,7 +105,7 @@ WebKitGstIceAgent* webkitGstWebRTCCreateIceAgent(WTF::StringView, WebCore::Scrip
 const GRefPtr<RiceAgent>& webkitGstWebRTCIceAgentGetRiceAgent(WebKitGstIceAgent*);
 Vector<String> webkitGstWebRTCIceAgentGatherSocketAddresses(WebKitGstIceAgent*, unsigned);
 
-GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent*, GThreadSafeWeakPtr<WebKitGstIceStream>&&, GstWebRTCICEComponent);
+GstWebRTCICETransport *webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent*, GThreadSafeWeakPtr<WebKitGstIceStream>&&, WebCore::RTCIceComponent);
 
 void webkitGstWebRTCIceAgentSend(WebKitGstIceAgent*, unsigned, WebCore::RTCIceProtocol, String from, String to, std::span<const uint8_t>);
 
@@ -118,7 +114,7 @@ void webkitGstWebRTCIceAgentGatheringDoneForStream(WebKitGstIceAgent*, unsigned)
 void webkitGstWebRTCIceAgentLocalCandidateGatheredForStream(WebKitGstIceAgent*, unsigned, RiceAgentGatheredCandidate&);
 void webkitGstWebRTCIceAgentComponentStateChangedForStream(WebKitGstIceAgent*, unsigned, RiceAgentComponentStateChange&);
 void webkitGstWebRTCIceAgentNewSelectedPairForStream(WebKitGstIceAgent*, unsigned, RiceAgentSelectedPair&);
-
+void webkitGstWebRTCIceAgentClosed(WebKitGstIceAgent*);
 void webkitGstWebRTCIceAgentFinalizeStream(WebKitGstIceAgent*, unsigned);
 
 #endif // USE(GSTREAMER_WEBRTC) && USE(LIBRICE)

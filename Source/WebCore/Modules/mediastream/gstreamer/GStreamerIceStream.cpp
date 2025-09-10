@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "GStreamerIceStream.h"
+#include "RTCIceComponent.h"
 
 #if USE(GSTREAMER_WEBRTC) && USE(LIBRICE)
 
@@ -71,11 +72,11 @@ GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(GstWebRTCICEStream*
     switch (component) {
     case GST_WEBRTC_ICE_COMPONENT_RTP:
         if (!stream->priv->rtpTransport)
-            stream->priv->rtpTransport = adoptGRef(GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCIceAgentCreateTransport(agent.get(), GThreadSafeWeakPtr(stream), component)));
+            stream->priv->rtpTransport = adoptGRef(GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCIceAgentCreateTransport(agent.get(), GThreadSafeWeakPtr(stream), RTCIceComponent::Rtp)));
         return stream->priv->rtpTransport.get();
     case GST_WEBRTC_ICE_COMPONENT_RTCP:
         if (!stream->priv->rtcpTransport)
-            stream->priv->rtcpTransport = adoptGRef(GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCIceAgentCreateTransport(agent.get(), GThreadSafeWeakPtr(stream), component)));
+            stream->priv->rtcpTransport = adoptGRef(GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCIceAgentCreateTransport(agent.get(), GThreadSafeWeakPtr(stream), RTCIceComponent::Rtcp)));
         return stream->priv->rtcpTransport.get();
     }
 

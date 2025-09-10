@@ -70,6 +70,7 @@ static gboolean agent_source_prepare(GSource* base, gint* timeout)
         case RICE_AGENT_POLL_CLOSED:
             source->complete = TRUE;
             rice_agent_poll_clear(&ret);
+            webkitGstWebRTCIceAgentClosed(iceAgent.get());
             return TRUE;
         case RICE_AGENT_POLL_COMPONENT_STATE_CHANGE:
             webkitGstWebRTCIceAgentComponentStateChangedForStream(iceAgent.get(), ret.component_state_change.stream_id, ret.component_state_change);
