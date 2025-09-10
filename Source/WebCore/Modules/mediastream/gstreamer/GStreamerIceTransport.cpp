@@ -170,9 +170,11 @@ void webkitGstWebRTCIceTransportNewSelectedPair(WebKitGstIceTransport* transport
 
 static void populateCandidateStats(const RiceCandidate* candidate, GstWebRTCICECandidateStats* gstStats)
 {
-    auto address = riceAddressToString(candidate->address, false);
-    gstStats->ipaddr = g_strdup(address.ascii().data());
-    gstStats->port = rice_address_get_port(candidate->address);
+    if (candidate->address) {
+        auto address = riceAddressToString(candidate->address, false);
+        gstStats->ipaddr = g_strdup(address.ascii().data());
+        gstStats->port = rice_address_get_port(candidate->address);
+    }
 
     switch (candidate->candidate_type) {
     case RICE_CANDIDATE_TYPE_HOST:
@@ -205,9 +207,11 @@ static void populateCandidateStats(const RiceCandidate* candidate, GstWebRTCICEC
 
 #if GST_CHECK_VERSION(1, 27, 0)
     GST_WEBRTC_ICE_CANDIDATE_STATS_FOUNDATION(gstStats) = g_strdup(candidate->foundation);
-    auto relatedAddress = riceAddressToString(candidate->related_address, false);
-    GST_WEBRTC_ICE_CANDIDATE_STATS_RELATED_ADDRESS(gstStats) = g_strdup(relatedAddress.ascii().data());
-    GST_WEBRTC_ICE_CANDIDATE_STATS_RELATED_PORT(gstStats) = rice_address_get_port(candidate->related_address);
+    if (candidate->related_address) {
+        auto relatedAddress = riceAddressToString(candidate->related_address, false);
+        GST_WEBRTC_ICE_CANDIDATE_STATS_RELATED_ADDRESS(gstStats) = g_strdup(relatedAddress.ascii().data());
+        GST_WEBRTC_ICE_CANDIDATE_STATS_RELATED_PORT(gstStats) = rice_address_get_port(candidate->related_address);
+    }
     switch (candidate->tcp_type) {
     case RICE_TCP_TYPE_ACTIVE:
         GST_WEBRTC_ICE_CANDIDATE_STATS_TCP_TYPE(gstStats) = GST_WEBRTC_ICE_TCP_CANDIDATE_TYPE_ACTIVE;

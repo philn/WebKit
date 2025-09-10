@@ -511,6 +511,15 @@ static void webkitGstWebRTCIceAgentClose(GstWebRTCICE* ice, GstPromise* promise)
         g_main_context_iteration(backend->priv->mainContext.get(), TRUE);
 }
 
+static void webkitGstWebRTCIceAgentDispose(GObject* object)
+{
+    gst_printerrln("dispose agent %p", object);
+#if !GST_CHECK_VERSION(1, 27, 0)
+    webkitGstWebRTCIceAgentClose(GST_WEBRTC_ICE(object), nullptr);
+#endif
+    G_OBJECT_CLASS(webkit_gst_webrtc_ice_backend_parent_class)->dispose(object);
+}
+
 static void webkitGstWebRTCIceAgentFinalize(GObject* object)
 {
     gst_printerrln("finalize agent %p", object);
@@ -598,6 +607,7 @@ static void webkit_gst_webrtc_ice_backend_class_init(WebKitGstIceAgentClass* kla
 {
     auto gobjectClass = G_OBJECT_CLASS(klass);
     gobjectClass->constructed = webkitGstWebRTCIceAgentConstructed;
+    gobjectClass->dispose = webkitGstWebRTCIceAgentDispose;
     gobjectClass->finalize = webkitGstWebRTCIceAgentFinalize;
 
     auto iceClass = GST_WEBRTC_ICE_CLASS(klass);
