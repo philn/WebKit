@@ -150,6 +150,7 @@ static gboolean webkitGstWebRTCIceStreamGatherCandidates(GstWebRTCICEStream* ice
     auto addresses = webkitGstWebRTCIceAgentGatherSocketAddresses(agent.get(), ice->stream_id);
     auto component = adoptGRef(rice_stream_get_component(stream->priv->riceStream.get(), 1));
 
+    gst_printerrln("component: %p", component.get());
     Vector<GUniquePtr<RiceAddress>> riceAddresses;
     Vector<RiceTransportType> riceTransports;
     for (const auto& address : addresses) {
