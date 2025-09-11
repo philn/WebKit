@@ -503,6 +503,9 @@ static void webkitGstWebRTCIceAgentClose(GstWebRTCICE* ice, GstPromise* promise)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
 
+    if (promise)
+        gst_promise_reply(promise, nullptr);
+    return;
     backend->priv->closePromise = adoptGRef(promise);
     auto now = WTF::MonotonicTime::now().secondsSinceEpoch();
     rice_agent_close(backend->priv->agent.get(), now.nanoseconds());

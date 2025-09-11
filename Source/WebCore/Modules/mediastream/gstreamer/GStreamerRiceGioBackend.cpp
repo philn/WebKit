@@ -91,7 +91,11 @@ static gboolean agent_source_prepare(GSource* base, gint* timeout)
             break;
         case RICE_AGENT_POLL_WAIT_UNTIL_NANOS:
             *timeout = static_cast<int>(ret.wait_until_nanos - now.nanoseconds());
+            // gst_printerrln("-> agent %p %zu now: %f timeout: %d", agent.get(), ret.wait_until_nanos, now.nanoseconds(), *timeout);
             GST_TRACE_OBJECT(iceAgent.get(), "Waiting for %d", *timeout);
+            ASSERT(*timeout >= 0);
+            // if (*timeout < 0)
+            //     *timeout = 0;
             result = FALSE;
             break;
         case RICE_AGENT_POLL_GATHERING_COMPLETE:
