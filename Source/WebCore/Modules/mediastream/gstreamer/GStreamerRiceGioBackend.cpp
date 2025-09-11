@@ -19,14 +19,15 @@
  */
 
 #include "config.h"
+#include "GStreamerRiceGioBackend.h"
 
 #if USE(GSTREAMER_WEBRTC) && USE(LIBRICE)
 
-#include "GStreamerRiceGioBackend.h"
 #include "GStreamerIceUtilities.h"
 #include <gst/gst.h>
 #include <rice-proto.h>
 #include <wtf/MonotonicTime.h>
+#include <wtf/glib/RunLoopSourcePriority.h>
 
 #define GST_CAT_DEFAULT gst_webrtc_rice_gio_debug
 GST_DEBUG_CATEGORY_STATIC(GST_CAT_DEFAULT);
@@ -161,16 +162,18 @@ static GSourceFuncs agent_event_source_funcs = {
 
 GSource* agent_source_new(GThreadSafeWeakPtr<WebKitGstIceAgent>&& agent)
 {
-  AgentSource* source;
+    init_debug();
 
-  init_debug();
+    auto source = g_source_new(&agent_event_source_funcs, sizeof(AgentSource));
+    g_source_set_priority(source, RunLoopSourcePriority::AsyncIONetwork);
+    g_source_set_name(source, "[WebKit] ICE Agent loop");
 
-  source = reinterpret_cast<AgentSource*>(g_source_new(&agent_event_source_funcs, sizeof(AgentSource)));
-  if (auto iceAgent = agent.get()) [[likely]]
-      source->agent.reset(iceAgent.get());
-  source->complete = FALSE;
+    auto agentSource = reinterpret_cast<AgentSource*>(source);
+    if (auto iceAgent = agent.get()) [[likely]]
+        agentSource->agent.reset(iceAgent.get());
+    agentSource->complete = FALSE;
 
-  return reinterpret_cast<GSource*>(source);
+    return source;
 }
 
 #undef GST_CAT_DEFAULT
