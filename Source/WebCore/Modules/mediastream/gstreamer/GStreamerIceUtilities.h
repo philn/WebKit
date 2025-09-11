@@ -43,11 +43,15 @@ static inline String riceAddressToString(const RiceAddress* address, bool includ
             builder.append(static_cast<int>(bytes[i]));
         }
     } else {
+        if (includePort)
+            builder.append('[');
         for (unsigned i = 0; i < size; i++) {
             if (i && !(i % 2))
                 builder.append(':');
             builder.append(hex(bytes[i], 2));
         }
+        if (includePort)
+            builder.append(']');
     }
     if (includePort)
         builder.append(':', rice_address_get_port(address));

@@ -150,11 +150,13 @@ static gboolean webkitGstWebRTCIceStreamGatherCandidates(GstWebRTCICEStream* ice
     auto addresses = webkitGstWebRTCIceAgentGatherSocketAddresses(agent.get(), ice->stream_id);
     auto component = adoptGRef(rice_stream_get_component(stream->priv->riceStream.get(), 1));
 
-    gst_printerrln("component: %p", component.get());
     Vector<GUniquePtr<RiceAddress>> riceAddresses;
     Vector<RiceTransportType> riceTransports;
     for (const auto& address : addresses) {
         GUniquePtr<RiceAddress> addr(rice_address_new_from_string(address.ascii().data()));
+        if (!addr) [[unlikely]]
+            continue;
+
         riceAddresses.append(WTFMove(addr));
         riceTransports.append(RICE_TRANSPORT_TYPE_UDP);
         // TODO: TCP

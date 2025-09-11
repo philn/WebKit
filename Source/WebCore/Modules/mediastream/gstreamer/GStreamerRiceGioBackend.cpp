@@ -33,7 +33,7 @@ GST_DEBUG_CATEGORY_STATIC(GST_CAT_DEFAULT);
 
 using namespace::WebCore;
 
-static void init_debug ()
+static void init_debug()
 {
     static gsize _init = 0;
 
@@ -65,15 +65,18 @@ static gboolean agent_source_prepare(GSource* base, gint* timeout)
     while (true) {
         RiceAgentPoll ret;
         rice_agent_poll_init(&ret);
+        GST_TRACE_OBJECT(iceAgent.get(), "Polling");
         rice_agent_poll(agent.get(), now.nanoseconds(), &ret);
+        GST_TRACE_OBJECT(iceAgent.get(), "Polling DONE");
         switch (ret.tag) {
         case RICE_AGENT_POLL_CLOSED:
-            gst_printerrln("-> closed!");
+            GST_TRACE_OBJECT(iceAgent.get(), "Agent closed!");
             source->complete = TRUE;
             rice_agent_poll_clear(&ret);
             webkitGstWebRTCIceAgentClosed(iceAgent.get());
             return TRUE;
         case RICE_AGENT_POLL_COMPONENT_STATE_CHANGE:
+            GST_TRACE_OBJECT(iceAgent.get(), "Component state changed");
             webkitGstWebRTCIceAgentComponentStateChangedForStream(iceAgent.get(), ret.component_state_change.stream_id, ret.component_state_change);
             result = TRUE;
             break;
@@ -88,12 +91,15 @@ static gboolean agent_source_prepare(GSource* base, gint* timeout)
             break;
         case RICE_AGENT_POLL_WAIT_UNTIL_NANOS:
             *timeout = static_cast<int>(ret.wait_until_nanos - now.nanoseconds());
+            GST_TRACE_OBJECT(iceAgent.get(), "Waiting for %d", *timeout);
             result = FALSE;
             break;
         case RICE_AGENT_POLL_GATHERING_COMPLETE:
+            GST_TRACE_OBJECT(iceAgent.get(), "Gathering complete");
             webkitGstWebRTCIceAgentGatheringDoneForStream(iceAgent.get(), ret.gathering_complete.stream_id);
             break;
         case RICE_AGENT_POLL_GATHERED_CANDIDATE:
+            GST_TRACE_OBJECT(iceAgent.get(), "Gathered candidate");
             webkitGstWebRTCIceAgentLocalCandidateGatheredForStream(iceAgent.get(), ret.gathered_candidate.stream_id, ret.gathered_candidate);
             result = TRUE;
             break;

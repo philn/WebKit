@@ -110,13 +110,14 @@ static void webkitGstWebRTCIceAgentSetOnIceCandidate(GstWebRTCICE* ice, GstWebRT
 
 static void webkitGstWebRTCIceAgentSetForceRelay(GstWebRTCICE*, gboolean)
 {
-    notImplemented();
+    GST_FIXME("Not implemented yet.");
 }
 
 static void webkitGstWebRTCIceAgentSetStunServer(GstWebRTCICE* ice, const gchar* uri)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
     backend->priv->stunServer = String::fromUTF8(uri);
+    GST_INFO_OBJECT(ice, "Setting STUN server address to %s", backend->priv->stunServer.utf8().data());
 
     URL url(backend->priv->stunServer);
     ASSERT(url.isValid());
@@ -205,6 +206,7 @@ Expected<URL, URLValidationError> validateTurnServerURL(const String& turnUrl)
 
 static void addTurnServer(WebKitGstIceAgent* agent, const URL& url)
 {
+    GST_INFO_OBJECT(agent, "Adding TURN server %s", url.string().utf8().data());
     if (!url.host())
         return;
 
@@ -212,7 +214,7 @@ static void addTurnServer(WebKitGstIceAgent* agent, const URL& url)
     unsigned nRelay = 0;
 
     if (url.protocolIs("turns"_s)) {
-        notImplemented();
+        GST_FIXME("Not implemented yet.");
         return;
     }
 
@@ -244,6 +246,7 @@ static void addTurnServer(WebKitGstIceAgent* agent, const URL& url)
             return;
 
         auto turnAddressString = makeString(result.returnValue(), ':', port);
+        GST_DEBUG_OBJECT(agent.get(), "TURN address resolved to %s", turnAddressString.ascii().data());
         GUniquePtr<RiceAddress> turnAddress(rice_address_new_from_string(turnAddressString.utf8().data()));
         GUniquePtr<RiceCredentials> credentials(rice_credentials_new(g_strdup(user.utf8().data()), g_strdup(password.utf8().data())));
         for (unsigned i = 0; i < nRelay; i++)
@@ -316,7 +319,7 @@ static gboolean webkitGstWebRTCIceAgentGetIsController(GstWebRTCICE* ice)
 
 static void webkitGstWebRTCIceAgentSetIsController(GstWebRTCICE*, gboolean)
 {
-    notImplemented();
+    GST_FIXME("Not implemented yet.");
 }
 
 struct CandidateAddress {
@@ -411,7 +414,7 @@ static GstWebRTCICETransport* webkitGstWebRTCIceAgentFindTransport(GstWebRTCICE*
 
 static void webkitGstWebRTCIceAgentSetTos(GstWebRTCICE*, GstWebRTCICEStream*, guint)
 {
-    notImplemented();
+    GST_FIXME("Not implemented yet.");
 }
 
 static gboolean webkitGstWebRTCIceAgentSetLocalCredentials(GstWebRTCICE*, GstWebRTCICEStream* stream, const gchar* ufrag, const gchar* pwd)
@@ -433,12 +436,12 @@ static gboolean webkitGstWebRTCIceAgentGatherCandidates(GstWebRTCICE*, GstWebRTC
 
 static void webkitGstWebRTCIceAgentSetHttpProxy(GstWebRTCICE*, const gchar*)
 {
-    notImplemented();
+    GST_FIXME("Not implemented yet.");
 }
 
 static gchar* webkitGstWebRTCIceAgentGetHttpProxy(GstWebRTCICE*)
 {
-    notImplemented();
+    GST_FIXME("Not implemented yet.");
     return nullptr;
 }
 
