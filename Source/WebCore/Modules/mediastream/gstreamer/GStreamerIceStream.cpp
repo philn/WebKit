@@ -19,7 +19,6 @@
 
 #include "config.h"
 #include "GStreamerIceStream.h"
-#include "RTCIceComponent.h"
 
 #if USE(GSTREAMER_WEBRTC) && USE(LIBRICE)
 
@@ -27,6 +26,7 @@
 #include "GRefPtrRice.h"
 #include "GStreamerIceUtilities.h"
 #include "GUniquePtrRice.h"
+#include "RTCIceComponent.h"
 #include <gst/webrtc/ice.h>
 #include <gst/webrtc/webrtc.h>
 #include <wtf/MonotonicTime.h>
@@ -84,7 +84,7 @@ GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(GstWebRTCICEStream*
     return nullptr;
 }
 
-void webkitGstWebRTCIceStreamGatheringDone(WebKitGstIceStream* ice)
+void webkitGstWebRTCIceStreamGatheringDone(const WebKitGstIceStream* ice)
 {
     auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);
     if (stream->priv->rtpTransport)
@@ -93,13 +93,13 @@ void webkitGstWebRTCIceStreamGatheringDone(WebKitGstIceStream* ice)
         gst_webrtc_ice_transport_gathering_state_change(GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtcpTransport.get()), GST_WEBRTC_ICE_GATHERING_STATE_COMPLETE);
 }
 
-void webkitGstWebRTCIceStreamAddLocalGatheredCandidate(WebKitGstIceStream* ice, RiceGatheredCandidate& candidate)
+void webkitGstWebRTCIceStreamAddLocalGatheredCandidate(const WebKitGstIceStream* ice, RiceGatheredCandidate& candidate)
 {
     auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);
     rice_stream_add_local_gathered_candidate(stream->priv->riceStream.get(), &candidate);
 }
 
-void webkitGstWebRTCIceStreamNewSelectedPair(WebKitGstIceStream* ice, RiceAgentSelectedPair& pair)
+void webkitGstWebRTCIceStreamNewSelectedPair(const WebKitGstIceStream* ice, RiceAgentSelectedPair& pair)
 {
     auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);
     if (!stream->priv->rtpTransport) [[unlikely]]
@@ -107,7 +107,7 @@ void webkitGstWebRTCIceStreamNewSelectedPair(WebKitGstIceStream* ice, RiceAgentS
     webkitGstWebRTCIceTransportNewSelectedPair(WEBKIT_GST_WEBRTC_ICE_TRANSPORT(stream->priv->rtpTransport.get()), pair);
 }
 
-void webkitGstWebRTCIceStreamComponentStateChanged(WebKitGstIceStream* ice, RiceAgentComponentStateChange& change)
+void webkitGstWebRTCIceStreamComponentStateChanged(const WebKitGstIceStream* ice, RiceAgentComponentStateChange& change)
 {
     auto stream = WEBKIT_GST_WEBRTC_ICE_STREAM(ice);
     if (!stream->priv->rtpTransport) [[unlikely]]
@@ -177,7 +177,7 @@ bool webkitGstWebRTCIceStreamGatherCandidates(WebKitGstIceStream* stream)
     return webkitGstWebRTCIceStreamGatherCandidates(GST_WEBRTC_ICE_STREAM(stream));
 }
 
-void webkitGstWebRTCIceStreamHandleIncomingData(WebKitGstIceStream* stream, WebCore::RTCIceProtocol protocol, String&& from, String&& to, std::span<const uint8_t>&& data)
+void webkitGstWebRTCIceStreamHandleIncomingData(const WebKitGstIceStream* stream, WebCore::RTCIceProtocol protocol, String&& from, String&& to, std::span<const uint8_t>&& data)
 {
     RiceTransportType transport;
     switch (protocol) {

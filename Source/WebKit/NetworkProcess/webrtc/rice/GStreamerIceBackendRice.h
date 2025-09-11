@@ -27,11 +27,9 @@
 #include <WebCore/GUniquePtrRice.h>
 #include <WebCore/RTCIceComponent.h>
 #include <WebCore/RTCIceProtocol.h>
-#include <wtf/Condition.h>
 #include <wtf/Expected.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
-#include <wtf/Lock.h>
 #include <wtf/RunLoop.h>
 #include <wtf/URL.h>
 #include <wtf/URLHash.h>
@@ -66,11 +64,7 @@ private:
     virtual IPC::Connection* connection() const = 0;
     virtual uint64_t destination() const = 0;
 
-    RefPtr<Thread> m_thread;
-    GRefPtr<GMainContext> m_mainContext;
-    GRefPtr<GMainLoop> m_loop;
-    Lock m_lock;
-    Condition m_condition;
+    RefPtr<RunLoop> m_runLoop;
 
     struct SocketData {
         GRefPtr<RiceSockets> sockets;

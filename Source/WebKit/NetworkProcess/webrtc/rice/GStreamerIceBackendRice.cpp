@@ -26,6 +26,7 @@
 #include <WebCore/GStreamerIceUtilities.h>
 #include <rice-io.h>
 #include <wtf/CompletionHandler.h>
+#include <wtf/glib/RunLoopSourcePriority.h>
 #include <wtf/glib/WTFGType.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -89,10 +90,14 @@ static GSourceFuncs recvSourceEventFunctions = {
 
 GSource* recvSourceNew()
 {
-    auto source = reinterpret_cast<RecvSource*>(g_source_new(&recvSourceEventFunctions, sizeof(RecvSource)));
-    source->needsDispatch.exchange(1);
+    auto source = g_source_new(&recvSourceEventFunctions, sizeof(RecvSource));
+    g_source_set_priority(source, RunLoopSourcePriority::AsyncIONetwork);
+    g_source_set_name(source, "[WebKit] ICE Agent loop");
 
-    return reinterpret_cast<GSource*>(source);
+    auto recvSource = reinterpret_cast<RecvSource*>(source);
+    recvSource->needsDispatch.exchange(1);
+
+    return source;
 }
 
 struct RecvSourceData {
@@ -103,44 +108,15 @@ WEBKIT_DEFINE_ASYNC_DATA_STRUCT(RecvSourceData);
 
 GStreamerIceBackendRice::GStreamerIceBackendRice()
 {
-    Locker locker(m_lock);
     static Atomic<uint32_t> counter = 0;
     auto id = counter.load();
     auto threadName = makeString("webrtc-rice-"_s, id);
     counter.exchangeAdd(1);
-    m_thread = Thread::create(ASCIILiteral::fromLiteralUnsafe(threadName.ascii().data()), [&] {
-        Locker locker(m_lock);
-        m_mainContext = adoptGRef(g_main_context_new());
-        m_loop = adoptGRef(g_main_loop_new(m_mainContext.get(), FALSE));
-        m_condition.notifyAll();
-        g_main_context_invoke(m_mainContext.get(), reinterpret_cast<GSourceFunc>(+[](gpointer data) -> gboolean {
-            reinterpret_cast<Locker<Lock>*>(data)->unlockEarly();
-            return G_SOURCE_REMOVE;
-        }), &locker);
 
-        g_main_context_push_thread_default(m_mainContext.get());
-        g_main_loop_run(m_loop.get());
-        g_main_context_pop_thread_default(m_mainContext.get());
-
-        {
-            Locker locker(m_lock);
-            m_loop = nullptr;
-            m_condition.notifyAll();
-        }
-    });
-    m_thread->detach();
-
-    while (!m_loop)
-        m_condition.wait(m_lock);
+    m_runLoop = RunLoop::create(ASCIILiteral::fromLiteralUnsafe(threadName.ascii().data()));
 }
 
-GStreamerIceBackendRice::~GStreamerIceBackendRice()
-{
-    Locker locker(m_lock);
-    g_main_loop_quit(m_loop.get());
-    while (m_loop)
-        m_condition.wait(m_lock);
-}
+GStreamerIceBackendRice::~GStreamerIceBackendRice() = default;
 
 GRefPtr<RiceSockets> GStreamerIceBackendRice::getSocketsForStream(unsigned streamId)
 {
@@ -177,7 +153,7 @@ void GStreamerIceBackendRice::resolveAddress(const String& address, CompletionHa
     data->resolver = adoptGRef(g_resolver_get_default());
     data->address = address;
     data->callback = WTFMove(completionHandler);
-    g_main_context_invoke_full(m_mainContext.get(), G_PRIORITY_DEFAULT, reinterpret_cast<GSourceFunc>(+[](gpointer userData) -> gboolean {
+    g_main_context_invoke_full(m_runLoop->mainContext(), G_PRIORITY_DEFAULT, reinterpret_cast<GSourceFunc>(+[](gpointer userData) -> gboolean {
         auto data = reinterpret_cast<ResolveAddressData*>(userData);
         auto innerData = createResolveAddressDataInner();
         innerData->callback = WTFMove(data->callback);
@@ -331,7 +307,7 @@ void GStreamerIceBackendRice::gatherSocketAddresses(unsigned streamId, Completio
         return G_SOURCE_CONTINUE;
     }), recvData, reinterpret_cast<GDestroyNotify>(destroyRecvSourceData));
 
-    g_source_attach(source.get(), m_mainContext.get());
+    g_source_attach(source.get(), m_runLoop->mainContext());
     m_sockets.add(streamId, SocketData { WTFMove(sockets), WTFMove(source) });
     m_udpAddresses.add(streamId, WTFMove(udpAddresses));
     completionHandler(WTFMove(result));
