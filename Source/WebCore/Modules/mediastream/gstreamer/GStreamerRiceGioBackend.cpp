@@ -68,6 +68,7 @@ static gboolean agent_source_prepare(GSource* base, gint* timeout)
         rice_agent_poll(agent.get(), now.nanoseconds(), &ret);
         switch (ret.tag) {
         case RICE_AGENT_POLL_CLOSED:
+            gst_printerrln("-> closed!");
             source->complete = TRUE;
             rice_agent_poll_clear(&ret);
             webkitGstWebRTCIceAgentClosed(iceAgent.get());
