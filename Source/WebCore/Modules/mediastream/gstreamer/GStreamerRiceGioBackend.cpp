@@ -27,6 +27,7 @@
 #include <gst/gst.h>
 #include <rice-proto.h>
 #include <wtf/MonotonicTime.h>
+#include <wtf/Seconds.h>
 #include <wtf/glib/RunLoopSourcePriority.h>
 
 #define GST_CAT_DEFAULT gst_webrtc_rice_gio_debug
@@ -90,15 +91,20 @@ static gboolean agent_source_prepare(GSource* base, gint* timeout)
             GST_FIXME("remove socket is not handled");
             result = TRUE;
             break;
-        case RICE_AGENT_POLL_WAIT_UNTIL_NANOS:
-            *timeout = static_cast<int>(ret.wait_until_nanos - now.nanoseconds());
-            // gst_printerrln("-> agent %p %zu now: %f timeout: %d", agent.get(), ret.wait_until_nanos, now.nanoseconds(), *timeout);
-            GST_TRACE_OBJECT(iceAgent.get(), "Waiting for %d", *timeout);
-            ASSERT(*timeout >= 0);
-            // if (*timeout < 0)
-            //     *timeout = 0;
+        case RICE_AGENT_POLL_WAIT_UNTIL_NANOS: {
+            auto delta = Seconds::fromNanoseconds(ret.wait_until_nanos - now.nanoseconds());
+            if (delta >= 99998_s) {
+                GST_TRACE_OBJECT(iceAgent.get(), "Nothing special to do.");
+                result = FALSE;
+                break;
+            }
+            if (timeout) {
+                *timeout = static_cast<int>(delta.milliseconds());
+                GST_TRACE_OBJECT(iceAgent.get(), "Waiting for %d ms", *timeout);
+            }
             result = FALSE;
             break;
+        }
         case RICE_AGENT_POLL_GATHERING_COMPLETE:
             GST_TRACE_OBJECT(iceAgent.get(), "Gathering complete");
             webkitGstWebRTCIceAgentGatheringDoneForStream(iceAgent.get(), ret.gathering_complete.stream_id);
@@ -109,6 +115,7 @@ static gboolean agent_source_prepare(GSource* base, gint* timeout)
             result = TRUE;
             break;
         case RICE_AGENT_POLL_SELECTED_PAIR:
+            GST_TRACE_OBJECT(iceAgent.get(), "New selected pair");
             webkitGstWebRTCIceAgentNewSelectedPairForStream(iceAgent.get(), ret.selected_pair.stream_id, ret.selected_pair);
             result = TRUE;
             break;
