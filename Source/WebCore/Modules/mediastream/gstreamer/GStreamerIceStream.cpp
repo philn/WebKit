@@ -73,11 +73,11 @@ GstWebRTCICETransport* webkitGstWebRTCIceStreamFindTransport(GstWebRTCICEStream*
     case GST_WEBRTC_ICE_COMPONENT_RTP:
         if (!stream->priv->rtpTransport)
             stream->priv->rtpTransport = adoptGRef(GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCIceAgentCreateTransport(agent.get(), GThreadSafeWeakPtr(stream), RTCIceComponent::Rtp)));
-        return stream->priv->rtpTransport.get();
+        return stream->priv->rtpTransport.ref();
     case GST_WEBRTC_ICE_COMPONENT_RTCP:
         if (!stream->priv->rtcpTransport)
             stream->priv->rtcpTransport = adoptGRef(GST_WEBRTC_ICE_TRANSPORT(webkitGstWebRTCIceAgentCreateTransport(agent.get(), GThreadSafeWeakPtr(stream), RTCIceComponent::Rtcp)));
-        return stream->priv->rtcpTransport.get();
+        return stream->priv->rtcpTransport.ref();
     }
 
     ASSERT_NOT_REACHED();
