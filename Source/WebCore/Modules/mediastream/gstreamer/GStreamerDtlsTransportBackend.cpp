@@ -25,6 +25,7 @@
 #include "GStreamerIceTransportBackend.h"
 #include "GStreamerWebRTCUtils.h"
 #include <JavaScriptCore/ArrayBuffer.h>
+#include <wtf/Noncopyable.h>
 #include <wtf/glib/GUniquePtr.h>
 
 namespace WebCore {
@@ -33,6 +34,7 @@ GST_DEBUG_CATEGORY(webkit_webrtc_dtls_transport_debug);
 #define GST_CAT_DEFAULT webkit_webrtc_dtls_transport_debug
 
 class GStreamerDtlsTransportBackendObserver final : public ThreadSafeRefCounted<GStreamerDtlsTransportBackendObserver> {
+    WTF_MAKE_NONCOPYABLE(GStreamerDtlsTransportBackendObserver);
 public:
     static Ref<GStreamerDtlsTransportBackendObserver> create(RTCDtlsTransportBackendClient& client, GRefPtr<GstWebRTCDTLSTransport>&& backend) { return adoptRef(*new GStreamerDtlsTransportBackendObserver(client, WTFMove(backend))); }
 
@@ -60,7 +62,7 @@ void GStreamerDtlsTransportBackendObserver::stateChanged()
     if (!m_client)
         return;
 
-    callOnMainThread([this, protectedThis = Ref { *this }]() mutable {
+    callOnMainThread([this]() mutable {
         if (!m_client || !m_backend)
             return;
 
@@ -127,7 +129,8 @@ UniqueRef<RTCIceTransportBackend> GStreamerDtlsTransportBackend::iceTransportBac
 
 void GStreamerDtlsTransportBackend::registerClient(RTCDtlsTransportBackendClient& client)
 {
-    m_observer = GStreamerDtlsTransportBackendObserver::create(client, GRefPtr<GstWebRTCDTLSTransport>(m_backend));
+    GRefPtr backend(m_backend);
+    m_observer = GStreamerDtlsTransportBackendObserver::create(client, WTFMove(backend));
     m_observer->start();
 }
 
