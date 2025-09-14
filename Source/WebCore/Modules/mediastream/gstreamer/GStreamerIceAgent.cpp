@@ -34,6 +34,7 @@
 #include <gst/webrtc/webrtc.h>
 #include <wtf/HashSet.h>
 #include <wtf/MonotonicTime.h>
+#include <wtf/Noncopyable.h>
 #include <wtf/RunLoop.h>
 #include <wtf/URL.h>
 #include <wtf/URLHash.h>
@@ -45,18 +46,28 @@
 using namespace WTF;
 using namespace WebCore;
 
-typedef struct _WebKitGstRiceStream {
-    unsigned sessionId;
+using WebKitGstRiceStream = struct _WebKitGstRiceStream {
+    WTF_MAKE_NONCOPYABLE(_WebKitGstRiceStream);
+    _WebKitGstRiceStream(unsigned streamId, GRefPtr<GstWebRTCICEStream>&& stream)
+        : riceStreamId(streamId)
+        , stream(WTFMove(stream))
+    {
+    }
+    ~_WebKitGstRiceStream()
+    {
+        gst_printerrln("dtor WebKitGstRiceStream %p ref-count: %d", this, GST_OBJECT_REFCOUNT(stream.get()));
+    }
+
     unsigned riceStreamId;
     GRefPtr<GstWebRTCICEStream> stream;
-} WebKitGstRiceStream;
+};
 
 typedef struct _WebKitGstIceAgentPrivate {
     RefPtr<GStreamerIceBackendClient> backendClient;
     RefPtr<SocketProvider> socketProvider;
     GRefPtr<RiceAgent> agent;
 
-    Vector<WebKitGstRiceStream> streams;
+    Vector<std::unique_ptr<WebKitGstRiceStream>> streams;
 
     RefPtr<RunLoop> runLoop;
 
@@ -290,7 +301,7 @@ static gchar* webkitGstWebRTCIceAgentGetTurnServer(GstWebRTCICE* ice)
     return g_strdup(backend->priv->turnServer.utf8().data());
 }
 
-static GstWebRTCICEStream* webkitGstWebRTCIceAgentAddStream(GstWebRTCICE* ice, guint sessionId)
+static GstWebRTCICEStream* webkitGstWebRTCIceAgentAddStream(GstWebRTCICE* ice, guint)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
     if (!backend->priv->iceBackend)
@@ -301,7 +312,8 @@ static GstWebRTCICEStream* webkitGstWebRTCIceAgentAddStream(GstWebRTCICE* ice, g
     [[maybe_unused]] auto component = adoptGRef(rice_stream_add_component(riceStream.get()));
 
     auto stream = GST_WEBRTC_ICE_STREAM(webkitGstWebRTCCreateIceStream(backend, WTFMove(riceStream)));
-    backend->priv->streams.append({ sessionId, streamId, GRefPtr(stream) });
+    std::unique_ptr<WebKitGstRiceStream> item = std::make_unique<WebKitGstRiceStream>(streamId, GRefPtr(stream));
+    backend->priv->streams.append(WTFMove(item));
     return stream;
 }
 
@@ -484,7 +496,9 @@ static gboolean webkitGstWebRTCIceAgentGetSelectedPair(GstWebRTCICE* ice,
 
 void webkitGstWebRTCIceAgentClosed(WebKitGstIceAgent* agent)
 {
+    gst_printerrln("agent %p closed! promise=%p", agent, agent->priv->closePromise.get());
     agent->priv->agentIsClosed = true;
+    agent->priv->streams.clear();
 
     if (!agent->priv->closePromise)
         return;
@@ -497,14 +511,17 @@ static void webkitGstWebRTCIceAgentClose(GstWebRTCICE* ice, GstPromise* promise)
 {
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
 
-    if (promise)
-        gst_promise_reply(promise, nullptr);
-    return;
+    // if (promise)
+    //     gst_promise_reply(promise, nullptr);
+    // return;
+    bool shouldWait = promise == nullptr;
     backend->priv->closePromise = adoptGRef(promise);
     auto now = WTF::MonotonicTime::now().secondsSinceEpoch();
     rice_agent_close(backend->priv->agent.get(), now.nanoseconds());
+    webkitGstWebRTCIceAgentWakeup(backend);
 
-    if (backend->priv->closePromise)
+    gst_printerrln("should wait: %d", shouldWait);
+    if (!shouldWait)
         return;
 
     while (!backend->priv->agentIsClosed)
@@ -517,6 +534,8 @@ static void webkitGstWebRTCIceAgentDispose(GObject* object)
 #if !GST_CHECK_VERSION(1, 27, 0)
     webkitGstWebRTCIceAgentClose(GST_WEBRTC_ICE(object), nullptr);
 #endif
+    // auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(object);
+    // backend->priv->closePromise = nullptr;
     G_OBJECT_CLASS(webkit_gst_webrtc_ice_backend_parent_class)->dispose(object);
     gst_printerrln("->> ref count: %u", object->ref_count);
 }
@@ -549,14 +568,14 @@ static void webkitGstWebRTCIceAgentConstructed(GObject* object)
     priv->agent = adoptGRef(rice_agent_new(true, true));
 }
 
-static void findStreamAndApply(const Vector<WebKitGstRiceStream>& streams, unsigned streamId, Function<void(const WebKitGstIceStream*)> callback)
+static void findStreamAndApply(const Vector<std::unique_ptr<WebKitGstRiceStream>>& streams, unsigned streamId, Function<void(const WebKitGstIceStream*)> callback)
 {
     auto index = streams.findIf([streamId](const auto& item) {
-        return item.riceStreamId == streamId;
+        return item->riceStreamId == streamId;
     });
     if (index == notFound) [[unlikely]]
         return;
-    callback(WEBKIT_GST_WEBRTC_ICE_STREAM(streams[index].stream.get()));
+    callback(WEBKIT_GST_WEBRTC_ICE_STREAM(streams[index]->stream.get()));
 }
 
 static void webkitGstWebRTCIceAgentConfigure(WebKitGstIceAgent* backend, RefPtr<SocketProvider>&& socketProvider)
@@ -683,7 +702,7 @@ void webkitGstWebRTCIceAgentFinalizeStream(WebKitGstIceAgent* agent, unsigned st
     backend->finalizeStream(streamId);
 
     agent->priv->streams.removeAllMatching([streamId](const auto& item) {
-        return item.riceStreamId == streamId;
+        return item->riceStreamId == streamId;
     });
 }
 

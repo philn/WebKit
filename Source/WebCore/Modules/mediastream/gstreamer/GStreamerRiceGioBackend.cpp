@@ -35,16 +35,6 @@ GST_DEBUG_CATEGORY_STATIC(GST_CAT_DEFAULT);
 
 using namespace::WebCore;
 
-static void init_debug()
-{
-    static gsize _init = 0;
-
-    if (g_once_init_enter(&_init)) {
-        GST_DEBUG_CATEGORY_INIT(GST_CAT_DEFAULT, "webkitwebrtcricegio", 0, "webkitwebrtcricegio");
-        g_once_init_leave(&_init, 1);
-    }
-}
-
 struct _AgentSource
 {
     GSource source;
@@ -83,8 +73,7 @@ static gboolean agent_source_prepare(GSource* base, gint* timeout)
             result = TRUE;
             break;
         case RICE_AGENT_POLL_ALLOCATE_SOCKET:
-            /* FIXME: handle */
-            g_assert_not_reached();
+            GST_FIXME("allocate socket is not handled");
             result = TRUE;
             break;
         case RICE_AGENT_POLL_REMOVE_SOCKET:
@@ -169,7 +158,10 @@ static GSourceFuncs agent_event_source_funcs = {
 
 GSource* agent_source_new(GThreadSafeWeakPtr<WebKitGstIceAgent>&& agent)
 {
-    init_debug();
+    static std::once_flag debugRegisteredFlag;
+    std::call_once(debugRegisteredFlag, [] {
+        GST_DEBUG_CATEGORY_INIT(GST_CAT_DEFAULT, "webkitwebrtcricegio", 0, "webkitwebrtcricegio");
+    });
 
     auto source = g_source_new(&agent_event_source_funcs, sizeof(AgentSource));
     g_source_set_priority(source, RunLoopSourcePriority::AsyncIONetwork);
