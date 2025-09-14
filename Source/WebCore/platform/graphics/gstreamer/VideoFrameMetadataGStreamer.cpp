@@ -168,7 +168,7 @@ void webkitGstTraceProcessingTimeForElement(GstElement* element)
 
     gst_pad_add_probe(sinkPad.get(), probeType, [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
         auto [modifiedBuffer, meta] = ensureVideoFrameMetadata(GST_PAD_PROBE_INFO_BUFFER(info));
-        GST_PAD_PROBE_INFO_DATA(info) = modifiedBuffer;
+        gst_pad_probe_info_set_buffer(info, gst_buffer_ref(modifiedBuffer));
         Locker locker { meta->priv->lock };
         meta->priv->processingTimes.set(GST_ELEMENT_CAST(userData), std::make_pair(gst_util_get_timestamp(), GST_CLOCK_TIME_NONE));
         return GST_PAD_PROBE_OK;
