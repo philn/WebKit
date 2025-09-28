@@ -2560,12 +2560,6 @@ webkit.org/b/187064 imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-get
 # Missing support for qpSum WebRTC stats.
 webkit.org/b/269285 webrtc/h265.html [ Failure Timeout ]
 
-# Too slow with filtering implemented in WebKit. Should be done directly by GstWebRTC.
-webrtc/datachannel/filter-ice-candidate.html [ Skip ]
-webrtc/datachannel/mdns-ice-candidates.html [ Skip ]
-http/tests/webrtc/filtering-ice-candidate-cross-origin-frame.html [ Skip ]
-http/wpt/webrtc/third-party-frame-ice-candidate-filtering.html [ Skip ]
-
 # The GstWebRTC backend doesn't support transforms yet.
 webkit.org/b/235885 http/wpt/webrtc/no-webrtc-transform.html [ Pass ]
 webkit.org/b/235885 http/wpt/webrtc/audiovideo-script-transform.html [ Skip ]
@@ -2625,6 +2619,11 @@ webkit.org/b/235885 webrtc/candidate-stats.html [ Failure ]
 webkit.org/b/262989 imported/w3c/web-platform-tests/webrtc-stats/getStats-remote-candidate-address.html [ Failure ]
 imported/w3c/web-platform-tests/webrtc/protocol/candidate-exchange.https.html [ Failure ]
 imported/w3c/web-platform-tests/webrtc/RTCIceTransport.html [ Skip ]
+
+webrtc/datachannel/mdns-ice-candidates.html [ Pass ]
+webrtc/datachannel/filter-ice-candidate.html [ Pass ]
+http/wpt/webrtc/third-party-frame-ice-candidate-filtering.html [ Failure ]
+http/tests/webrtc/filtering-ice-candidate-cross-origin-frame.html [ Failure ]
 
 # Pending investigation.
 webkit.org/b/235885 fast/mediastream/mediastreamtrack-video-clone.html [ Failure ]

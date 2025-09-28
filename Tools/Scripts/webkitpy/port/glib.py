@@ -92,6 +92,7 @@ class GLibPort(Port):
         environment['LD_LIBRARY_PATH'] = self._prepend_to_env_value(self._build_path('lib'), environment.get('LD_LIBRARY_PATH', ''))
         self._copy_value_from_environ_if_set(environment, 'LIBGL_ALWAYS_SOFTWARE')
         self._copy_value_from_environ_if_set(environment, 'AT_SPI_BUS_ADDRESS')
+        self._copy_value_from_environ_if_set(environment, 'DBUS_SYSTEM_BUS_ADDRESS')
 
         # Copy all GStreamer related env vars
         self._copy_values_from_environ_with_prefix(environment, 'GST_')

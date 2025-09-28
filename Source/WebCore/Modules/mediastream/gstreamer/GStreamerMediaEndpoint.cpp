@@ -838,6 +838,7 @@ void GStreamerMediaEndpoint::doSetLocalDescription(const RTCSessionDescription* 
             return;
 
         auto filterICECandidates = peerConnectionBackend->shouldFilterICECandidates() ? FilterICECandidates::Yes : FilterICECandidates::No;
+        gst_printerrln(">>> filter: %d", peerConnectionBackend->shouldFilterICECandidates());
         auto descriptions = descriptionsFromWebRTCBin(filterICECandidates, GatherSignalingState::Yes);
 
         // The initial description we pass to webrtcbin might actually be invalid or empty SDP, so

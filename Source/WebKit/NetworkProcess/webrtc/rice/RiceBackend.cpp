@@ -189,6 +189,7 @@ void RiceBackend::resolveAddress(const String& address, CompletionHandler<void(E
         auto data = reinterpret_cast<ResolveAddressData*>(userData);
         auto innerData = createResolveAddressDataInner();
         innerData->callback = WTFMove(data->callback);
+        WTFLogAlways("phil resolving >%s<", data->address.utf8().data());
         g_resolver_lookup_by_name_async(data->resolver.get(), data->address.utf8().data(), nullptr,
             reinterpret_cast<GAsyncReadyCallback>(+[](GResolver* resolver, GAsyncResult* result, gpointer userData) {
                 auto data = reinterpret_cast<ResolveAddressDataInner*>(userData);
