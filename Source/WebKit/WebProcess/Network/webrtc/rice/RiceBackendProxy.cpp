@@ -84,11 +84,11 @@ void RiceBackendProxy::resolveAddress(const String& address, RiceBackend::Resolv
     }, messageSenderDestinationID());
 }
 
-Vector<String> RiceBackendProxy::gatherSocketAddresses(unsigned streamId)
+HashMap<String, String> RiceBackendProxy::gatherSocketAddresses(WebCore::ScriptExecutionContextIdentifier identifier, unsigned streamId)
 {
-    Vector<String> addresses;
+    HashMap<String, String> addresses;
     callOnMainRunLoopAndWait([&] {
-        auto sendResult = m_connection->sendSync(Messages::RiceBackend::GatherSocketAddresses { streamId }, messageSenderDestinationID(), 3_s);
+        auto sendResult = m_connection->sendSync(Messages::RiceBackend::GatherSocketAddresses { identifier, streamId }, messageSenderDestinationID(), 3_s);
         if (!sendResult.succeeded())
             return;
 

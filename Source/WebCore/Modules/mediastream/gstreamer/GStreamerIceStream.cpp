@@ -159,7 +159,7 @@ static gboolean webkitGstWebRTCIceStreamGatherCandidates(GstWebRTCICEStream* ice
 
     Vector<GUniquePtr<RiceAddress>> riceAddresses;
     Vector<RiceTransportType> riceTransports;
-    for (const auto& address : addresses) {
+    for (const auto& address : addresses.keys()) {
         GUniquePtr<RiceAddress> addr(rice_address_new_from_string(address.ascii().data()));
         if (!addr) [[unlikely]]
             continue;

@@ -185,13 +185,14 @@ bool GStreamerMediaEndpoint::initializePipeline()
         if (!peerConnectionBackend)
             return false;
 
-        auto agent = webkitGstWebRTCCreateIceAgent(makeString(binName, ":ice"_s), peerConnectionBackend->context());
-        if (!agent) {
+        m_iceAgent = adoptGRef(webkitGstWebRTCCreateIceAgent(makeString(binName, ":ice"_s), peerConnectionBackend->context()));
+        if (!m_iceAgent) {
             gst_printerrln("Unable to create WebRTC ICE agent");
             return false;
         }
+
         auto name = binName.ascii();
-        m_webrtcBin = gst_element_factory_create_full(webrtcBinFactory.get(), "name", name.data(), "ice-agent", agent, nullptr);
+        m_webrtcBin = gst_element_factory_create_full(webrtcBinFactory.get(), "name", name.data(), "ice-agent", m_iceAgent.ref(), nullptr);
     }
 #endif // USE(LIBRICE) && GST_CHECK_VERSION(1, 20, 0)
     if (!m_webrtcBin)
@@ -463,13 +464,13 @@ void GStreamerMediaEndpoint::restartIce()
     // We should re-initiate negotiation with the ice-restart offer option set to true.
 }
 
-static std::optional<std::pair<RTCSdpType, String>> fetchDescription(GstElement* webrtcBin, ASCIILiteral name)
+std::optional<std::pair<RTCSdpType, String>> GStreamerMediaEndpoint::fetchDescription(ASCIILiteral name, FilterICECandidates filterICECandidates [[maybe_unused]])
 {
-    if (!webrtcBin)
+    if (!m_webrtcBin)
         return { };
 
     GUniqueOutPtr<GstWebRTCSessionDescription> description;
-    g_object_get(webrtcBin, makeString(name, "-description"_s).utf8().data(), &description.outPtr(), nullptr);
+    g_object_get(m_webrtcBin.get(), makeString(name, "-description"_s).utf8().data(), &description.outPtr(), nullptr);
     if (!description)
         return { };
 
@@ -482,8 +483,11 @@ static std::optional<std::pair<RTCSdpType, String>> fetchDescription(GstElement*
         }
     }
 
-    auto sdpString = GMallocString::unsafeAdoptFromUTF8(gst_sdp_message_as_text(description->sdp));
-    return { { fromSessionDescriptionType(*description.get()), sdpString.span() } };
+    std::optional<HashMap<String, String>> mdnsRegistry;
+#if USE(LIBRICE)
+    mdnsRegistry = webkitGstWebRTCIceAgentGetMDNSRegistry(m_iceAgent.get());
+#endif
+    return { { fromSessionDescriptionType(*description.get()), sdpAsString(description->sdp, mdnsRegistry, filterICECandidates == FilterICECandidates::Yes) } };
 }
 
 static GstWebRTCSignalingState fetchSignalingState(GstElement* webrtcBin)
@@ -497,27 +501,26 @@ static GstWebRTCSignalingState fetchSignalingState(GstElement* webrtcBin)
     return state;
 }
 
-enum class GatherSignalingState : bool { No, Yes };
-static std::optional<PeerConnectionBackend::DescriptionStates> descriptionsFromWebRTCBin(GstElement* webrtcBin, GatherSignalingState gatherSignalingState = GatherSignalingState::No)
+std::optional<PeerConnectionBackend::DescriptionStates> GStreamerMediaEndpoint::descriptionsFromWebRTCBin(FilterICECandidates filterICECandidates, GatherSignalingState gatherSignalingState)
 {
     std::optional<RTCSdpType> currentLocalDescriptionSdpType, pendingLocalDescriptionSdpType, currentRemoteDescriptionSdpType, pendingRemoteDescriptionSdpType;
     String currentLocalDescriptionSdp, pendingLocalDescriptionSdp, currentRemoteDescriptionSdp, pendingRemoteDescriptionSdp;
-    if (auto currentLocalDescription = fetchDescription(webrtcBin, "current-local"_s)) {
+    if (auto currentLocalDescription = fetchDescription("current-local"_s, filterICECandidates)) {
         auto [sdpType, description] = *currentLocalDescription;
         currentLocalDescriptionSdpType = sdpType;
         currentLocalDescriptionSdp = WTFMove(description);
     }
-    if (auto pendingLocalDescription = fetchDescription(webrtcBin, "pending-local"_s)) {
+    if (auto pendingLocalDescription = fetchDescription("pending-local"_s, filterICECandidates)) {
         auto [sdpType, description] = *pendingLocalDescription;
         pendingLocalDescriptionSdpType = sdpType;
         pendingLocalDescriptionSdp = WTFMove(description);
     }
-    if (auto currentRemoteDescription = fetchDescription(webrtcBin, "current-remote"_s)) {
+    if (auto currentRemoteDescription = fetchDescription("current-remote"_s, filterICECandidates)) {
         auto [sdpType, description] = *currentRemoteDescription;
         currentRemoteDescriptionSdpType = sdpType;
         currentRemoteDescriptionSdp = WTFMove(description);
     }
-    if (auto pendingRemoteDescription = fetchDescription(webrtcBin, "pending-remote"_s)) {
+    if (auto pendingRemoteDescription = fetchDescription("pending-remote"_s, filterICECandidates)) {
         auto [sdpType, description] = *pendingRemoteDescription;
         pendingRemoteDescriptionSdpType = sdpType;
         pendingRemoteDescriptionSdp = WTFMove(description);
@@ -525,7 +528,7 @@ static std::optional<PeerConnectionBackend::DescriptionStates> descriptionsFromW
 
     std::optional<RTCSignalingState> signalingState;
     if (gatherSignalingState == GatherSignalingState::Yes)
-        signalingState = toSignalingState(fetchSignalingState(webrtcBin));
+        signalingState = toSignalingState(fetchSignalingState(m_webrtcBin.get()));
 
     return PeerConnectionBackend::DescriptionStates {
         signalingState,
@@ -763,7 +766,9 @@ void GStreamerMediaEndpoint::doSetLocalDescription(const RTCSessionDescription* 
         case GST_WEBRTC_SIGNALING_STATE_HAVE_LOCAL_PRANSWER:
         case GST_WEBRTC_SIGNALING_STATE_HAVE_REMOTE_OFFER: {
             GST_DEBUG_OBJECT(m_pipeline.get(), "Empty local description, generating an answer");
-            auto pendingRemoteDescription = fetchDescription(m_webrtcBin.get(), "pending-remote"_s);
+            auto peerConnectionBackend = this->peerConnectionBackend();
+            auto filterICECandidates = peerConnectionBackend && peerConnectionBackend->shouldFilterICECandidates() ? FilterICECandidates::Yes : FilterICECandidates::No;
+            auto pendingRemoteDescription = fetchDescription("pending-remote"_s, filterICECandidates);
             g_signal_emit_by_name(m_webrtcBin.get(), "create-answer", nullptr, promise);
             auto result = gst_promise_wait(promise);
             const auto reply = gst_promise_get_reply(promise);
@@ -777,7 +782,7 @@ void GStreamerMediaEndpoint::doSetLocalDescription(const RTCSessionDescription* 
                         peerConnectionBackend->setLocalDescriptionFailed(Exception { ExceptionCode::OperationError, WTFMove(errorMessage) });
                     return;
                 }
-                if (auto peerConnectionBackend = this->peerConnectionBackend())
+                if (peerConnectionBackend)
                     peerConnectionBackend->setLocalDescriptionFailed(Exception { ExceptionCode::OperationError, "Unable to set local description"_s });
                 return;
             }
@@ -832,7 +837,8 @@ void GStreamerMediaEndpoint::doSetLocalDescription(const RTCSessionDescription* 
         if (!peerConnectionBackend)
             return;
 
-        auto descriptions = descriptionsFromWebRTCBin(m_webrtcBin.get(), GatherSignalingState::Yes);
+        auto filterICECandidates = peerConnectionBackend->shouldFilterICECandidates() ? FilterICECandidates::Yes : FilterICECandidates::No;
+        auto descriptions = descriptionsFromWebRTCBin(filterICECandidates, GatherSignalingState::Yes);
 
         // The initial description we pass to webrtcbin might actually be invalid or empty SDP, so
         // what we would get in return is an empty SDP message, without media line. When this
@@ -946,7 +952,8 @@ void GStreamerMediaEndpoint::doSetRemoteDescription(const RTCSessionDescription&
         });
 
         GST_DEBUG_OBJECT(m_pipeline.get(), "Acking remote description");
-        auto descriptions = descriptionsFromWebRTCBin(m_webrtcBin.get(), GatherSignalingState::Yes);
+        auto filterICECandidates = peerConnectionBackend->shouldFilterICECandidates() ? FilterICECandidates::Yes : FilterICECandidates::No;
+        auto descriptions = descriptionsFromWebRTCBin(filterICECandidates, GatherSignalingState::Yes);
 
         // The initial description we pass to webrtcbin might actually be invalid or empty SDP, so
         // what we would get in return is an empty SDP message, without media line. When this
@@ -1351,7 +1358,10 @@ void GStreamerMediaEndpoint::initiate(bool isInitiator, GstStructure* rawOptions
     holder->sdpType = isInitiator ? RTCSdpType::Offer : RTCSdpType::Answer;
 
     if (holder->sdpType == RTCSdpType::Answer) {
-        if (auto pendingRemoteDescription = fetchDescription(m_webrtcBin.get(), "pending-remote"_s))
+        auto peerConnectionBackend = this->peerConnectionBackend();
+        auto filterICECandidates = peerConnectionBackend && peerConnectionBackend->shouldFilterICECandidates() ? FilterICECandidates::Yes : FilterICECandidates::No;
+
+        if (auto pendingRemoteDescription = fetchDescription("pending-remote"_s, filterICECandidates))
             holder->pendingRemoteDescription = pendingRemoteDescription->second;
     }
 
@@ -1937,8 +1947,9 @@ std::unique_ptr<GStreamerRtpTransceiverBackend> GStreamerMediaEndpoint::transcei
 }
 
 struct AddIceCandidateCallData {
-    GRefPtr<GstElement> webrtcBin;
+    ThreadSafeWeakPtr<GStreamerMediaEndpoint> endPoint;
     PeerConnectionBackend::AddIceCandidateCallback callback;
+    GStreamerMediaEndpoint::FilterICECandidates filterICECandidates;
 };
 WEBKIT_DEFINE_ASYNC_DATA_STRUCT(AddIceCandidateCallData)
 
@@ -1955,11 +1966,15 @@ void GStreamerMediaEndpoint::addIceCandidate(GStreamerIceCandidate& candidate, P
 
     m_statsCollector->invalidateCache();
 
+    auto peerConnectionBackend = this->peerConnectionBackend();
+    auto filterICECandidates = peerConnectionBackend && peerConnectionBackend->shouldFilterICECandidates() ? FilterICECandidates::Yes : FilterICECandidates::No;
+
     // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/3960
     if (gst_check_version(1, 24, 0)) {
         auto* data = createAddIceCandidateCallData();
-        data->webrtcBin = m_webrtcBin;
+        data->endPoint = *this;
         data->callback = WTFMove(callback);
+        data->filterICECandidates = filterICECandidates;
 
         StringView view;
         if (candidate.candidate.startsWithIgnoringASCIICase("a="_s))
@@ -1985,11 +2000,11 @@ void GStreamerMediaEndpoint::addIceCandidate(GStreamerIceCandidate& candidate, P
                 return;
             }
 
-            callOnMainThread([task = createSharedTask<PeerConnectionBackend::AddIceCandidateCallbackFunction>(WTFMove(data->callback)), weakWebrtcBin = GThreadSafeWeakPtr { data->webrtcBin.get() }]() mutable {
-                auto webrtcBin = weakWebrtcBin.get();
-                if (!webrtcBin)
+            callOnMainThread([task = createSharedTask<PeerConnectionBackend::AddIceCandidateCallbackFunction>(WTFMove(data->callback)), weakEndPoint = WTFMove(data->endPoint), filterICECandidates = data->filterICECandidates]() mutable {
+                auto endPoint = weakEndPoint.get();
+                if (!endPoint)
                     return;
-                task->run(descriptionsFromWebRTCBin(webrtcBin.get()));
+                task->run(endPoint->descriptionsFromWebRTCBin(filterICECandidates));
             });
         }, data, reinterpret_cast<GDestroyNotify>(destroyAddIceCandidateCallData)));
         return;
@@ -2006,11 +2021,12 @@ void GStreamerMediaEndpoint::addIceCandidate(GStreamerIceCandidate& candidate, P
 
     // This is racy but nothing we can do about it when we are on older GStreamer runtimes.
     g_signal_emit_by_name(m_webrtcBin.get(), "add-ice-candidate", candidate.sdpMLineIndex, candidate.candidate.utf8().data());
-    callOnMainThread([task = createSharedTask<PeerConnectionBackend::AddIceCandidateCallbackFunction>(WTFMove(callback)), weakWebrtcBin = GThreadSafeWeakPtr { m_webrtcBin.get() }]() mutable {
-        auto webrtcBin = weakWebrtcBin.get();
-        if (!webrtcBin)
+
+    callOnMainThread([task = createSharedTask<PeerConnectionBackend::AddIceCandidateCallbackFunction>(WTFMove(callback)), weakEndPoint = ThreadSafeWeakPtr { *this }, filterICECandidates]() mutable {
+        auto endPoint = weakEndPoint.get();
+        if (!endPoint)
             return;
-        task->run(descriptionsFromWebRTCBin(webrtcBin.get()));
+        task->run(endPoint->descriptionsFromWebRTCBin(filterICECandidates));
     });
 }
 
@@ -2278,7 +2294,6 @@ void GStreamerMediaEndpoint::onIceCandidate(guint sdpMLineIndex, gchararray cand
     if (candidateString.isEmpty())
         return;
 
-    auto descriptions = descriptionsFromWebRTCBin(m_webrtcBin.get());
 
     String mid;
     GUniqueOutPtr<GstWebRTCSessionDescription> description;
@@ -2288,7 +2303,18 @@ void GStreamerMediaEndpoint::onIceCandidate(guint sdpMLineIndex, gchararray cand
         mid = unsafeSpan(gst_sdp_media_get_attribute_val(media, "mid"));
     }
 
-    callOnMainThread([protectedThis = Ref(*this), this, sdp = candidateString.isolatedCopy(), sdpMLineIndex, descriptions = WTFMove(descriptions), mid = WTFMove(mid)]() mutable {
+    auto peerConnectionBackend = this->peerConnectionBackend();
+
+    auto filterICECandidates = peerConnectionBackend && peerConnectionBackend->shouldFilterICECandidates() ? FilterICECandidates::Yes : FilterICECandidates::No;
+#if USE(LIBRICE)
+    auto filteredSdp = maybeObfuscateSDPCandidate(candidateString, webkitGstWebRTCIceAgentGetMDNSRegistry(m_iceAgent.get()), filterICECandidates == FilterICECandidates::Yes);
+    if (!filteredSdp)
+        return;
+    candidateString = *filteredSdp;
+#endif
+    auto descriptions = descriptionsFromWebRTCBin(filterICECandidates);
+
+    callOnMainThread([protectedThis = Ref(*this), this, sdp = WTFMove(candidateString), sdpMLineIndex, descriptions = WTFMove(descriptions), mid = WTFMove(mid)]() mutable {
         if (isStopped())
             return;
         auto peerConnectionBackend = this->peerConnectionBackend();

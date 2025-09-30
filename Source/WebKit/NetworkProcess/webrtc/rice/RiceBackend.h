@@ -31,6 +31,7 @@
 #include <WebCore/GUniquePtrRice.h>
 #include <WebCore/RTCIceComponent.h>
 #include <WebCore/RTCIceProtocol.h>
+#include <WebCore/ScriptExecutionContextIdentifier.h>
 #include <WebCore/SharedMemory.h>
 #include <wtf/Expected.h>
 #include <wtf/Forward.h>
@@ -77,7 +78,8 @@ public:
     void sendData(unsigned, WebCore::RTCIceProtocol, String, String, WebCore::SharedMemory::Handle&&);
     void finalizeStream(unsigned);
 
-    void gatherSocketAddresses(unsigned, CompletionHandler<void(Vector<String> &&)>&&);
+    using GatherSocketAddressesCallback = CompletionHandler<void(HashMap<String, String>&&)>;
+    void gatherSocketAddresses(WebCore::ScriptExecutionContextIdentifier, unsigned, GatherSocketAddressesCallback&&);
 
     GRefPtr<RiceSockets> getSocketsForStream(unsigned);
     GRefPtr<GSource> getRecvSourceForStream(unsigned);

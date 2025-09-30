@@ -267,14 +267,22 @@ void RiceBackend::finalizeStream(unsigned streamId)
         g_source_destroy(data.source.get());
 }
 
-void RiceBackend::gatherSocketAddresses(unsigned streamId, CompletionHandler<void(Vector<String>&&)>&& completionHandler)
+struct MDNSRegistrationData {
+    Atomic<unsigned> pendingRequests;
+    HashMap<String, String> registeredAddresses;
+    RiceBackend::GatherSocketAddressesCallback callback;
+};
+WEBKIT_DEFINE_ASYNC_DATA_STRUCT(MDNSRegistrationData);
+
+void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identifier, unsigned streamId, GatherSocketAddressesCallback&& completionHandler)
 {
     if (m_udpSocketAddressesCache.contains(streamId)) {
         completionHandler(m_udpSocketAddressesCache.get(streamId));
         return;
     }
 
-    Vector<String> result;
+    HashMap<String, String> result;
+    //RELEASE_ASSERT(!m_sockets.contains(streamId));
 
     auto recvData2 = createRecvSourceData();
     recvData2->backend = this;
@@ -362,8 +370,33 @@ void RiceBackend::gatherSocketAddresses(unsigned streamId, CompletionHandler<voi
     g_source_attach(source.get(), m_runLoop->mainContext());
     m_sockets.add(streamId, SocketData { WTFMove(sockets), WTFMove(source) });
     m_udpAddresses.add(streamId, WTFMove(udpAddresses));
-    m_udpSocketAddressesCache.add(streamId, result);
-    completionHandler(WTFMove(result));
+
+    RefPtr connection = m_connection.get();
+    if (!connection) [[unlikely]] {
+        completionHandler(WTFMove(result));
+        return;
+    }
+
+    auto registrationData = createMDNSRegistrationData();
+    registrationData->pendingRequests.exchange(result.size());
+    registrationData->callback = WTFMove(completionHandler);
+    registrationData->registeredAddresses.reserveInitialCapacity(result.size());
+    auto mdnsRegister = connection->protectedMDNSRegister();
+    for (const auto& address : result.keys()) {
+        auto riceAddress = riceAddressFromString(address);
+        auto ipAddress = riceAddressToString(riceAddress.get(), false);
+        mdnsRegister->registerMDNSName(identifier, ipAddress, [ipAddress, address, &registrationData](const auto& mdnsAddress, auto error) {
+            WTFLogAlways("address: %s ipAddress: %s mdns: %s error: %d", address.ascii().data(), ipAddress.ascii().data(), mdnsAddress.ascii().data(), !!error);
+            registrationData->registeredAddresses.set(address, error ? emptyString() : mdnsAddress);
+
+            auto pendingRequests = registrationData->pendingRequests.exchangeSub(1);
+            if (pendingRequests - 1)
+                return;
+
+            registrationData->callback(WTFMove(registrationData->registeredAddresses));
+            destroyMDNSRegistrationData(registrationData);
+        });
+    }
 }
 
 const RiceAddress* RiceBackend::ensureRiceAddressFromCache(const String& address)

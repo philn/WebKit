@@ -105,6 +105,8 @@ typedef struct _WebKitGstIceAgentPrivate {
     Vector<GRefPtr<RiceTurnConfig>> turnConfigs;
 
     GRefPtr<GSource> recvSource;
+
+    HashMap<String, String> mdnsRegistry;
 } WebKitGstIceAgentPrivate;
 
 typedef struct _WebKitGstIceAgent {
@@ -742,13 +744,17 @@ Vector<GRefPtr<RiceTurnConfig>> webkitGstWebRTCIceAgentGetTurnConfigs(WebKitGstI
     return result;
 }
 
-Vector<String> webkitGstWebRTCIceAgentGatherSocketAddresses(WebKitGstIceAgent* agent, unsigned streamId)
+HashMap<String, String> webkitGstWebRTCIceAgentGatherSocketAddresses(WebKitGstIceAgent* agent, unsigned streamId)
 {
     auto backend = agent->priv->iceBackend;
     if (!backend)
         return { };
 
-    return backend->gatherSocketAddresses(streamId);
+    RELEASE_ASSERT(agent->priv->identifier);
+    auto addresses = backend->gatherSocketAddresses(*agent->priv->identifier, streamId);
+    for (auto& [addressWithPort, mdnsHostname] : addresses)
+        agent->priv->mdnsRegistry.set(addressWithPort, mdnsHostname);
+    return addresses;
 }
 
 GstWebRTCICETransport* webkitGstWebRTCIceAgentCreateTransport(WebKitGstIceAgent* agent, GThreadSafeWeakPtr<WebKitGstIceStream>&& stream, RTCIceComponent component)
@@ -814,6 +820,11 @@ void webkitGstWebRTCIceAgentComponentStateChangedForStream(WebKitGstIceAgent* ag
     findStreamAndApply(agent->priv->streams, streamId, [&](const auto* stream) {
         webkitGstWebRTCIceStreamComponentStateChanged(stream, change);
     });
+}
+
+HashMap<String, String> webkitGstWebRTCIceAgentGetMDNSRegistry(WebKitGstIceAgent* agent)
+{
+    return agent->priv->mdnsRegistry;
 }
 
 #undef GST_CAT_DEFAULT

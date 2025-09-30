@@ -107,9 +107,11 @@ public:
 #endif
     };
 
+    using RegisterMDNSNameCallback = CompletionHandler<void(const String&, std::optional<WebCore::MDNSRegisterError>)>;
+    void registerMDNSName(WebCore::ScriptExecutionContextIdentifier, const String &ipAddress, RegisterMDNSNameCallback &&);
+
 private:
     void unregisterMDNSNames(WebCore::ScriptExecutionContextIdentifier);
-    void registerMDNSName(WebCore::ScriptExecutionContextIdentifier, const String& ipAddress, CompletionHandler<void(const String&, std::optional<WebCore::MDNSRegisterError>)>&&);
 
     PAL::SessionID sessionID() const;
 
