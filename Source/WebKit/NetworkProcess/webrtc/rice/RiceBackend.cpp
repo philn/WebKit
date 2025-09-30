@@ -181,10 +181,29 @@ WEBKIT_DEFINE_ASYNC_DATA_STRUCT(ResolveAddressDataInner);
 
 void RiceBackend::resolveAddress(const String& address, CompletionHandler<void(Expected<String, WebCore::ExceptionData>&&)>&& completionHandler)
 {
+    if (!address.contains("."_s)) {
+        auto errorMessage = makeString('"', address, "\" is not a FQDN"_s);
+        completionHandler(makeUnexpected(ExceptionData { ExceptionCode::DataError, WTF::move(errorMessage) }));
+        return;
+    }
+
+    if (address.endsWith(".local"_s)) {
+        RefPtr connection = m_connection.get();
+        if (!connection) [[unlikely]] {
+            auto errorMessage = makeString("Connection to WebProcess is closed"_s);
+            completionHandler(makeUnexpected(ExceptionData { ExceptionCode::DataError, WTF::move(errorMessage) }));
+            return;
+        }
+        auto mdnsRegister = connection->protectedMDNSRegister();
+        mdnsRegister->resolveAddress(address, WTF::move(completionHandler));
+        return;
+    }
+
     auto data = createResolveAddressData();
+    data->callback = WTF::move(completionHandler);
     data->resolver = adoptGRef(g_resolver_get_default());
     data->address = address;
-    data->callback = WTF::move(completionHandler);
+
     g_main_context_invoke_full(m_runLoop->mainContext(), G_PRIORITY_DEFAULT, reinterpret_cast<GSourceFunc>(+[](gpointer userData) -> gboolean {
         auto data = reinterpret_cast<ResolveAddressData*>(userData);
         auto innerData = createResolveAddressDataInner();
@@ -204,8 +223,8 @@ void RiceBackend::resolveAddress(const String& address, CompletionHandler<void(E
                 }
 
                 GUniquePtr<char> address(g_inet_address_to_string(G_INET_ADDRESS(addresses->data)));
-                callOnMainRunLoopAndWait([data, address = WTF::move(address)] {
-                    data->callback(String::fromUTF8(address.get()));
+                callOnMainRunLoopAndWait([data, address = String::fromUTF8(address.get())] mutable {
+                    data->callback(WTF::move(address));
                 });
 
                 g_resolver_free_addresses(addresses);
@@ -217,11 +236,6 @@ void RiceBackend::resolveAddress(const String& address, CompletionHandler<void(E
 
 void RiceBackend::sendData(unsigned streamId, WebCore::RTCIceProtocol protocol, String from, String to, WebCore::SharedMemory::Handle&& handle)
 {
-    if (protocol != RTCIceProtocol::Udp) {
-        g_printerr("Unable to send data to rice sockets, only UDP is currently supported.\n");
-        return;
-    }
-
     auto sockets = getSocketsForStream(streamId);
     if (!sockets) [[unlikely]]
         return;
@@ -267,14 +281,9 @@ void RiceBackend::finalizeStream(unsigned streamId)
         g_source_destroy(data.source.get());
 }
 
-void RiceBackend::gatherSocketAddresses(unsigned streamId, CompletionHandler<void(Vector<String>&&)>&& completionHandler)
+void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identifier, unsigned streamId, GatherSocketAddressesCallback&& completionHandler)
 {
-    if (m_udpSocketAddressesCache.contains(streamId)) {
-        completionHandler(m_udpSocketAddressesCache.get(streamId));
-        return;
-    }
-
-    Vector<String> result;
+    HashMap<std::pair<String, RTCIceProtocol>, String> result;
 
     auto recvData2 = createRecvSourceData();
     recvData2->backend = this;
@@ -290,11 +299,41 @@ void RiceBackend::gatherSocketAddresses(unsigned streamId, CompletionHandler<voi
     size_t totalInterfaces = 0;
     auto interfaces = rice_interfaces(&totalInterfaces);
     std::span<RiceAddress*> interfaceAddresses = WTF::unsafeMakeSpan(interfaces, totalInterfaces);
+
+    RefPtr connection = m_connection.get();
+    if (!connection) [[unlikely]] {
+        completionHandler(WTF::move(result));
+        return;
+    }
+    auto mdnsRegister = connection->protectedMDNSRegister();
+
+    // De-duplicate IP addresses and make sure to start the mDNS service on an IPv4 address.
+    HashSet<String> ipAddresses;
+    ipAddresses.reserveInitialCapacity(totalInterfaces);
     for (size_t i = 0; i < totalInterfaces; i++) {
+        auto address = riceAddressToString(interfaceAddresses[i], false);
+        if (ipAddresses.contains(address))
+            continue;
+
+        if (!mdnsRegister->isStarted() && !URL::isIPv6Address(address))
+            mdnsRegister->start(address);
+
+        ipAddresses.add(WTF::move(address));
+    }
+
+    HashMap<String, String> registeredAddresses;
+    for (auto& address : ipAddresses) {
+        mdnsRegister->registerMDNSName(identifier, address, [&](const auto& mdnsAddress, auto error) {
+            registeredAddresses.add(address, mdnsAddress);
+        });
+    }
+    for (size_t i = 0; i < totalInterfaces; i++) {
+        auto ipAddress = riceAddressToString(interfaceAddresses[i], false);
+        auto name = registeredAddresses.get(ipAddress);
         if (auto socket = rice_udp_socket_new(interfaceAddresses[i])) {
             GUniquePtr<RiceAddress> localAddress(rice_udp_socket_local_addr(socket));
 
-            result.append(riceAddressToString(localAddress.get()));
+            result.add({ riceAddressToString(localAddress.get()).convertToLowercaseWithoutLocale(), WebCore::RTCIceProtocol::Udp }, name);
             udpAddresses.append(WTF::move(localAddress));
             rice_sockets_add_udp(sockets.get(), socket);
         }
@@ -307,6 +346,9 @@ void RiceBackend::gatherSocketAddresses(unsigned streamId, CompletionHandler<voi
             auto sockets = recvData->backend->getSocketsForStream(recvData->streamId);
             rice_sockets_add_tcp(sockets.get(), socket);
         }, recvData, reinterpret_cast<RiceIoDestroy>(destroyRecvSourceData)));
+
+        GUniquePtr<RiceAddress> tcpListenerLocalAddress(rice_tcp_listener_local_addr(tcpListener.get()));
+        result.add({ riceAddressToString(tcpListenerLocalAddress.get()).convertToLowercaseWithoutLocale(), WebCore::RTCIceProtocol::Tcp }, name);
         m_tcpListeners.append(WTF::move(tcpListener));
     }
 
@@ -362,7 +404,7 @@ void RiceBackend::gatherSocketAddresses(unsigned streamId, CompletionHandler<voi
     g_source_attach(source.get(), m_runLoop->mainContext());
     m_sockets.add(streamId, SocketData { WTF::move(sockets), WTF::move(source) });
     m_udpAddresses.add(streamId, WTF::move(udpAddresses));
-    m_udpSocketAddressesCache.add(streamId, result);
+
     completionHandler(WTF::move(result));
 }
 

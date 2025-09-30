@@ -125,6 +125,8 @@ public:
 
     void onNegotiationNeeded();
 
+    enum class FilterICECandidates : bool { No, Yes };
+
 protected:
 #if !RELEASE_LOG_DISABLED
     void onStatsDelivered(const GstStructure*);
@@ -146,6 +148,11 @@ private:
 
     void setDescription(const RTCSessionDescription*, DescriptionType, Function<void(const GstSDPMessage&)>&& successCallback, Function<void(const GError*)>&& failureCallback);
     void initiate(bool isInitiator, GstStructure*);
+
+    std::optional<std::pair<RTCSdpType, String>> fetchDescription(ASCIILiteral name, FilterICECandidates);
+
+    enum class GatherSignalingState : bool { No, Yes };
+    std::optional<PeerConnectionBackend::DescriptionStates> descriptionsFromWebRTCBin(FilterICECandidates, GatherSignalingState gatherSignalingState = GatherSignalingState::No);
 
     void onIceConnectionChange();
     void onIceGatheringChange();
@@ -237,6 +244,7 @@ private:
     NetSimOptions m_sinkNetSimOptions;
 
     GUniquePtr<GstSDPMessage> completeSDPAnswer(const String&, const GstSDPMessage*);
+    GUniquePtr<GstSDPMessage> completeSDPOffer(const String&, const GstSDPMessage*);
 
     void updatePtDemuxSrcPadCaps(GstElement*, GstPad*);
 
@@ -244,6 +252,11 @@ private:
     HashMap<uint32_t, GRefPtr<GstBuffer>> m_inputBuffers;
 
     RTPHeaderExtensionMapping m_rtpHeaderExtensions;
+
+#if USE(LIBRICE)
+    typedef struct _WebKitGstIceAgent WebKitGstIceAgent;
+    GRefPtr<WebKitGstIceAgent> m_iceAgent;
+#endif
 };
 
 } // namespace WebCore

@@ -96,8 +96,6 @@ GStreamerPeerConnectionBackend::GStreamerPeerConnectionBackend(RTCPeerConnection
     : PeerConnectionBackend(peerConnection)
     , m_endpoint(GStreamerMediaEndpoint::create(*this))
 {
-    disableICECandidateFiltering();
-
 #if !RELEASE_LOG_DISABLED && !defined(GST_DISABLE_GST_DEBUG)
     // PeerConnectionBackend relies on the Document logger, so to prevent duplicate messages in case
     // more than one PeerConnection is created, we register a single observer.

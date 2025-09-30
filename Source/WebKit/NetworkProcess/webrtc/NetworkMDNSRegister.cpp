@@ -51,16 +51,12 @@ NetworkMDNSRegister::PendingRegistrationRequest::PendingRegistrationRequest(Ref<
 {
 }
 
-#if !USE(GLIB)
 NetworkMDNSRegister::NetworkMDNSRegister(NetworkConnectionToWebProcess& connection)
     : m_connection(connection)
 {
 }
-#endif
 
-#if !USE(GLIB)
 NetworkMDNSRegister::~NetworkMDNSRegister() = default;
-#endif
 
 void NetworkMDNSRegister::ref() const
 {
