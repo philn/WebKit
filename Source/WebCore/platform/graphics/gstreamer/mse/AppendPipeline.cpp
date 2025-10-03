@@ -20,6 +20,11 @@
 
 #include "config.h"
 #include "AppendPipeline.h"
+#include "wtf/text/StringCommon.h"
+#include <gst/gstbin.h>
+#include <gst/gstcaps.h>
+#include <gst/gstcompat.h>
+#include <gst/gstutils.h>
 
 #if ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(MEDIA_SOURCE)
 
@@ -46,6 +51,7 @@
 #include <wtf/glib/RunLoopSourcePriority.h>
 #include <wtf/text/ASCIILiteral.h>
 #include <wtf/text/MakeString.h>
+#include <wtf/text/StringCommon.h>
 
 GST_DEBUG_CATEGORY_STATIC(webkit_mse_append_pipeline_debug);
 #define GST_CAT_DEFAULT webkit_mse_append_pipeline_debug
@@ -358,7 +364,8 @@ GstPadProbeReturn AppendPipeline::appsrcEndOfAppendCheckerProbe(GstPadProbeInfo*
     }
 
     GST_TRACE_OBJECT(pipeline(), "Posting end-of-append task to the main thread");
-    GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, "end-of-append");
+    auto foo = makeString(unsafeSpan(GST_ELEMENT_NAME(m_pipeline.get())), "-end-of-append"_s);
+    GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(m_pipeline.get()), GST_DEBUG_GRAPH_SHOW_ALL, foo.ascii().data());
     m_taskQueue.enqueueTask([this]() {
         handleEndOfAppend();
     });
@@ -819,6 +826,41 @@ void AppendPipeline::handleAppsinkNewSampleFromStreamingThread(GstElement*)
     }
 }
 
+static guint8
+gst_aac_parse_get_audio_sampling_frequency_index(gint sample_rate)
+{
+    switch (sample_rate) {
+    case 96000:
+        return 0x0U;
+    case 88200:
+        return 0x1U;
+    case 64000:
+        return 0x2U;
+    case 48000:
+        return 0x3U;
+    case 44100:
+        return 0x4U;
+    case 32000:
+        return 0x5U;
+    case 24000:
+        return 0x6U;
+    case 22050:
+        return 0x7U;
+    case 16000:
+        return 0x8U;
+    case 12000:
+        return 0x9U;
+    case 11025:
+        return 0xAU;
+    case 8000:
+        return 0xBU;
+    case 7350:
+        return 0xCU;
+    default:
+        return G_MAXUINT8;
+    }
+}
+
 GRefPtr<GstElement> createOptionalParserForFormat([[maybe_unused]] GstBin* bin, const String& parserName, const GstCaps* caps)
 {
     // Parser elements have either or both of two functions:
@@ -887,11 +929,33 @@ GRefPtr<GstElement> createOptionalParserForFormat([[maybe_unused]] GstBin* bin, 
             // specified in Section 2.4.1.2 of ISO 11172-3. Without specifying a stream-format,
             // aacparse will fallback to raw, which might confuse some decoders (avdec) leading to
             // garbled audio rendering.
+            gst_printerrln("aac caps: %" GST_PTR_FORMAT, caps);
+            int rate = gstStructureGet<int>(structure, "rate"_s).value_or(8000);
+            int channels = gstStructureGet<int>(structure, "channels"_s).value_or(1);
+            // if (getenv("WEBKIT_GST_AAC")) {
+                uint8_t codecData[4];
+                uint16_t data = (2 << 11) | (gst_aac_parse_get_audio_sampling_frequency_index(rate) << 7) | (channels << 3);
+                GST_WRITE_UINT16_BE(codecData, data);
+                GST_WRITE_UINT16_BE(codecData + 2, 1);
+
+                auto buf = adoptGRef(gst_buffer_new_and_alloc(4));
+                gst_buffer_fill(buf.get(), 0, codecData, 4);
+                auto newCaps = adoptGRef(gst_caps_copy(caps));
+                gst_codec_utils_aac_caps_set_level_and_profile(newCaps.get(), codecData, 4);
+                gst_caps_set_simple(newCaps.get(), "codec_data", GST_TYPE_BUFFER, buf.get(), nullptr);
+
+                gst_printerrln("new caps: %" GST_PTR_FORMAT, newCaps.get());
+            //     elementClass = "aacparse"_s;
+            //     break;
+            // }
             GUniqueOutPtr<GError> error;
-            result = gst_parse_bin_from_description("aacparse ! capsfilter caps=\"audio/mpeg, stream-format=(string)adts\"", TRUE, &error.outPtr());
-            if (result)
+            //  ! capsfilter caps=\"audio/mpeg, stream-format=(string)adts\"
+            result = gst_parse_bin_from_description("capssetter name=setter ! aacparse", TRUE, &error.outPtr());
+            if (result) {
                 gst_object_set_name(GST_OBJECT_CAST(result.get()), parserName.ascii().data());
-            else
+                auto capsSetter = adoptGRef(gst_bin_get_by_name(GST_BIN_CAST(result.get()), "setter"));
+                g_object_set(capsSetter.get(), "caps", newCaps.get(), nullptr);
+            } else
                 GST_WARNING_OBJECT(bin, "Unable to create AAC parser: %s", error->message);
             break;
         }
