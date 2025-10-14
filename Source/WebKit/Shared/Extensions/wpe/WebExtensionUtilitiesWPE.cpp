@@ -29,6 +29,7 @@
 #if ENABLE(WK_WEB_EXTENSIONS)
 
 #include "WPEToplevelPrivate.h"
+#include "WPEDisplay.h"
 #include <wtf/glib/GUniquePtr.h>
 #include <wtf/glib/WTFGType.h>
 
@@ -40,9 +41,7 @@ Vector<double> availableScreenScales()
 
     GUniquePtr<GList> toplevels(wpe_toplevel_list());
     for (GList* iter = toplevels.get(); iter; iter = g_list_next(iter)) {
-        auto* display = WPE_DISPLAY_DRM(wpe_toplevel_get_display(toplevel));
-        auto* screen = wpeDisplayDRMGetScreen(display);
-        auto* mode = wpeScreenDRMGetMode(WPE_SCREEN_DRM(screen));
+        auto* screen = wpe_toplevel_get_screen(WPE_TOPLEVEL(iter->data));
         screenScales.append(wpe_screen_get_scale(screen));
     }
 
