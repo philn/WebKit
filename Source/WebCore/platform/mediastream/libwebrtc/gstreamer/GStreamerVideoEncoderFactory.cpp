@@ -140,9 +140,45 @@ public:
         if (!m_internalEncoder)
             return;
 
-        auto bitRateAllocation = WebCore::WebKitVideoEncoderBitRateAllocation::create(WebCore::VideoEncoderScalabilityMode::L1T1);
+        size_t totalSpatialLayers = 0;
         for (size_t spatialIndex = 0; spatialIndex < webrtc::kMaxSpatialLayers; spatialIndex++) {
-            for (size_t temporalIndex = 0; temporalIndex < webrtc::kMaxTemporalStreams; temporalIndex++) {
+            if (!parameters.bitrate.HasBitrate(spatialIndex, 0))
+                break;
+            totalSpatialLayers++;
+        }
+        size_t totalTemporalLayers = 0;
+        for (size_t temporalIndex = 0; temporalIndex < webrtc::kMaxTemporalStreams; temporalIndex++) {
+            if (!parameters.bitrate.HasBitrate(0, temporalIndex))
+                break;
+            totalTemporalLayers++;
+        }
+
+        WebCore::VideoEncoderScalabilityMode mode;
+        switch (totalSpatialLayers) {
+        case 1: {
+            switch (totalTemporalLayers) {
+            case 1:
+                mode = WebCore::VideoEncoderScalabilityMode::L1T1;
+                break;
+            case 2:
+                mode = WebCore::VideoEncoderScalabilityMode::L1T2;
+                break;
+            case 3:
+                mode = WebCore::VideoEncoderScalabilityMode::L1T3;
+                break;
+            default:
+                gst_printerrln("Unsupported scalability mode for 1 spatial layer and %zu temporal layers", totalTemporalLayers);
+                return;
+            }
+            break;
+        }
+        default:
+            gst_printerrln("Unsupported scalability mode for %zu spatial layers", totalSpatialLayers);
+            return;
+        }
+        auto bitRateAllocation = WebCore::WebKitVideoEncoderBitRateAllocation::create(mode);
+        for (size_t spatialIndex = 0; spatialIndex < totalSpatialLayers; spatialIndex++) {
+            for (size_t temporalIndex = 0; temporalIndex < totalTemporalLayers; temporalIndex++) {
                 if (!parameters.bitrate.HasBitrate(spatialIndex, temporalIndex))
                     continue;
                 auto bitRate = parameters.bitrate.GetBitrate(spatialIndex, temporalIndex);

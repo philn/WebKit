@@ -64,11 +64,11 @@ void RealtimeIncomingAudioSourceLibWebRTC::OnData(const void* audioData, int bit
 
     gst_audio_info_set_format(&info, format, sampleRate, numberOfChannels, NULL);
 
-    auto bufferSize = GST_AUDIO_INFO_BPF(&info) * numberOfFrames;
+    auto bufferSize = numberOfChannels * numberOfFrames * bitsPerSample / 8; //GST_AUDIO_INFO_BPF(&info) * numberOfFrames;
     auto buffer = adoptGRef(gst_buffer_new_memdup(const_cast<gpointer>(audioData), bufferSize));
     gst_buffer_add_audio_meta(buffer.get(), &info, numberOfFrames, nullptr);
     auto caps = adoptGRef(gst_audio_info_to_caps(&info));
-
+    // gst_printerrln("-> %" GST_PTR_FORMAT, caps.get());
     if (m_baseTime == MediaTime::invalidTime())
         m_baseTime = MediaTime::createWithSeconds(MonotonicTime::now().secondsSinceEpoch());
 

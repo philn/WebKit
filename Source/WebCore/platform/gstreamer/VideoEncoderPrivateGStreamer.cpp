@@ -20,9 +20,6 @@
 
 #include "config.h"
 #include "VideoEncoderPrivateGStreamer.h"
-#include <gst/gstbin.h>
-#include <gst/gstcaps.h>
-#include <gst/gstdebugutils.h>
 
 #if ENABLE(VIDEO) && USE(GSTREAMER)
 
