@@ -98,6 +98,8 @@ public:
             gst_printerrln("Unable to create GStreamer video encoder for format %s", sdpVideoFormat.ToString().c_str());
             return;
         }
+
+        GST_INFO("Creating WebRTC video encoder for codec %s", codecName.ascii().data());
         WebCore::VideoEncoder::Config config;
         config.useAnnexB = true;
         auto result = GStreamerVideoEncoder::create(codecName, config, [](auto&&) { }, [&](auto&& encodedFrame) {
@@ -227,14 +229,13 @@ std::unique_ptr<webrtc::VideoEncoder> GStreamerVideoEncoderFactory::Create(const
     // and webrtc/simulcast-h264.html timeouts and most likely bad UX in WPE/GTK browsers. So for
     // now we prefer to use LibWebRTC's VP9 encoders.
     if (format == webrtc::SdpVideoFormat::VP9Profile0()) {
-        GST_INFO("Using VP9 P0 Encoder from LibWebRTC.");
+        GST_INFO("Using VP9 P0 encoder from LibWebRTC.");
         return webrtc::CreateVp9Encoder(environment, { webrtc::VP9Profile::kProfile0 });
     }
     if (format == webrtc::SdpVideoFormat::VP9Profile2()) {
-        GST_INFO("Using VP9 P2 Encoder from LibWebRTC.");
+        GST_INFO("Using VP9 P2 encoder from LibWebRTC.");
         return webrtc::CreateVp9Encoder(environment, { webrtc::VP9Profile::kProfile2 });
     }
-
 
     if (format.IsSameCodec(webrtc::SdpVideoFormat::VP8()) || format.IsSameCodec(webrtc::SdpVideoFormat::H264()))
         return makeUnique<LibWebRTCGStreamerVideoEncoder>(format);
@@ -269,7 +270,6 @@ std::vector<webrtc::SdpVideoFormat> GStreamerVideoEncoderFactory::GetSupportedFo
         supportedCodecs.push_back(webrtc::SdpVideoFormat::VP9Profile0());
     if (m_isSupportingVP9Profile2)
         supportedCodecs.push_back(webrtc::SdpVideoFormat::VP9Profile2());
-
 
     return supportedCodecs;
 }
