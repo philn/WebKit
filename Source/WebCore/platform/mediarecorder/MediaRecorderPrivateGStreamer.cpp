@@ -487,7 +487,7 @@ void MediaRecorderPrivateBackend::configureAudioEncoder(GstElement* element)
 void MediaRecorderPrivateBackend::configureVideoEncoder(GstElement* element)
 {
     auto encoder = WEBKIT_VIDEO_ENCODER(element);
-    videoEncoderSetCodec(encoder, m_videoCodec, { }, { }, true);
+    videoEncoderSetCodec(encoder, { m_videoCodec, false }, { }, { }, true);
 
     auto bitrate = [options = m_options]() -> unsigned {
         if (options.videoBitsPerSecond)

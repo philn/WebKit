@@ -135,7 +135,7 @@ RefPtr<GStreamerVideoRTPPacketizer> GStreamerVideoRTPPacketizer::create(RefPtr<U
         payloadType = gstStructureGet<int>(encodingParameters.get(), "payload"_s);
 
     GRefPtr<GstElement> encoder = gst_element_factory_make("webkitvideoencoder", nullptr);
-    if (!videoEncoderSetCodec(WEBKIT_VIDEO_ENCODER(encoder.get()), WTFMove(codec), { })) {
+    if (!videoEncoderSetCodec(WEBKIT_VIDEO_ENCODER(encoder.get()), { WTFMove(codec), false }, { })) {
         GST_ERROR("Unable to set encoder format");
         return nullptr;
     }
