@@ -80,6 +80,7 @@ public:
     LibWebRTCGStreamerVideoEncoder(const webrtc::SdpVideoFormat& sdpVideoFormat)
         : m_sdpVideoFormat(sdpVideoFormat)
     {
+        WebCore::VideoEncoder::Config config;
         StringBuilder builder;
         if (m_sdpVideoFormat.IsSameCodec(webrtc::SdpVideoFormat::H264())) {
             builder.append("avc1"_s);
@@ -88,6 +89,7 @@ public:
                 builder.append('.', fromStdString(profileLevelId));
             m_codecInfo.codecType = webrtc::kVideoCodecH264;
             m_codecInfo.codecSpecific.H264.packetization_mode = webrtc::H264PacketizationMode::NonInterleaved;
+            config.useAnnexB = true;
         } else if (m_sdpVideoFormat.IsSameCodec(webrtc::SdpVideoFormat::VP8())) {
             builder.append("vp8"_s);
             m_codecInfo.codecType = webrtc::kVideoCodecVP8;
@@ -100,8 +102,6 @@ public:
         }
 
         GST_INFO("Creating WebRTC video encoder for codec %s", codecName.ascii().data());
-        WebCore::VideoEncoder::Config config;
-        config.useAnnexB = true;
         auto result = GStreamerVideoEncoder::create(codecName, config, [](auto&&) { }, [&](auto&& encodedFrame) {
             notifyEncodedFrame(WTFMove(encodedFrame));
         });

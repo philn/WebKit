@@ -53,13 +53,13 @@ RealtimeIncomingAudioSourceLibWebRTC::RealtimeIncomingAudioSourceLibWebRTC(Ref<w
 {
 }
 
-void RealtimeIncomingAudioSourceLibWebRTC::OnData(const void* audioData, int, int sampleRate, size_t numberOfChannels, size_t numberOfFrames)
+void RealtimeIncomingAudioSourceLibWebRTC::OnData(const void* audioData, int bitsPerSample, int sampleRate, size_t numberOfChannels, size_t numberOfFrames)
 {
     GstAudioInfo info;
     GstAudioFormat format = gst_audio_format_build_integer(
         LibWebRTCAudioFormat::isSigned,
         LibWebRTCAudioFormat::isBigEndian ? G_BIG_ENDIAN : G_LITTLE_ENDIAN,
-        LibWebRTCAudioFormat::sampleSize,
+        bitsPerSample,
         LibWebRTCAudioFormat::sampleSize);
 
     gst_audio_info_set_format(&info, format, sampleRate, numberOfChannels, NULL);
