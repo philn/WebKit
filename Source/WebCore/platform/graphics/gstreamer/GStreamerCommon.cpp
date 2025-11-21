@@ -96,6 +96,7 @@
 #endif
 
 #if USE(GSTREAMER_WEBRTC)
+#include "GStreamerRTPPlayoutDelayHeaderExtension.h"
 #include "GStreamerRTPVideoRotationHeaderExtension.h"
 #include <gst/webrtc/webrtc-enumtypes.h>
 #endif
@@ -519,6 +520,7 @@ void registerWebKitGStreamerElements()
 
 #if USE(GSTREAMER_WEBRTC)
         gst_element_register(nullptr, "webkitrtpvideorotationheaderextension", GST_RANK_MARGINAL, WEBKIT_TYPE_GST_RTP_VIDEO_ROTATION_HEADER_EXTENSION);
+        gst_element_register(nullptr, "webkitrtpplayoutdelayheaderextension", GST_RANK_MARGINAL, WEBKIT_TYPE_GST_RTP_PLAYOUT_DELAY_HEADER_EXTENSION);
 #endif
 
 #if ENABLE(MEDIA_SOURCE)

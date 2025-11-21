@@ -406,10 +406,10 @@ bool GStreamerMediaEndpoint::setConfiguration(MediaEndpointConfiguration& config
 {
     // Balanced bundle policy is currently not supported in webrtcbin and an error is emitted, so
     // explicitely configure it only for the other cases.
-    if (configuration.bundlePolicy != RTCBundlePolicy::Balanced) {
+    // if (configuration.bundlePolicy != RTCBundlePolicy::Balanced) {
         auto bundlePolicy = bundlePolicyFromConfiguration(configuration);
         g_object_set(m_webrtcBin.get(), "bundle-policy", bundlePolicy, nullptr);
-    }
+    // }
 
     auto iceTransportPolicy = iceTransportPolicyFromConfiguration(configuration);
     g_object_set(m_webrtcBin.get(), "ice-transport-policy", iceTransportPolicy, nullptr);
@@ -1678,9 +1678,11 @@ ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::createTran
 
     if (init.streams.isEmpty()) {
         switchOn(source, [&](Ref<RealtimeOutgoingAudioSourceGStreamer>& source) {
-            source->setMediaStreamID("-"_s);
+            auto newMsID = makeString("- "_s, source->mediaStreamID());
+            source->setMediaStreamID(newMsID);
         }, [&](Ref<RealtimeOutgoingVideoSourceGStreamer>& source) {
-            source->setMediaStreamID("-"_s);
+            auto newMsID = makeString("- "_s, source->mediaStreamID());
+            source->setMediaStreamID(newMsID);
         }, [](std::nullptr_t&) { });
     }
     StringBuilder msidBuilder;
@@ -1692,14 +1694,20 @@ ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::createTran
         msidBuilder.append(source->mediaStreamID());
         if (auto track = source->track())
             msidBuilder.append(' ', track->id());
-    }, [](std::nullptr_t&) { });
+    }, [&](std::nullptr_t&) { msidBuilder.append("- "_s, createVersion4UUIDString()); });
 
     int payloadType = pickAvailablePayloadType();
     auto msid = msidBuilder.toString();
     bool msidSet = false;
-    auto caps = capsFromRtpCapabilities({ .codecs = codecs, .headerExtensions = rtpExtensions }, [&payloadType, &msid, &msidSet](GstStructure* structure) {
+
+    auto caps = capsFromRtpCapabilities(m_rtpHeaderExtensions, { .codecs = codecs, .headerExtensions = rtpExtensions }, [&payloadType, &msid, &msidSet, ssrcGenerator = m_ssrcGenerator](GstStructure* structure) {
         if (!gst_structure_has_field(structure, "payload"))
             gst_structure_set(structure, "payload", G_TYPE_INT, payloadType++, nullptr);
+        if (!gst_structure_has_field(structure, "ssrc")) {
+            auto ssrc = ssrcGenerator->generateSSRC();
+            if (ssrc != std::numeric_limits<uint32_t>::max())
+                gst_structure_set(structure, "ssrc", G_TYPE_UINT, ssrc, nullptr);
+        }
         if (msidSet)
             return;
         if (msid.isEmpty())
