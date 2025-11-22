@@ -1644,6 +1644,13 @@ ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::createTran
     Vector<RTCRtpCodecCapability> codecs;
 
     auto rtpExtensions = kind == "video"_s ? registryScanner.videoRtpExtensions() : registryScanner.audioRtpExtensions();
+    for (auto& extension : rtpExtensions) {
+        if (m_rtpHeaderExtensions.contains(extension.uri))
+            continue;
+
+        auto identifier = m_rtpHeaderExtensions.size() + 1;
+        m_rtpHeaderExtensions.add(extension.uri, identifier);
+    }
 
     if (direction == GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_SENDRECV) {
         auto mergeCodecs = [&codecs](auto& additionalCodecs) {
@@ -1686,14 +1693,16 @@ ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::createTran
         }, [](std::nullptr_t&) { });
     }
     StringBuilder msidBuilder;
-    switchOn(source, [&](Ref<RealtimeOutgoingAudioSourceGStreamer>& source) {
+    switchOn(source, [&, rtpHeaderExtensionMapping = m_rtpHeaderExtensions](Ref<RealtimeOutgoingAudioSourceGStreamer>& source) {
         msidBuilder.append(source->mediaStreamID());
         if (auto track = source->track())
             msidBuilder.append(' ', track->id());
-    }, [&](Ref<RealtimeOutgoingVideoSourceGStreamer>& source) {
+        source->setRtpHeaderExtensionMapping(rtpHeaderExtensionMapping);
+    }, [&, rtpHeaderExtensionMapping = m_rtpHeaderExtensions](Ref<RealtimeOutgoingVideoSourceGStreamer>& source) {
         msidBuilder.append(source->mediaStreamID());
         if (auto track = source->track())
             msidBuilder.append(' ', track->id());
+        source->setRtpHeaderExtensionMapping(rtpHeaderExtensionMapping);
     }, [&](std::nullptr_t&) { msidBuilder.append("- "_s, createVersion4UUIDString()); });
 
     int payloadType = pickAvailablePayloadType();
