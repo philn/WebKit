@@ -464,17 +464,19 @@ static std::optional<std::pair<RTCSdpType, String>> fetchDescription(GstElement*
     if (!description)
         return { };
 
-    unsigned totalAttributesNumber = gst_sdp_message_attributes_len(description->sdp);
-    for (unsigned i = 0; i < totalAttributesNumber; i++) {
-        const auto attribute = gst_sdp_message_get_attribute(description->sdp, i);
-        if (!g_strcmp0(attribute->key, "end-of-candidates")) {
-            gst_sdp_message_remove_attribute(description->sdp, i);
-            i--;
-        }
-    }
+    // unsigned totalAttributesNumber = gst_sdp_message_attributes_len(description->sdp);
+    // for (unsigned i = 0; i < totalAttributesNumber; i++) {
+    //     const auto attribute = gst_sdp_message_get_attribute(description->sdp, i);
+    //     if (!g_strcmp0(attribute->key, "end-of-candidates")) {
+    //         gst_sdp_message_remove_attribute(description->sdp, i);
+    //         i--;
+    //     }
+    // }
 
     GUniquePtr<char> sdpString(gst_sdp_message_as_text(description->sdp));
-    return { { fromSessionDescriptionType(*description.get()), String::fromUTF8(sdpString.get()) } };
+    auto sdp = String::fromUTF8(sdpString.get());
+    sdp = makeStringByReplacingAll(sdp, "OPUS"_s, "opus"_s);
+    return { { fromSessionDescriptionType(*description.get()), WTFMove(sdp) } };
 }
 
 static GstWebRTCSignalingState fetchSignalingState(GstElement* webrtcBin)
@@ -1014,11 +1016,16 @@ void GStreamerMediaEndpoint::setDescription(const RTCSessionDescription* descrip
             failureCallback(nullptr);
             return;
         }
-        auto sdp = makeStringByReplacingAll(description->sdp(), "opus"_s, "OPUS"_s);
+        //auto sdp = makeStringByReplacingAll(description->sdp(), "opus"_s, "OPUS"_s);
+        auto sdp = makeStringByReplacingAll(description->sdp(), "OPUS"_s, "opus"_s);
         if (gst_sdp_message_new_from_text(sdp.utf8().data(), &message.outPtr()) != GST_SDP_OK) {
             failureCallback(nullptr);
             return;
         }
+        // if (gst_sdp_message_new_from_text(description->sdp().utf8().data(), &message.outPtr()) != GST_SDP_OK) {
+        //     failureCallback(nullptr);
+        //     return;
+        // }
         sdpType = description->type();
         if (descriptionType == DescriptionType::Local && sdpType == RTCSdpType::Answer && !gst_sdp_message_get_version(message.get())) {
             GError error;
@@ -1781,7 +1788,7 @@ ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::createTran
             gst_value_set_structure(&value, encodingData.returnValue().get());
             gst_value_list_append_and_take_value(&encodingsValue, &value);
         } else {
-            GUniquePtr<GstStructure> encodingData(gst_structure_new("encoding-parameters", "encoding-name", G_TYPE_STRING, "OPUS", "payload", G_TYPE_INT, 96, "active", G_TYPE_BOOLEAN, TRUE, nullptr));
+            GUniquePtr<GstStructure> encodingData(gst_structure_new("encoding-parameters", "encoding-name", G_TYPE_STRING, "opus", "payload", G_TYPE_INT, 96, "active", G_TYPE_BOOLEAN, TRUE, nullptr));
             GValue value = G_VALUE_INIT;
             g_value_init(&value, GST_TYPE_STRUCTURE);
             gst_value_set_structure(&value, encodingData.get());

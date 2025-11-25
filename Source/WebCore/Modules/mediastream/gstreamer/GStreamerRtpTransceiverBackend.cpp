@@ -50,7 +50,7 @@ GStreamerRtpTransceiverBackend::GStreamerRtpTransceiverBackend(GRefPtr<GstWebRTC
 
     // FIXME: The ulp/red encoders drop MID extension headers. See also:
     // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/issues/923
-    gst_util_set_object_arg(G_OBJECT(m_rtcTransceiver.get()), "fec-type", "ulp-red");
+    //gst_util_set_object_arg(G_OBJECT(m_rtcTransceiver.get()), "fec-type", "ulp-red");
 
     // Enable nack only for video transceivers, so that RTX payloads are not signaled in SDP
     // offer/answer. Those are confusing some media servers... Internally webrtcbin will always

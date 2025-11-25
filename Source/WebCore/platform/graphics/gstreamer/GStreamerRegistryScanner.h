@@ -192,7 +192,7 @@ private:
         GST_RTP_HDREXT_BASE "sdes:repaired-rtp-stream-id"_s,
         GST_RTP_HDREXT_BASE "sdes:rtp-stream-id"_s,
         GST_RTP_HDREXT_BASE "toffset"_s,
-        GST_RTP_HDREXT_BASE "ntp-64"_s,
+        //GST_RTP_HDREXT_BASE "ntp-64"_s,
     };
     Vector<ASCIILiteral> m_allAudioRtpExtensions {
         GST_RTP_HDREXT_BASE "ssrc-audio-level"_s

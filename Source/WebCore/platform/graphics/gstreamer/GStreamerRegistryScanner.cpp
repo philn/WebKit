@@ -1115,7 +1115,7 @@ void GStreamerRegistryScanner::fillAudioRtpCapabilities(Configuration configurat
 
     auto factories = ElementFactories({ codecElement, rtpElement });
     if (factories.hasElementForMediaType(codecElement, "audio/x-opus"_s) && factories.hasElementForMediaType(rtpElement, "audio/x-opus"_s))
-        capabilities.codecs.append({ .mimeType = "audio/opus"_s, .clockRate = 48000, .channels = 2, .sdpFmtpLine = "minptime=10;useinbandfec=1"_s });
+        capabilities.codecs.append({ .mimeType = "audio/opus"_s, .clockRate = 48000, .channels = 2, .sdpFmtpLine = "minptime=10;useinbandfec=1;stereo=1"_s });
 
     if (factories.hasElementForMediaType(codecElement, "audio/G722"_s) && factories.hasElementForMediaType(rtpElement, "audio/G722"_s))
         capabilities.codecs.append({ .mimeType = "audio/G722"_s, .clockRate = 8000, .channels = 1, .sdpFmtpLine = emptyString() });
@@ -1166,11 +1166,11 @@ void GStreamerRegistryScanner::fillVideoRtpCapabilities(Configuration configurat
             element = gst_element_factory_make("webkitvideoencoder", nullptr);
 
         if (element) {
-            static constexpr std::array<std::pair<ASCIILiteral, unsigned>, 4> profiles = { {
-                { "42e01f"_s, 0x42e01f },
-                { "640c1f"_s, 0x640c1f },
+            static constexpr std::array<std::pair<ASCIILiteral, unsigned>, 1> profiles = { {
+                // { "42e01f"_s, 0x42e01f },
+                // { "640c1f"_s, 0x640c1f },
                 { "42001f"_s, 0x42001f },
-                { "4d001f"_s, 0x4d001f },
+                // { "4d001f"_s, 0x4d001f },
             } };
 
             for (auto& [profileLevelId, spsAsInteger] : profiles) {

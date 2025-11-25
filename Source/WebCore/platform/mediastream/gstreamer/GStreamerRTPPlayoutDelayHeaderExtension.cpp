@@ -120,7 +120,8 @@ static void webkit_gst_rtp_playout_delay_header_extension_class_init(RTPPlayoutD
 
     gst_element_class_set_static_metadata(GST_ELEMENT_CLASS(klass), "RTP Playout Delay Header Extension", GST_RTP_HDREXT_ELEMENT_CLASS,
         "Read/write Playout Delay from/to RTP packets", "Philippe Normand <philn@igalia.com>");
-    gst_rtp_header_extension_class_set_uri(rtpHeaderExtensionClass, "http://www.webrtc.org/experiments/rtp-hdrext/playout-delay");
+    // gst_rtp_header_extension_class_set_uri(rtpHeaderExtensionClass, "http://www.webrtc.org/experiments/rtp-hdrext/playout-delay");
+    gst_rtp_header_extension_class_set_uri(rtpHeaderExtensionClass, "http://www.webrtc.org/experiments/rtp-hdrext/video-timing");
 }
 
 #undef GST_CAT_DEFAULT
