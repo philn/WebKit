@@ -1166,8 +1166,8 @@ void GStreamerRegistryScanner::fillVideoRtpCapabilities(Configuration configurat
             element = gst_element_factory_make("webkitvideoencoder", nullptr);
 
         if (element) {
-            static constexpr std::array<std::pair<ASCIILiteral, unsigned>, 1> profiles = { {
-                // { "42e01f"_s, 0x42e01f },
+            static constexpr std::array<std::pair<ASCIILiteral, unsigned>, 2> profiles = { {
+                    { "42e01f"_s, 0x42e01f },
                 // { "640c1f"_s, 0x640c1f },
                 { "42001f"_s, 0x42001f },
                 // { "4d001f"_s, 0x4d001f },

@@ -1719,11 +1719,11 @@ ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::createTran
     auto caps = capsFromRtpCapabilities(m_rtpHeaderExtensions, { .codecs = codecs, .headerExtensions = rtpExtensions }, [&payloadType, &msid, &msidSet, ssrcGenerator = m_ssrcGenerator](GstStructure* structure) {
         if (!gst_structure_has_field(structure, "payload"))
             gst_structure_set(structure, "payload", G_TYPE_INT, payloadType++, nullptr);
-        if (!gst_structure_has_field(structure, "ssrc")) {
-            auto ssrc = ssrcGenerator->generateSSRC();
-            if (ssrc != std::numeric_limits<uint32_t>::max())
-                gst_structure_set(structure, "ssrc", G_TYPE_UINT, ssrc, nullptr);
-        }
+        // if (!gst_structure_has_field(structure, "ssrc")) {
+        //     auto ssrc = ssrcGenerator->generateSSRC();
+        //     if (ssrc != std::numeric_limits<uint32_t>::max())
+        //         gst_structure_set(structure, "ssrc", G_TYPE_UINT, ssrc, nullptr);
+        // }
         if (msidSet)
             return;
         if (msid.isEmpty())
