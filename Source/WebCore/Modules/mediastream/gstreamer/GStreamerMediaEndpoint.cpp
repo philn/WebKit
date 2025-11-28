@@ -1944,7 +1944,7 @@ void GStreamerMediaEndpoint::addIceCandidate(GStreamerIceCandidate& candidate, P
 {
     GST_DEBUG_OBJECT(m_pipeline.get(), "Adding ICE candidate %s", candidate.candidate.utf8().data());
 
-    if (!candidate.candidate.startsWith("candidate:"_s)) {
+    if (!candidate.candidate.startsWith("candidate:"_s) && !candidate.candidate.startsWith("a=candidate:"_s)) {
         callOnMainThread([task = createSharedTask<PeerConnectionBackend::AddIceCandidateCallbackFunction>(WTFMove(callback))]() mutable {
             task->run(Exception { ExceptionCode::OperationError, "Expect line: candidate:<candidate-str>"_s });
         });
@@ -1958,7 +1958,14 @@ void GStreamerMediaEndpoint::addIceCandidate(GStreamerIceCandidate& candidate, P
         auto* data = createAddIceCandidateCallData();
         data->webrtcBin = m_webrtcBin;
         data->callback = WTFMove(callback);
-        g_signal_emit_by_name(m_webrtcBin.get(), "add-ice-candidate-full", candidate.sdpMLineIndex, candidate.candidate.utf8().data(), gst_promise_new_with_change_func([](GstPromise* rawPromise, gpointer userData) {
+
+        StringView view;
+        if (candidate.candidate.startsWithIgnoringASCIICase("a="_s))
+            view = candidate.candidate.substring(2);
+        else
+            view = candidate.candidate;
+
+        g_signal_emit_by_name(m_webrtcBin.get(), "add-ice-candidate-full", candidate.sdpMLineIndex, view.toStringWithoutCopying().utf8().data(), gst_promise_new_with_change_func([](GstPromise* rawPromise, gpointer userData) {
             auto* data = reinterpret_cast<AddIceCandidateCallData*>(userData);
             auto promise = adoptGRef(rawPromise);
             auto result = gst_promise_wait(promise.get());

@@ -1465,7 +1465,29 @@ static std::optional<RefPtr<JSON::Value>> gstStructureValueToJSON(const GValue* 
         if (!name.isEmpty()) [[likely]]
             return JSON::Value::create(makeString(name))->asValue();
     }
+    if (valueType == GST_TYPE_WEBRTC_DTLS_TRANSPORT_STATE) {
+        switch (g_value_get_enum(value)) {
+        case GST_WEBRTC_DTLS_TRANSPORT_STATE_NEW:
+            return JSON::Value::create(makeString("new"_s))->asValue();
+        case GST_WEBRTC_DTLS_TRANSPORT_STATE_CLOSED:
+            return JSON::Value::create(makeString("closed"_s))->asValue();
+        case GST_WEBRTC_DTLS_TRANSPORT_STATE_FAILED:
+            return JSON::Value::create(makeString("failed"_s))->asValue();
+        case GST_WEBRTC_DTLS_TRANSPORT_STATE_CONNECTING:
+            return JSON::Value::create(makeString("connecting"_s))->asValue();
+        case GST_WEBRTC_DTLS_TRANSPORT_STATE_CONNECTED:
+            return JSON::Value::create(makeString("connected"_s))->asValue();
+        };
+    }
 #if GST_CHECK_VERSION(1, 27, 0)
+    if (valueType == GST_TYPE_WEBRTC_DTLS_ROLE) {
+        switch (g_value_get_enum(value)) {
+        case GST_WEBRTC_DTLS_ROLE_CLIENT:
+            return JSON::Value::create(makeString("client"_s))->asValue();
+        case GST_WEBRTC_DTLS_ROLE_SERVER:
+            return JSON::Value::create(makeString("server"_s))->asValue();
+        };
+    }
     if (valueType == GST_TYPE_WEBRTC_ICE_TCP_CANDIDATE_TYPE) {
         auto name = webrtcIceTcpCandidateTypeName(g_value_get_enum(value));
         if (!name.isEmpty()) [[likely]]

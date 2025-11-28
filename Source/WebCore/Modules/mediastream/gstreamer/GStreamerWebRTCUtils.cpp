@@ -296,7 +296,7 @@ std::optional<RTCIceCandidate::Fields> parseIceCandidateSDP(const String& sdp)
 {
     ensureDebugCategoryInitialized();
     GST_TRACE("Parsing ICE Candidate: %s", sdp.utf8().data());
-    if (!sdp.startsWith("candidate:"_s)) {
+    if (!sdp.startsWith("candidate:"_s) && !sdp.startsWith("a=candidate:"_s)) {
         GST_WARNING("Invalid SDP ICE candidate format, must start with candidate: prefix");
         return { };
     }
@@ -313,7 +313,7 @@ std::optional<RTCIceCandidate::Fields> parseIceCandidateSDP(const String& sdp)
     guint16 relatedPort = 0;
     String usernameFragment;
     String lowercasedSDP = sdp.convertToASCIILowercase();
-    StringView view = StringView(lowercasedSDP).substring(10);
+    StringView view = StringView(lowercasedSDP).substring(sdp.startsWith("candidate:"_s) ? 10 : 12);
     unsigned i = 0;
     NextSDPField nextSdpField { NextSDPField::None };
 
