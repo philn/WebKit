@@ -381,12 +381,8 @@ static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICES
     }
 
     GST_DEBUG_OBJECT(ice, "Processing SDP ICE candidate: %s", candidateSdp);
-    auto sdp = String::fromLatin1(candidateSdp);
-    while (sdp.endsWith(' '))
-        sdp = sdp.substring(0, sdp.length() - 1);
-
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
-    GUniquePtr<RiceCandidate> candidate(rice_candidate_new_from_sdp_string(sdp.ascii().data()));
+    GUniquePtr<RiceCandidate> candidate(rice_candidate_new_from_sdp_string(candidateSdp));
     if (candidate) {
         GST_DEBUG_OBJECT(ice, "Adding remote candidate: %s", candidateSdp);
         rice_stream_add_remote_candidate(riceStream.get(), candidate.get());
@@ -396,13 +392,7 @@ static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICES
     }
 
     GST_DEBUG_OBJECT(ice, "Failed to build RiceCandidate from SDP, it might contain a FQDN. Attempting address resolution");
-    auto iceBackend = backend->priv->iceBackend;
-    if (!iceBackend) [[unlikely]] {
-        gst_promise_reply(promise, nullptr);
-        return;
-    }
-
-    auto localAddressResult = getCandidateAddress(sdp);
+    auto localAddressResult = getCandidateAddress(StringView::fromLatin1(candidateSdp));
     if (!localAddressResult.has_value()) {
         auto errorMessage = makeString("Failed to retrieve address from candidate: "_s, localAddressResult.error().message);
         auto errorMessageString = errorMessage.utf8();
@@ -419,6 +409,12 @@ static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICES
         GST_ERROR_OBJECT(ice, "%s", errorMessageString.data());
         GUniquePtr<GError> error(g_error_new(GST_WEBRTC_ERROR, GST_WEBRTC_ERROR_INTERNAL_FAILURE, "%s", errorMessageString.data()));
         gst_promise_reply(promise, gst_structure_new("application/x-gst-promise", "error", G_TYPE_ERROR, error.get(), nullptr));
+        return;
+    }
+
+    auto iceBackend = backend->priv->iceBackend;
+    if (!iceBackend) [[unlikely]] {
+        gst_promise_reply(promise, nullptr);
         return;
     }
 

@@ -1965,6 +1965,7 @@ void GStreamerMediaEndpoint::addIceCandidate(GStreamerIceCandidate& candidate, P
         else
             view = candidate.candidate;
 
+        view = view.trim(isASCIIWhitespace<char8_t>);
         g_signal_emit_by_name(m_webrtcBin.get(), "add-ice-candidate-full", candidate.sdpMLineIndex, view.toStringWithoutCopying().utf8().data(), gst_promise_new_with_change_func([](GstPromise* rawPromise, gpointer userData) {
             auto* data = reinterpret_cast<AddIceCandidateCallData*>(userData);
             auto promise = adoptGRef(rawPromise);
