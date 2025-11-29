@@ -1692,9 +1692,11 @@ ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::createTran
 
     if (init.streams.isEmpty()) {
         switchOn(source, [&](Ref<RealtimeOutgoingAudioSourceGStreamer>& source) {
-            source->setMediaStreamID("-"_s);
+            auto newMsID = makeString("- "_s, source->mediaStreamID());
+            source->setMediaStreamID(newMsID);
         }, [&](Ref<RealtimeOutgoingVideoSourceGStreamer>& source) {
-            source->setMediaStreamID("-"_s);
+            auto newMsID = makeString("- "_s, source->mediaStreamID());
+            source->setMediaStreamID(newMsID);
         }, [](std::nullptr_t&) { });
     }
     StringBuilder msidBuilder;
@@ -1708,7 +1710,7 @@ ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::createTran
         if (auto track = source->track())
             msidBuilder.append(' ', track->id());
         source->setRtpHeaderExtensionMapping(rtpHeaderExtensionMapping);
-    }, [&](std::nullptr_t&) { });
+    }, [&](std::nullptr_t&) { msidBuilder.append("- "_s, createVersion4UUIDString()); });
 
     int payloadType = pickAvailablePayloadType();
     auto msid = msidBuilder.toString();
