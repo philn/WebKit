@@ -380,10 +380,9 @@ static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICES
         return;
     }
 
-    auto sdp = String::fromLatin1(candidateSdp);
-    auto sdpString = sdp.ascii();
+    GST_DEBUG_OBJECT(ice, "Processing SDP ICE candidate: %s", candidateSdp);
     auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
-    GUniquePtr<RiceCandidate> candidate(rice_candidate_new_from_sdp_string(sdpString.data()));
+    GUniquePtr<RiceCandidate> candidate(rice_candidate_new_from_sdp_string(candidateSdp));
     if (candidate) {
         GST_DEBUG_OBJECT(ice, "Adding remote candidate: %s", candidateSdp);
         rice_stream_add_remote_candidate(riceStream.get(), candidate.get());
@@ -392,13 +391,8 @@ static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICES
         return;
     }
 
-    auto iceBackend = backend->priv->iceBackend;
-    if (!iceBackend) [[unlikely]] {
-        gst_promise_reply(promise, nullptr);
-        return;
-    }
-    GST_DEBUG_OBJECT(ice, "Processing local candidate: %s", sdp.ascii().data());
-    auto localAddressResult = getCandidateAddress(sdp);
+    GST_DEBUG_OBJECT(ice, "Failed to build RiceCandidate from SDP, it might contain a FQDN. Attempting address resolution");
+    auto localAddressResult = getCandidateAddress(StringView::fromLatin1(candidateSdp));
     if (!localAddressResult.has_value()) {
         auto errorMessage = makeString("Failed to retrieve address from candidate: "_s, localAddressResult.error().message);
         auto errorMessageString = errorMessage.utf8();
@@ -418,7 +412,13 @@ static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICES
         return;
     }
 
-    iceBackend->resolveAddress(WTFMove(localAddress.address), [promise = GRefPtr(promise), riceStream = WTFMove(riceStream), prefix = WTFMove(localAddress.prefix), suffix = WTFMove(localAddress.suffix)](auto&& result) mutable {
+    auto iceBackend = backend->priv->iceBackend;
+    if (!iceBackend) [[unlikely]] {
+        gst_promise_reply(promise, nullptr);
+        return;
+    }
+
+    iceBackend->resolveAddress(WTFMove(localAddress.address), [promise = GRefPtr(promise), riceStream = WTFMove(riceStream), prefix = WTFMove(localAddress.prefix), suffix = WTFMove(localAddress.suffix), backend](auto&& result) mutable {
         if (result.hasException()) {
             auto& errorMessage = result.exception().message();
             auto errorMessageString = errorMessage.utf8();
@@ -436,6 +436,7 @@ static void webkitGstWebRTCIceAgentAddCandidate(GstWebRTCICE* ice, GstWebRTCICES
         if (newCandidate) {
             rice_stream_add_remote_candidate(riceStream.get(), newCandidate.get());
             gst_promise_reply(promise.get(), nullptr);
+            g_main_context_wakeup(backend->priv->runLoop->mainContext());
         } else {
             auto errorMessage = "Unable to create Rice candidate from SDP"_s;
             GST_ERROR("%s", errorMessage.characters());
