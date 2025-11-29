@@ -3620,10 +3620,17 @@ void MediaPlayerPrivateGStreamer::configureVideoDecoder(GstElement* decoder)
         GST_INFO_OBJECT(pipeline(), "the decoder %s does not have a src pad, probably because it's a hardware decoder sink, can't get decoder stats", name.get());
         return;
     }
-    gst_pad_add_probe(pad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_QUERY_DOWNSTREAM | GST_PAD_PROBE_TYPE_BUFFER), [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+    gst_pad_add_probe(pad.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_QUERY_DOWNSTREAM | GST_PAD_PROBE_TYPE_BUFFER), [](GstPad* pad, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
         auto* player = static_cast<MediaPlayerPrivateGStreamer*>(userData);
         if (GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_BUFFER) {
             player->incrementDecodedVideoFramesCount();
+
+            auto decoder = adoptGRef(gst_pad_get_parent_element(pad));
+            auto processingTime = webkitGstBufferGetProcessingTime(gst_pad_probe_info_get_buffer(info), decoder.get());
+            if (processingTime.isInvalid())
+                return GST_PAD_PROBE_OK;
+
+            player->m_totalVideoDecodeTime += processingTime;
             return GST_PAD_PROBE_OK;
         }
 
@@ -3634,12 +3641,14 @@ void MediaPlayerPrivateGStreamer::configureVideoDecoder(GstElement* decoder)
                 gst_structure_set(structure, "frames-decoded", G_TYPE_UINT64, player->decodedVideoFramesCount(), nullptr);
 
                 if (player->updateVideoSinkStatistics())
-                    gst_structure_set(structure, "frames-dropped", G_TYPE_UINT64, player->m_droppedVideoFrames, nullptr);
+                    gst_structure_set(structure, "frames-dropped", G_TYPE_UINT64, player->m_droppedVideoFrames, "frames-per-second", G_TYPE_DOUBLE, player->m_averageFrameRate, nullptr);
 
                 auto naturalSize = roundedIntSize(player->naturalSize());
                 if (naturalSize.width() && naturalSize.height())
                     gst_structure_set(structure, "frame-width", G_TYPE_UINT, naturalSize.width(), "frame-height", G_TYPE_UINT, naturalSize.height(), nullptr);
 
+                if (player->m_totalVideoDecodeTime.isValid())
+                    gst_structure_set(structure, "total-decode-time", G_TYPE_DOUBLE, player->m_totalVideoDecodeTime.toDouble(), nullptr);
                 GST_PAD_PROBE_INFO_DATA(info) = query;
                 return GST_PAD_PROBE_HANDLED;
             }
@@ -4282,7 +4291,7 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSink()
 {
     acceleratedRenderingStateChanged();
 
-    // Ensure the sink has the max-lateness property set.
+    // Ensure the sink has the some additional properties configured, such as max-lateness and qos.
     auto exit = makeScopeExit([this] {
         if (!m_videoSink || isMediaStreamPlayer())
             return;
@@ -4293,9 +4302,12 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSink()
             GValue value = G_VALUE_INIT;
             auto result = gst_iterator_next(iter.get(), &value);
             ASSERT_UNUSED(result, result == GST_ITERATOR_OK);
-            sink = GST_ELEMENT(g_value_get_object(&value));
+            sink = GST_ELEMENT_CAST(g_value_get_object(&value));
             g_value_unset(&value);
         }
+
+        if (gstObjectHasProperty(sink, "qos")) [[likely]]
+            g_object_set(sink, "qos", TRUE, nullptr);
 
         if (gstObjectHasProperty(sink, "max-lateness"_s)) {
             uint64_t maxLateness = 100 * GST_MSECOND;
@@ -4386,8 +4398,9 @@ bool MediaPlayerPrivateGStreamer::updateVideoSinkStatistics()
 
     auto totalVideoFrames = gstStructureGet<uint64_t>(stats.get(), "rendered"_s);
     auto droppedVideoFrames = gstStructureGet<uint64_t>(stats.get(), "dropped"_s);
+    auto averageRate = gstStructureGet<double>(stats.get(), "average-rate"_s);
 
-    if (!totalVideoFrames || !droppedVideoFrames)
+    if (!totalVideoFrames || !droppedVideoFrames || !averageRate)
         return false;
 
     // Caching is required so that metrics queries performed after EOS still return valid values.
@@ -4395,6 +4408,12 @@ bool MediaPlayerPrivateGStreamer::updateVideoSinkStatistics()
         m_totalVideoFrames = *totalVideoFrames;
     if (*droppedVideoFrames)
         m_droppedVideoFrames = *droppedVideoFrames;
+
+    if (*averageRate && m_videoInfo) {
+        double frameRate;
+        gst_util_fraction_to_double(GST_VIDEO_INFO_FPS_N(&m_videoInfo->info), GST_VIDEO_INFO_FPS_D(&m_videoInfo->info), &frameRate);
+        m_averageFrameRate = *averageRate * frameRate;
+    }
     return true;
 }
 
