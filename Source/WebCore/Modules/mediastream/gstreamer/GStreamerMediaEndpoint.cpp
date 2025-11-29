@@ -481,9 +481,7 @@ static std::optional<std::pair<RTCSdpType, String>> fetchDescription(GstElement*
     }
 
     GUniquePtr<char> sdpString(gst_sdp_message_as_text(description->sdp));
-    auto sdp = String::fromUTF8(sdpString.get());
-    sdp = makeStringByReplacingAll(sdp, "OPUS"_s, "opus"_s);
-    return { { fromSessionDescriptionType(*description.get()), WTFMove(sdp) } };
+    return { { fromSessionDescriptionType(*description.get()), String::fromUTF8(sdpString.get()) } };
 }
 
 static GstWebRTCSignalingState fetchSignalingState(GstElement* webrtcBin)
@@ -1023,8 +1021,7 @@ void GStreamerMediaEndpoint::setDescription(const RTCSessionDescription* descrip
             failureCallback(nullptr);
             return;
         }
-        //auto sdp = makeStringByReplacingAll(description->sdp(), "opus"_s, "OPUS"_s);
-        auto sdp = makeStringByReplacingAll(description->sdp(), "OPUS"_s, "opus"_s);
+        auto sdp = makeStringByReplacingAll(description->sdp(), "opus"_s, "OPUS"_s);
         if (gst_sdp_message_new_from_text(sdp.utf8().data(), &message.outPtr()) != GST_SDP_OK) {
             failureCallback(nullptr);
             return;
@@ -1784,7 +1781,7 @@ ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::createTran
             gst_value_set_structure(&value, encodingData.returnValue().get());
             gst_value_list_append_and_take_value(&encodingsValue, &value);
         } else {
-            GUniquePtr<GstStructure> encodingData(gst_structure_new("encoding-parameters", "encoding-name", G_TYPE_STRING, "opus", "payload", G_TYPE_INT, 96, "active", G_TYPE_BOOLEAN, TRUE, nullptr));
+            GUniquePtr<GstStructure> encodingData(gst_structure_new("encoding-parameters", "encoding-name", G_TYPE_STRING, "OPUS", "payload", G_TYPE_INT, 96, "active", G_TYPE_BOOLEAN, TRUE, nullptr));
             GValue value = G_VALUE_INIT;
             g_value_init(&value, GST_TYPE_STRUCTURE);
             gst_value_set_structure(&value, encodingData.get());
