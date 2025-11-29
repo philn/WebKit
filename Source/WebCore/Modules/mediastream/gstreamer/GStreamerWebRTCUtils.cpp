@@ -601,7 +601,7 @@ std::optional<int> payloadTypeForEncodingName(const String& encodingName)
     return { };
 }
 
-GRefPtr<GstCaps> capsFromRtpCapabilities(const RTCRtpCapabilities& capabilities, Function<void(GstStructure*)> supplementCapsCallback)
+GRefPtr<GstCaps> capsFromRtpCapabilities(const RTPHeaderExtensionMapping& extensionMapping, const RTCRtpCapabilities& capabilities, Function<void(GstStructure*)> supplementCapsCallback)
 {
     auto caps = adoptGRef(gst_caps_new_empty());
     for (unsigned index = 0; auto& codec : capabilities.codecs) {
@@ -627,8 +627,10 @@ GRefPtr<GstCaps> capsFromRtpCapabilities(const RTCRtpCapabilities& capabilities,
         supplementCapsCallback(codecStructure);
 
         if (!index) {
-            for (unsigned i = 1; auto& extension : capabilities.headerExtensions)
-                gst_structure_set(codecStructure, makeString("extmap-"_s, i++).ascii().data(), G_TYPE_STRING, extension.uri.ascii().data(), nullptr);
+            for (auto& extension : capabilities.headerExtensions) {
+                auto identifier = extensionMapping.get(extension.uri);
+                gst_structure_set(codecStructure, makeString("extmap-"_s, identifier).ascii().data(), G_TYPE_STRING, extension.uri.ascii().data(), nullptr);
+            }
         }
         gst_caps_append_structure(caps.get(), codecStructure);
         index++;
