@@ -404,12 +404,19 @@ void GStreamerMediaEndpoint::disposeElementChain(GstElement* element)
 
 bool GStreamerMediaEndpoint::setConfiguration(MediaEndpointConfiguration& configuration)
 {
-    // Balanced bundle policy is currently not supported in webrtcbin and an error is emitted, so
-    // explicitely configure it only for the other cases.
-    if (configuration.bundlePolicy != RTCBundlePolicy::Balanced) {
-        auto bundlePolicy = bundlePolicyFromConfiguration(configuration);
-        g_object_set(m_webrtcBin.get(), "bundle-policy", bundlePolicy, nullptr);
-    }
+    auto peerConnectionBackend = this->peerConnectionBackend();
+    if (!peerConnectionBackend)
+        return false;
+
+    auto& document = downcast<Document>(*peerConnectionBackend->connection().scriptExecutionContext());
+    GST_DEBUG_OBJECT(m_pipeline.get(), "Configuring webrtcbin for PeerConnection created by %s", document.url().string().utf8().data());
+    GstWebRTCBundlePolicy bundlePolicy;
+    if (document.url().isMatchingDomain("www.xbox.com"_s)) {
+        GST_DEBUG_OBJECT(m_pipeline.get(), "Applying XBox-play quirk, forcing max-bundle policy");
+        bundlePolicy = GST_WEBRTC_BUNDLE_POLICY_MAX_BUNDLE;
+    } else
+        bundlePolicy = bundlePolicyFromConfiguration(configuration);
+    g_object_set(m_webrtcBin.get(), "bundle-policy", bundlePolicy, nullptr);
 
     auto iceTransportPolicy = iceTransportPolicyFromConfiguration(configuration);
     g_object_set(m_webrtcBin.get(), "ice-transport-policy", iceTransportPolicy, nullptr);
