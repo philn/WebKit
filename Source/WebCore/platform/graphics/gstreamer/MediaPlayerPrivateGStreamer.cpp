@@ -602,7 +602,7 @@ bool MediaPlayerPrivateGStreamer::doSeek(const SeekTarget& target, float rate, b
     if (rate >= 0.0 && startTime >= duration()) {
         GST_DEBUG_OBJECT(pipeline(), "Seek requested beyond duration, triggering EOS handler");
         didEnd();
-        return false;
+        return true;
     }
 
     // Stream mode. Seek will automatically deplete buffer level, so we always want to pause the pipeline and wait until the
@@ -681,7 +681,7 @@ Ref<MediaTimePromise> MediaPlayerPrivateGStreamer::seekToTarget(const SeekTarget
 
     if (m_isLiveStream.value_or(false)) {
         GST_DEBUG_OBJECT(pipeline(), "[Seek] Live stream seek unhandled");
-        return MediaTimePromise::createAndReject(PlatformMediaError::Cancelled);
+        return MediaTimePromise::createAndResolve(inTarget.time);
     }
 
     RefPtr player = m_player.get();
@@ -697,25 +697,31 @@ Ref<MediaTimePromise> MediaPlayerPrivateGStreamer::seekToTarget(const SeekTarget
     MediaTelemetryReport::singleton().reportPlaybackState(MediaTelemetryReport::AVPipelineState::SeekStart, makeString(toString(playbackPosition()), "->"_s, toString(target.time)));
 #endif
 
-    m_seekPromise.emplace(PlatformMediaError::Cancelled);
-
     if (!isSeamlessSeekingEnabled() && m_isSeeking) {
         if (m_seekTarget.time == target.time) {
             // Nothing new to seek to, we continue current seek.
-            return *m_seekPromise;
+            return MediaTimePromise::createAndReject(PlatformMediaError::Cancelled);
         }
         m_timeOfOverlappingSeek = target.time;
         if (m_isSeekPending) {
             GST_DEBUG_OBJECT(pipeline(), "[Seek] A seek is pending already, letting it finish");
             m_seekTarget = target;
-            return *m_seekPromise;
+            return MediaTimePromise::createAndReject(PlatformMediaError::Cancelled);
         }
     }
 
     if (!prepareSeek(target))
         return MediaTimePromise::createAndReject(PlatformMediaError::Cancelled);
 
-    return *m_seekPromise;
+    if (!doSeek(target, player->rate())) {
+        GST_DEBUG_OBJECT(pipeline(), "[Seek] seeking to %s failed", toString(target.time).utf8().data());
+        return MediaTimePromise::createAndReject(PlatformMediaError::Cancelled);
+    }
+
+    // FIXME: Instead of returning a resolved promise here we could return an unresolved one and
+    // have it marked resolved once we know the position reported by the sinks has been updated to
+    // the seek target time.
+    return MediaTimePromise::createAndResolve(inTarget.time);
 }
 
 bool MediaPlayerPrivateGStreamer::prepareSeek(const SeekTarget& target)
@@ -742,12 +748,6 @@ bool MediaPlayerPrivateGStreamer::prepareSeek(const SeekTarget& target)
                 loadingFailed(MediaPlayer::NetworkState::Empty);
                 return false;
             }
-        }
-    } else {
-        // We can seek now.
-        if (!doSeek(target, player->rate())) {
-            GST_DEBUG_OBJECT(pipeline(), "[Seek] seeking to %s failed", toString(target.time).utf8().data());
-            return false;
         }
     }
 
