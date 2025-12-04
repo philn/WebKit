@@ -73,8 +73,7 @@ private:
     bool hasVideo() const final { return false; }
     bool hasAudio() const final { return false; }
     void setPageIsVisible(bool) final { }
-    void seekToTarget(const SeekTarget&) final { }
-    bool seeking() const final { return false; }
+    Ref<MediaTimePromise> seekToTarget(const SeekTarget&) final { MediaTimePromise::createAndReject(PlatformMediaError::Cancelled); }
     bool paused() const final { return true; }
     MediaPlayer::NetworkState networkState() const final { return MediaPlayer::NetworkState::Empty; }
     MediaPlayer::ReadyState readyState() const final { return MediaPlayer::ReadyState::HaveNothing; }

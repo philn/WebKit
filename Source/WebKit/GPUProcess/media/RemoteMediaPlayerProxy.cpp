@@ -271,10 +271,30 @@ void RemoteMediaPlayerProxy::pause()
     sendCachedState();
 }
 
-void RemoteMediaPlayerProxy::seekToTarget(const WebCore::SeekTarget& target)
+static MediaTimeUpdateData timeUpdateData(const MediaPlayer& player, MediaTime time)
+{
+    return {
+        time,
+        player.timeIsProgressing(),
+        MonotonicTime::now()
+    };
+}
+
+void RemoteMediaPlayerProxy::seekToTarget(const WebCore::SeekTarget& target, CompletionHandler<void(Expected<WebKit::MediaTimeUpdateData, WebCore::PlatformMediaError>)>&& handler)
 {
     ALWAYS_LOG(LOGIDENTIFIER, target);
-    protectedPlayer()->seekToTarget(target);
+    protectedPlayer()->seekToTarget(target)->whenSettled(RunLoop::mainSingleton(), [weakThis = WeakPtr { *this }, handler = WTFMove(handler)](auto&& result) mutable {
+        if (!result) {
+            handler(makeUnexpected(result.error()));
+            return;
+        }
+        RefPtr protectedThis = weakThis.get();
+        if (!protectedThis) {
+            handler(makeUnexpected(PlatformMediaError::Cancelled));
+            return;
+        }
+        handler(timeUpdateData(*protectedThis->protectedPlayer(), *result));
+    });
 }
 
 void RemoteMediaPlayerProxy::setVolumeLocked(bool volumeLocked)
@@ -486,21 +506,6 @@ void RemoteMediaPlayerProxy::mediaPlayerVolumeChanged()
 void RemoteMediaPlayerProxy::mediaPlayerMuteChanged()
 {
     protectedConnection()->send(Messages::MediaPlayerPrivateRemote::MuteChanged(protectedPlayer()->muted()), m_id);
-}
-
-static MediaTimeUpdateData timeUpdateData(const MediaPlayer& player, MediaTime time)
-{
-    return {
-        time,
-        player.timeIsProgressing(),
-        MonotonicTime::now()
-    };
-}
-
-void RemoteMediaPlayerProxy::mediaPlayerSeeked(const MediaTime& time)
-{
-    ALWAYS_LOG(LOGIDENTIFIER, time);
-    protectedConnection()->send(Messages::MediaPlayerPrivateRemote::Seeked(timeUpdateData(*protectedPlayer(), time)), m_id);
 }
 
 void RemoteMediaPlayerProxy::mediaPlayerTimeChanged()

@@ -369,8 +369,8 @@ private:
     bool m_processingInitializationSegment { false };
 
     // Seek logic support
-    void seekToTarget(const SeekTarget&) final;
-    bool seeking() const final;
+    Ref<MediaTimePromise> seekToTarget(const SeekTarget&) final;
+    bool seeking() const;
     void seekInternal();
     void cancelPendingSeek();
     void startSeek(const MediaTime&);
@@ -384,7 +384,7 @@ private:
     std::optional<SeekTarget> m_pendingSeek;
     std::optional<GenericPromise::Producer> m_waitForTimeBufferedPromise;
     const Ref<NativePromiseRequest> m_rendererSeekRequest;
-    bool m_seeking { false };
+    std::optional<MediaTimePromise::AutoRejectProducer> m_seekPromise;
 #if HAVE(SPATIAL_TRACKING_LABEL)
     String m_defaultSpatialTrackingLabel;
     String m_spatialTrackingLabel;

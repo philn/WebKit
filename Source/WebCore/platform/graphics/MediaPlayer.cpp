@@ -150,8 +150,7 @@ public:
 
     void setPageIsVisible(bool) final { }
 
-    void seekToTarget(const SeekTarget&) final { }
-    bool seeking() const final { return false; }
+    Ref<MediaTimePromise> seekToTarget(const SeekTarget&) final { return MediaTimePromise::createAndReject(PlatformMediaError::Cancelled); }
 
     void setRateDouble(double) final { }
     void setPreservesPitch(bool) final { }
@@ -856,11 +855,11 @@ void MediaPlayer::willSeekToTarget(const MediaTime& time)
     protectedPrivate()->willSeekToTarget(time);
 }
 
-void MediaPlayer::seekToTarget(const SeekTarget& target)
+Ref<MediaTimePromise> MediaPlayer::seekToTarget(const SeekTarget& target)
 {
     RefPtr playerPrivate = m_private;
     playerPrivate->willSeekToTarget(MediaTime::invalidTime());
-    playerPrivate->seekToTarget(target);
+    return playerPrivate->seekToTarget(target);
 }
 
 void MediaPlayer::seekToTime(const MediaTime& time)
@@ -876,19 +875,9 @@ void MediaPlayer::seekWhenPossible(const MediaTime& time)
         seekToTime(time);
 }
 
-void MediaPlayer::seeked(const MediaTime& time)
-{
-    protectedClient()->mediaPlayerSeeked(time);
-}
-
 bool MediaPlayer::paused() const
 {
     return protectedPrivate()->paused();
-}
-
-bool MediaPlayer::seeking() const
-{
-    return protectedPrivate()->seeking();
 }
 
 bool MediaPlayer::supportsFullscreen() const

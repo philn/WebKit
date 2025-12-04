@@ -3265,10 +3265,6 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
             ALWAYS_LOG(LOGIDENTIFIER, "queuing waiting event, currentTime = ", currentMediaTime());
             scheduleEvent(eventNames().waitingEvent);
         }
-
-        // 4.8.10.10 step 14 & 15.
-        if (m_seekRequested && !player->seeking() && m_readyState >= HAVE_CURRENT_DATA)
-            finishSeek();
     } else {
         if (wasPotentiallyPlaying && m_readyState < HAVE_FUTURE_DATA) {
             // 4.8.10.8
@@ -4035,7 +4031,27 @@ void HTMLMediaElement::seekTask()
 
     // 11 - Set the current playback position to the given new playback position
     m_seekRequested = true;
-    player->seekToTarget({ time, negativeTolerance, positiveTolerance });
+    player->seekToTarget({ time, negativeTolerance, positiveTolerance })->whenSettled(RunLoop::mainSingleton(), [weakThis = WeakPtr { *this }](auto&& result) {
+        RefPtr protectedThis = weakThis.get();
+        if (!protectedThis)
+            return;
+        if (!result) {
+            ALWAYS_LOG_WITH_THIS(protectedThis, LOGIDENTIFIER_WITH_THIS(protectedThis), "seek cancelled");
+            return;
+        }
+
+#if ENABLE(MEDIA_SOURCE)
+        if (RefPtr mediaSource = protectedThis->m_mediaSource)
+            mediaSource->monitorSourceBuffers(); // Update readyState.
+#endif
+
+        ALWAYS_LOG_WITH_THIS(protectedThis, LOGIDENTIFIER_WITH_THIS(protectedThis), "seek completed time: ", *result, " readyState: ", convertEnumerationToString(protectedThis->m_readyState));
+        // 4.8.10.9 step 14 & 15.
+        if (protectedThis->m_seekRequested)
+            protectedThis->finishSeek();
+
+        protectedThis->mediaPlayerTimeChanged();
+    });
 
     // 12 - Wait until the user agent has established whether or not the media data for the new playback
     // position is available, and, if it is, until it has decoded enough data to play back that position.
@@ -4089,10 +4105,6 @@ void HTMLMediaElement::finishSeek()
     if (RefPtr mediaSession = m_mediaSession)
         mediaSession->clientCharacteristicsChanged(true);
 
-#if ENABLE(MEDIA_SOURCE)
-    if (RefPtr mediaSource = m_mediaSource)
-        mediaSource->monitorSourceBuffers();
-#endif
     if (wasPlayingBeforeSeeking)
         playInternal();
 }
@@ -5829,20 +5841,14 @@ void HTMLMediaElement::mediaPlayerTimeChanged()
 
     updateActiveTextTrackCues(currentMediaTime());
 
+    if (seeking())
+        return;
+
     beginProcessingMediaPlayerCallback();
 
     invalidateOfficialPlaybackPosition();
-    bool wasSeeking = seeking();
 
-    // 4.8.10.9 step 14 & 15.  Needed if no ReadyState change is associated with the seek.
-    if (m_seekRequested && m_readyState >= HAVE_CURRENT_DATA && !protectedPlayer()->seeking())
-        finishSeek();
-
-    // Always call scheduleTimeupdateEvent when the media engine reports a time discontinuity,
-    // it will only queue a 'timeupdate' event if we haven't already posted one at the current
-    // movie time.
-    else
-        scheduleTimeupdateEvent(false);
+    scheduleTimeupdateEvent(false);
 
     MediaTime now = currentMediaTime();
     MediaTime dur = durationMediaTime();
@@ -5875,8 +5881,7 @@ void HTMLMediaElement::mediaPlayerTimeChanged()
             if (!m_sentEndEvent) {
                 m_sentEndEvent = true;
                 scheduleEvent(eventNames().endedEvent);
-                if (!wasSeeking)
-                    addBehaviorRestrictionsOnEndIfNecessary();
+                addBehaviorRestrictionsOnEndIfNecessary();
                 setAutoplayEventPlaybackState(AutoplayEventPlaybackState::None);
                 if (now > m_lastSeekTime)
                     addPlayedRange(m_lastSeekTime, now);
@@ -5902,8 +5907,7 @@ void HTMLMediaElement::mediaPlayerTimeChanged()
                 if (RefPtr player = m_player; player && player->ended()) {
                     m_sentEndEvent = true;
                     scheduleEvent(eventNames().endedEvent);
-                    if (!wasSeeking)
-                        addBehaviorRestrictionsOnEndIfNecessary();
+                    addBehaviorRestrictionsOnEndIfNecessary();
                     setPaused(true);
                     setPlaying(false);
                 }
@@ -5983,16 +5987,6 @@ void HTMLMediaElement::mediaPlayerMuteChanged()
     if (RefPtr player = m_player)
         setMuted(player->muted());
     endProcessingMediaPlayerCallback();
-}
-
-void HTMLMediaElement::mediaPlayerSeeked(const MediaTime&)
-{
-    ALWAYS_LOG(LOGIDENTIFIER);
-
-#if ENABLE(MEDIA_SOURCE)
-    if (RefPtr mediaSource = m_mediaSource)
-        mediaSource->monitorSourceBuffers(); // Update readyState.
-#endif
 }
 
 void HTMLMediaElement::mediaPlayerDurationChanged()

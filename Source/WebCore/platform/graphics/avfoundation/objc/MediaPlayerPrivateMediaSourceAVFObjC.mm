@@ -487,7 +487,7 @@ MediaTime MediaPlayerPrivateMediaSourceAVFObjC::initialTime() const
     return MediaTime::zeroTime();
 }
 
-void MediaPlayerPrivateMediaSourceAVFObjC::seekToTarget(const SeekTarget& target)
+Ref<MediaTimePromise> MediaPlayerPrivateMediaSourceAVFObjC::seekToTarget(const SeekTarget& target)
 {
     assertIsMainThread();
     ALWAYS_LOG(LOGIDENTIFIER, "time = ", target.time, ", negativeThreshold = ", target.negativeThreshold, ", positiveThreshold = ", target.positiveThreshold);
@@ -497,6 +497,9 @@ void MediaPlayerPrivateMediaSourceAVFObjC::seekToTarget(const SeekTarget& target
     if (m_seekTimer.isActive())
         m_seekTimer.stop();
     m_seekTimer.startOneShot(0_s);
+
+    m_seekPromise.emplace(PlatformMediaError::Cancelled);
+    return *m_seekPromise;
 }
 
 void MediaPlayerPrivateMediaSourceAVFObjC::seekInternal()
@@ -511,8 +514,6 @@ void MediaPlayerPrivateMediaSourceAVFObjC::seekInternal()
 
     auto pendingSeek = std::exchange(m_pendingSeek, { }).value();
     m_lastSeekTime = pendingSeek.time;
-
-    m_seeking = true;
 
     cancelPendingSeek();
     m_renderer->prepareToSeek();
@@ -568,12 +569,8 @@ void MediaPlayerPrivateMediaSourceAVFObjC::completeSeek(const MediaTime& seekedT
     assertIsMainThread();
     ALWAYS_LOG(LOGIDENTIFIER, "");
 
-    m_seeking = false;
-
-    if (auto player = m_player.get()) {
-        player->seeked(seekedTime);
-        player->timeChanged();
-    }
+    if (auto promise = std::exchange(m_seekPromise, std::nullopt))
+        promise->resolve(seekedTime);
 
     if (hasVideo())
         setHasAvailableVideoFrame(true);
@@ -582,7 +579,7 @@ void MediaPlayerPrivateMediaSourceAVFObjC::completeSeek(const MediaTime& seekedT
 bool MediaPlayerPrivateMediaSourceAVFObjC::seeking() const
 {
     assertIsMainThread();
-    return m_pendingSeek || m_seeking;
+    return m_seekPromise.has_value();
 }
 
 void MediaPlayerPrivateMediaSourceAVFObjC::setLoadingProgresssed(bool flag)

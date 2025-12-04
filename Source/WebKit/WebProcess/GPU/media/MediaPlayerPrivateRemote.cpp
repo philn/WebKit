@@ -428,12 +428,21 @@ MediaTime MediaPlayerPrivateRemote::currentOrPendingSeekTime() const
     return currentTimeWithLockHeld();
 }
 
-void MediaPlayerPrivateRemote::seekToTarget(const WebCore::SeekTarget& target)
+Ref<MediaTimePromise> MediaPlayerPrivateRemote::seekToTarget(const WebCore::SeekTarget& target)
 {
     ALWAYS_LOG(LOGIDENTIFIER, target);
     m_seeking = true;
     m_currentTimeEstimator.setTime({ target.time, false, MonotonicTime::now() });
-    protectedConnection()->send(Messages::RemoteMediaPlayerProxy::SeekToTarget(target), m_id);
+    return protectedConnection()->sendWithPromisedReply<MediaPromiseConverter>(Messages::RemoteMediaPlayerProxy::SeekToTarget(target), m_id)->whenSettled(RunLoop::mainSingleton(), [weakThis = ThreadSafeWeakPtr { *this }](auto&& result) {
+        RefPtr protectedThis = weakThis.get();
+        if (!protectedThis)
+            return MediaTimePromise::createAndReject(PlatformMediaError::Cancelled);
+        protectedThis->m_seeking = false;
+        if (!result)
+            return MediaTimePromise::createAndReject(result.error());
+        protectedThis->m_currentTimeEstimator.setTime(*result);
+        return MediaTimePromise::createAndResolve(result->currentTime);
+    });
 }
 
 bool MediaPlayerPrivateRemote::didLoadingProgress() const
@@ -513,15 +522,6 @@ void MediaPlayerPrivateRemote::muteChanged(bool muted)
         player->muteChanged(muted);
 }
 
-void MediaPlayerPrivateRemote::seeked(MediaTimeUpdateData&& timeData)
-{
-    ALWAYS_LOG(LOGIDENTIFIER, "currentTime:", timeData.currentTime, " timeIsProgressing:", timeData.timeIsProgressing);
-    m_seeking = false;
-    m_currentTimeEstimator.setTime(timeData);
-    if (RefPtr player = m_player.get())
-        player->seeked(timeData.currentTime);
-}
-
 void MediaPlayerPrivateRemote::timeChanged(RemoteMediaPlayerState&& state, MediaTimeUpdateData&& timeData)
 {
     ALWAYS_LOG(LOGIDENTIFIER, "currentTime:", timeData.currentTime, " timeIsProgressing:", timeData.timeIsProgressing);
@@ -536,11 +536,6 @@ void MediaPlayerPrivateRemote::durationChanged(RemoteMediaPlayerState&& state)
     updateCachedState(WTFMove(state));
     if (RefPtr player = m_player.get())
         player->durationChanged();
-}
-
-bool MediaPlayerPrivateRemote::seeking() const
-{
-    return m_seeking;
 }
 
 void MediaPlayerPrivateRemote::rateChanged(double rate, MediaTimeUpdateData&& timeData)

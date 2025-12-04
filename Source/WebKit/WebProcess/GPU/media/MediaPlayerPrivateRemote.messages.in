@@ -33,7 +33,6 @@ messages -> MediaPlayerPrivateRemote {
     FirstVideoFrameAvailable()
     VolumeChanged(double volume)
     MuteChanged(bool mute)
-    Seeked(struct WebKit::MediaTimeUpdateData timeData)
     TimeChanged(struct WebKit::RemoteMediaPlayerState state, struct WebKit::MediaTimeUpdateData timeData)
     DurationChanged(struct WebKit::RemoteMediaPlayerState state)
     RateChanged(double rate, struct WebKit::MediaTimeUpdateData timeData)

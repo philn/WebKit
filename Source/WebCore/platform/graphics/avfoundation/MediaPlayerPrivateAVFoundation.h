@@ -35,6 +35,7 @@
 #include <wtf/Function.h>
 #include <wtf/Lock.h>
 #include <wtf/LoggerHelper.h>
+#include <wtf/NativePromise.h>
 #include <wtf/RefCounted.h>
 #include <wtf/ThreadSafeWeakPtr.h>
 
@@ -188,8 +189,8 @@ protected:
     void setPageIsVisible(bool) final;
     MediaTime duration() const override;
     MediaTime currentTime() const override = 0;
-    void seekToTarget(const SeekTarget&) final;
-    bool seeking() const final;
+    Ref<MediaTimePromise> seekToTarget(const SeekTarget&) final;
+    bool seeking() const;
     bool paused() const override;
     void setVolume(float) override = 0;
     bool hasClosedCaptions() const override { return m_cachedHasCaptions; }
@@ -349,6 +350,7 @@ protected:
     RefPtr<SecurityOrigin> m_resolvedOrigin;
 
     MediaPlayer::Preload m_preload;
+    std::optional<MediaTimePromise::AutoRejectProducer> m_seekPromise;
 
 #if !RELEASE_LOG_DISABLED
     const Ref<const Logger> m_logger;
@@ -376,6 +378,10 @@ protected:
     bool m_shouldMaintainAspectRatio;
     bool m_seeking;
     bool m_needsRenderingModeChanged { false };
+
+private:
+    void seekInternal(const SeekTarget&);
+    void resolveSeekPromiseIfNeeded();
 };
 
 String convertEnumerationToString(MediaPlayerPrivateAVFoundation::MediaRenderingMode);

@@ -487,7 +487,7 @@ MediaTime MediaPlayerPrivateWebM::currentTime() const
     return m_renderer->currentTime();
 }
 
-void MediaPlayerPrivateWebM::seekToTarget(const SeekTarget& target)
+Ref<MediaTimePromise> MediaPlayerPrivateWebM::seekToTarget(const SeekTarget& target)
 {
     ALWAYS_LOG(LOGIDENTIFIER, "time = ", target.time, ", negativeThreshold = ", target.negativeThreshold, ", positiveThreshold = ", target.positiveThreshold);
 
@@ -496,6 +496,9 @@ void MediaPlayerPrivateWebM::seekToTarget(const SeekTarget& target)
     if (m_seekTimer.isActive())
         m_seekTimer.stop();
     m_seekTimer.startOneShot(0_s);
+
+    m_seekPromise.emplace(PlatformMediaError::Cancelled);
+    return *m_seekPromise;
 }
 
 void MediaPlayerPrivateWebM::seekInternal()
@@ -509,8 +512,6 @@ void MediaPlayerPrivateWebM::seekInternal()
     m_lastSeekTime = pendingSeek.time;
 
     cancelPendingSeek();
-
-    m_seeking = true;
 
     m_renderer->prepareToSeek();
 
@@ -558,14 +559,10 @@ void MediaPlayerPrivateWebM::completeSeek(const MediaTime& seekedTime)
 {
     ALWAYS_LOG(LOGIDENTIFIER, "");
 
-    m_seeking = false;
-
     monitorReadyState();
 
-    if (RefPtr player = m_player.get()) {
-        player->seeked(seekedTime);
-        player->timeChanged();
-    }
+    if (auto seekPromise = std::exchange(m_seekPromise, std::nullopt))
+        seekPromise->resolve(seekedTime);
 }
 
 Ref<GenericPromise> MediaPlayerPrivateWebM::waitForTimeBuffered(const MediaTime& time)
@@ -586,7 +583,7 @@ Ref<GenericPromise> MediaPlayerPrivateWebM::waitForTimeBuffered(const MediaTime&
 
 bool MediaPlayerPrivateWebM::seeking() const
 {
-    return m_pendingSeek || m_seeking;
+    return m_seekPromise.has_value();
 }
 
 bool MediaPlayerPrivateWebM::shouldBePlaying() const
@@ -1285,7 +1282,7 @@ void MediaPlayerPrivateWebM::didProvideMediaDataForTrackId(Ref<MediaSampleAVFObj
         m_readyForMoreSamplesMap[trackId] = true;
         return;
     }
-    if (m_seeking || m_layerRequiresFlush)
+    if (seeking() || m_layerRequiresFlush)
         return;
     notifyClientWhenReadyForMoreSamples(trackId);
 }

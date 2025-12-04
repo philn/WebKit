@@ -165,7 +165,7 @@ public:
     void play();
     void pause();
 
-    void seekToTarget(const WebCore::SeekTarget&);
+    void seekToTarget(const WebCore::SeekTarget&, CompletionHandler<void(Expected<WebKit::MediaTimeUpdateData, WebCore::PlatformMediaError>)>&&);
 
     void setVolumeLocked(bool);
     void setVolume(double);
@@ -257,7 +257,6 @@ private:
     void mediaPlayerReadyStateChanged() final;
     void mediaPlayerVolumeChanged() final;
     void mediaPlayerMuteChanged() final;
-    void mediaPlayerSeeked(const MediaTime&) final;
     void mediaPlayerTimeChanged() final;
     void mediaPlayerDurationChanged() final;
     void mediaPlayerSizeChanged() final;
