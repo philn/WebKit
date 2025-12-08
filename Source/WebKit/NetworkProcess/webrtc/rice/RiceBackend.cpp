@@ -181,6 +181,12 @@ WEBKIT_DEFINE_ASYNC_DATA_STRUCT(ResolveAddressDataInner);
 
 void RiceBackend::resolveAddress(const String& address, CompletionHandler<void(Expected<String, WebCore::ExceptionData>&&)>&& completionHandler)
 {
+    if (!address.contains("."_s)) {
+        auto errorMessage = makeString('"', address, "\" is not a FQDN"_s);
+        completionHandler(makeUnexpected(ExceptionData { ExceptionCode::DataError, WTFMove(errorMessage) }));
+        return;
+    }
+
     auto data = createResolveAddressData();
     data->resolver = adoptGRef(g_resolver_get_default());
     data->address = address;
@@ -189,7 +195,6 @@ void RiceBackend::resolveAddress(const String& address, CompletionHandler<void(E
         auto data = reinterpret_cast<ResolveAddressData*>(userData);
         auto innerData = createResolveAddressDataInner();
         innerData->callback = WTFMove(data->callback);
-        WTFLogAlways("phil resolving >%s<", data->address.utf8().data());
         g_resolver_lookup_by_name_async(data->resolver.get(), data->address.utf8().data(), nullptr,
             reinterpret_cast<GAsyncReadyCallback>(+[](GResolver* resolver, GAsyncResult* result, gpointer userData) {
                 auto data = reinterpret_cast<ResolveAddressDataInner*>(userData);
@@ -205,8 +210,8 @@ void RiceBackend::resolveAddress(const String& address, CompletionHandler<void(E
                 }
 
                 GUniquePtr<char> address(g_inet_address_to_string(G_INET_ADDRESS(addresses->data)));
-                callOnMainRunLoopAndWait([data, address = WTFMove(address)] {
-                    data->callback(String::fromUTF8(address.get()));
+                callOnMainRunLoopAndWait([data, address = String::fromUTF8(address.get())] {
+                    data->callback(WTFMove(address));
                 });
 
                 g_resolver_free_addresses(addresses);
@@ -277,10 +282,10 @@ WEBKIT_DEFINE_ASYNC_DATA_STRUCT(MDNSRegistrationData);
 
 void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identifier, unsigned streamId, GatherSocketAddressesCallback&& completionHandler)
 {
-    if (m_udpSocketAddressesCache.contains(streamId)) {
-        completionHandler(m_udpSocketAddressesCache.get(streamId));
-        return;
-    }
+    // if (m_udpSocketAddressesCache.contains(streamId)) {
+    //     completionHandler(m_udpSocketAddressesCache.get(streamId));
+    //     return;
+    // }
 
     HashMap<String, String> result;
     //RELEASE_ASSERT(!m_sockets.contains(streamId));
@@ -303,7 +308,7 @@ void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identif
         if (auto socket = rice_udp_socket_new(interfaceAddresses[i])) {
             GUniquePtr<RiceAddress> localAddress(rice_udp_socket_local_addr(socket));
 
-            result.append(riceAddressToString(localAddress.get()));
+            // result.append(riceAddressToString(localAddress.get()));
             udpAddresses.append(WTFMove(localAddress));
             rice_sockets_add_udp(sockets.get(), socket);
         }
