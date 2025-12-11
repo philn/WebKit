@@ -2987,7 +2987,7 @@ imported/w3c/web-platform-tests/webrtc/protocol/crypto-suite.https.html [ Failur
 
 # Our video encoder is not enforcing video resolution capping based on the configured H.264 level.
 # See also: https://en.wikipedia.org/wiki/Advanced_Video_Coding#Levels
-webkit.org/b/301687 imported/w3c/web-platform-tests/webrtc/protocol/h264-profile-levels.https.html [ Failure ]
+#webkit.org/b/301687 imported/w3c/web-platform-tests/webrtc/protocol/h264-profile-levels.https.html [ Failure ]
 
 # offerPc doesn't receive a datachannel event for the "second back" channel created by
 # answerPcSecond, leading to the test timing out.

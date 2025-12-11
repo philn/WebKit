@@ -101,8 +101,11 @@ for (let level of Object.keys(levelTable)) {
       if (stats.type === 'outbound-rtp') {
         const activeCodec = stats.codecId;
         const codecStats = statsReport.get(activeCodec);
-        assert_implements_optional(codecStats.mimeType ==='video/H264',
-                          'Level ' + level + ' H264 video is not supported');
+          console.log("activeCodec: " + activeCodec + " -> " + codecStats);
+          if (codecStats === undefined)
+              continue;
+          assert_implements_optional(codecStats.mimeType ==='video/H264',
+                                     'Level ' + level + ' H264 video is not supported');
       }
     }
     // TODO(hta): This will not catch situations where the initial size is

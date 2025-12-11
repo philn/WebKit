@@ -41,8 +41,8 @@ struct H264LevelRequirements {
     unsigned maxBitrate; // in kbps
 };
 
-bool checkH264LevelRequirements(const char* level, unsigned width, unsigned height, double fps, H264LevelRequirements& outRequirements);
-std::optional<IntSize> adjustToH264LevelConstraints(const char* level, unsigned width, unsigned height, double fps, H264LevelRequirements& outRequirements);
+bool checkH264LevelRequirements(CStringView level, unsigned width, unsigned height, double fps, H264LevelRequirements&);
+std::optional<IntSize> adjustToH264LevelConstraints(CStringView level, unsigned width, unsigned height, double fps, H264LevelRequirements&);
 
 } // namespace GStreamerCodecUtilities
 
