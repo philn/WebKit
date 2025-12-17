@@ -384,6 +384,7 @@ _PATH_RULES_SPECIFIER = [
       os.path.join('Source', 'ThirdParty', 'ANGLE'),
       os.path.join('Source', 'ThirdParty', 'libsysprof-capture'),
       os.path.join('Source', 'ThirdParty', 'libwebrtc'),
+      os.path.join('Source', 'ThirdParty', 'mjansson-mdns'),
       os.path.join('Source', 'ThirdParty', 'openvr'),
       os.path.join('Source', 'ThirdParty', 'skia'),
       os.path.join('Source', 'ThirdParty', 'xdgmime'),
@@ -659,6 +660,9 @@ _SKIPPED_FILES_WITHOUT_WARNING = [
 
     # libsysprof-capture.
     os.path.join('Source', 'ThirdParty', 'libsysprof-capture'),
+
+    # mjansson-mdns.
+    os.path.join('Source', 'ThirdParty', 'mjansson-mdns'),
 
     # Skia.
     os.path.join('Source', 'ThirdParty', 'skia'),

@@ -1,0 +1,18 @@
+This directory contains a copy of mdns from:
+
+  - URL: https://github.com/mjansson/mdns
+  - Commit: a569c4759bd47e0f2a7bfc4d4c19620445782806
+
+The simplest way of updating its contents is to re-create the directory from scratch, and restoring
+the needed files with Git. Example commands:
+
+  rm -rf Source/ThirdParty/mjansson-mdns
+  cp -ar ../path/to/mdns Source/ThirdParty/mjansson-mdns
+  git checkout -- \
+      Source/ThirdParty/mjansson-mdns/README.WebKit \
+      Source/ThirdParty/mjansson-mdns/CMakeLists.txt
+  rm -rf Source/ThirdParty/mjansson-mdns/.git*
+  git add -A Source/ThirdParty/mjansson-mdns
+
+Then check whether the updated sources require any changes to the CMake build system, and update the
+commit identifier in this file.

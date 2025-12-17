@@ -853,6 +853,10 @@ if (USE_LIBWEBRTC)
     endif ()
 endif ()
 
+if (USE_LIBWEBRTC AND NOT APPLE)
+    list(APPEND MjanssonMDNS::MjanssonMDNS)
+endif ()
+
 if (ATOMICS_REQUIRE_LIBATOMIC)
     list(APPEND WebKit_PRIVATE_LIBRARIES atomic)
 endif ()
