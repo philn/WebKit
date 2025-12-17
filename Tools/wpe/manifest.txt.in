@@ -79,6 +79,7 @@ directory Source/ThirdParty/skia/src
 directory Source/ThirdParty/unifdef
 directory Source/ThirdParty/xdgmime
 directory Source/ThirdParty/libsysprof-capture
+directory Source/ThirdParty/mjansson-mdns
 
 exclude Source/WebKit/Resources
 

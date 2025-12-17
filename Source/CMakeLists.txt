@@ -50,6 +50,10 @@ elseif (USE_SYSPROF_CAPTURE)
     add_subdirectory(ThirdParty/libsysprof-capture)
 endif ()
 
+if (USE_LIBRICE)
+    add_subdirectory(ThirdParty/mjansson-mdns)
+endif ()
+
 if (ENABLE_WEBINSPECTORUI)
     add_subdirectory(WebInspectorUI)
 endif ()
