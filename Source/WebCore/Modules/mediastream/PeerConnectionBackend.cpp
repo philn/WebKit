@@ -638,7 +638,7 @@ void PeerConnectionBackend::addIceCandidate(RTCIceCandidate* iceCandidate, Funct
         return;
     }
 
-    doAddIceCandidate(*iceCandidate, [weakThis = WeakPtr { *this }, callback = WTF::move(callback)]<typename Result> (Result&& result) mutable {
+    doAddIceCandidate(*iceCandidate, [weakThis = ThreadSafeWeakPtr { *this }, callback = WTF::move(callback)]<typename Result>(Result&& result) mutable {
         RefPtr protectedThis = weakThis.get();
         if (!protectedThis)
             return;
@@ -821,16 +821,6 @@ static String toJSONString(const PeerConnectionBackend::TransceiverState& transc
 static String toJSONString(const PeerConnectionBackend::TransceiverStates& transceiverStates)
 {
     return toJSONArray(transceiverStates)->toJSONString();
-}
-
-void PeerConnectionBackend::ref() const
-{
-    m_peerConnection->ref();
-}
-
-void PeerConnectionBackend::deref() const
-{
-    m_peerConnection->deref();
 }
 
 String PeerConnectionBackend::generateJSONLogEvent(LogEvent&& logEvent, bool isForGatherLogs)

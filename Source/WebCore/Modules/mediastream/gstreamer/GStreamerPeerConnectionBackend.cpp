@@ -40,8 +40,7 @@
 #include "RTCRtpCapabilities.h"
 #include "RTCRtpReceiver.h"
 #include "RTCSessionDescription.h"
-#include "RealtimeIncomingAudioSourceGStreamer.h"
-#include "RealtimeIncomingVideoSourceGStreamer.h"
+#include "RealtimeIncomingSourceGStreamer.h"
 #include "RealtimeOutgoingAudioSourceGStreamer.h"
 #include "RealtimeOutgoingVideoSourceGStreamer.h"
 #include <wtf/StdLibExtras.h>
@@ -86,8 +85,8 @@ static const std::unique_ptr<PeerConnectionBackend> createGStreamerPeerConnectio
         return nullptr;
     }
     auto backend = WTF::makeUniqueWithoutRefCountedCheck<GStreamerPeerConnectionBackend, PeerConnectionBackend>(peerConnection);
-    bool status = backend->setConfiguration(WTF::move(configuration));
-    ASSERT_UNUSED(status, status);
+    if (!backend->setConfiguration(WTF::move(configuration)))
+        return nullptr;
     return backend;
 }
 
@@ -466,14 +465,10 @@ std::optional<bool> GStreamerPeerConnectionBackend::canTrickleIceCandidates() co
     return m_endpoint->canTrickleIceCandidates();
 }
 
-RTCPeerConnection& GStreamerPeerConnectionBackend::connection()
-{
-    return m_peerConnection.get();
-}
-
 void GStreamerPeerConnectionBackend::tearDown()
 {
-    for (auto& transceiver : connection().currentTransceivers()) {
+    auto connection = protectedPeerConnection();
+    for (auto& transceiver : connection->currentTransceivers()) {
         auto& sender = transceiver->sender();
         sender.setTransport(nullptr);
 
@@ -492,7 +487,7 @@ void GStreamerPeerConnectionBackend::tearDown()
         auto& backend = backendFromRTPTransceiver(*transceiver);
         backend.tearDown();
     }
-    connection().clearTransports();
+    connection->clearTransports();
 }
 
 void GStreamerPeerConnectionBackend::startGatheringStatLogs(Function<void(String&&)>&& callback)

@@ -71,8 +71,8 @@ GST_DEBUG_CATEGORY(webkit_webrtc_endpoint_debug);
 
 namespace WebCore {
 
-GStreamerMediaEndpoint::GStreamerMediaEndpoint(GStreamerPeerConnectionBackend& peerConnection)
-    : m_peerConnectionBackend(WeakPtr { &peerConnection })
+GStreamerMediaEndpoint::GStreamerMediaEndpoint(const GStreamerPeerConnectionBackend& peerConnection)
+    : m_peerConnectionBackend(ThreadSafeWeakPtr { &peerConnection })
     , m_statsCollector(GStreamerStatsCollector::create())
 #if !RELEASE_LOG_DISABLED
     , m_statsLogTimer(*this, &GStreamerMediaEndpoint::gatherStatsForLogging)
@@ -401,7 +401,7 @@ void GStreamerMediaEndpoint::disposeElementChain(GstElement* element)
     gst_element_release_request_pad(m_webrtcBin.get(), peer.get());
 }
 
-bool GStreamerMediaEndpoint::setConfiguration(MediaEndpointConfiguration& configuration)
+bool GStreamerMediaEndpoint::setConfiguration(const MediaEndpointConfiguration& configuration)
 {
     auto peerConnectionBackend = this->peerConnectionBackend();
     if (!peerConnectionBackend)
@@ -410,7 +410,8 @@ bool GStreamerMediaEndpoint::setConfiguration(MediaEndpointConfiguration& config
     if (!m_webrtcBin)
         return false;
 
-    auto& document = downcast<Document>(*peerConnectionBackend->connection().scriptExecutionContext());
+    auto connection = peerConnectionBackend->protectedPeerConnection();
+    auto& document = downcast<Document>(*connection->scriptExecutionContext());
     GST_DEBUG_OBJECT(m_pipeline.get(), "Configuring webrtcbin for PeerConnection created by %s", document.url().string().utf8().data());
     GstWebRTCBundlePolicy bundlePolicy;
     if (document.url().isMatchingDomain("www.xbox.com"_s)) {
@@ -806,7 +807,7 @@ void GStreamerMediaEndpoint::doSetLocalDescription(const RTCSessionDescription* 
     if (!peerConnectionBackend)
         return;
     auto initialSDP = description ? description->sdp().isolatedCopy() : emptyString();
-    auto remoteDescription = peerConnectionBackend->connection().remoteDescription();
+    auto remoteDescription = peerConnectionBackend->protectedPeerConnection()->remoteDescription();
     String remoteDescriptionSdp = remoteDescription ? remoteDescription->sdp() : emptyString();
     std::optional<RTCSdpType> remoteDescriptionSdpType = remoteDescription ? std::make_optional(remoteDescription->type()) : std::nullopt;
 
@@ -912,7 +913,7 @@ void GStreamerMediaEndpoint::doSetRemoteDescription(const RTCSessionDescription&
     auto peerConnectionBackend = this->peerConnectionBackend();
     if (!peerConnectionBackend)
         return;
-    auto localDescription = peerConnectionBackend->connection().localDescription();
+    auto localDescription = peerConnectionBackend->protectedPeerConnection()->localDescription();
     String localDescriptionSdp = localDescription ? localDescription->sdp() : emptyString();
     std::optional<RTCSdpType> localDescriptionSdpType = localDescription ? std::make_optional(localDescription->type()) : std::nullopt;
 
@@ -1446,7 +1447,7 @@ MediaStream& GStreamerMediaEndpoint::mediaStreamFromRTCStream(String mediaStream
         auto peerConnectionBackend = this->peerConnectionBackend();
         if (!peerConnectionBackend)
             return nullptr;
-        auto& document = downcast<Document>(*peerConnectionBackend->connection().scriptExecutionContext());
+        auto& document = downcast<Document>(*peerConnectionBackend->protectedPeerConnection()->scriptExecutionContext());
         return MediaStream::create(document, MediaStreamPrivate::create(document.logger(), { }, WTF::move(mediaStreamId)), MediaStream::AllowEventTracks::Yes);
     });
     return *mediaStream.iterator->value;
@@ -1878,7 +1879,7 @@ ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::createTran
 
     auto transceiver = makeUnique<GStreamerRtpTransceiverBackend>(WTF::move(rtcTransceiver));
 
-    return GStreamerMediaEndpoint::Backends { transceiver->createSenderBackend(WeakPtr { m_peerConnectionBackend }, WTF::move(source), WTF::move(initData)), transceiver->createReceiverBackend(), WTF::move(transceiver) };
+    return GStreamerMediaEndpoint::Backends { transceiver->createSenderBackend(ThreadSafeWeakPtr { m_peerConnectionBackend }, WTF::move(source), WTF::move(initData)), transceiver->createReceiverBackend(), WTF::move(transceiver) };
 }
 
 ExceptionOr<GStreamerMediaEndpoint::Backends> GStreamerMediaEndpoint::addTransceiver(const String& trackKind, const RTCRtpTransceiverInit& init, PeerConnectionBackend::IgnoreNegotiationNeededFlag ignoreNegotiationNeededFlag)
@@ -2243,9 +2244,9 @@ void GStreamerMediaEndpoint::onIceConnectionChange()
         auto peerConnectionBackend = this->peerConnectionBackend();
         if (!peerConnectionBackend)
             return;
-        auto& connection = peerConnectionBackend->connection();
-        if (connection.iceConnectionState() != connectionState)
-            connection.updateIceConnectionState(connectionState);
+        auto connection = peerConnectionBackend->protectedPeerConnection();
+        if (connection->iceConnectionState() != connectionState)
+            connection->updateIceConnectionState(connectionState);
     });
 }
 
@@ -2400,7 +2401,7 @@ GUniquePtr<GstStructure> GStreamerMediaEndpoint::preprocessStats(const GRefPtr<G
         if (!peerConnectionBackend)
             return nullptr;
 
-        for (auto& sender : peerConnectionBackend->connection().getSenders()) {
+        for (auto& sender : peerConnectionBackend->protectedPeerConnection()->getSenders()) {
             auto& backend = peerConnectionBackend->backendFromRTPSender(sender);
             GUniquePtr<GstStructure> stats, captureStats;
             ASCIILiteral captureStatsName;
@@ -2422,7 +2423,7 @@ GUniquePtr<GstStructure> GStreamerMediaEndpoint::preprocessStats(const GRefPtr<G
 
             gst_structure_set(result.get(), captureStatsName.characters(), GST_TYPE_STRUCTURE, captureStats.get(), nullptr);
         }
-        for (auto& receiver : peerConnectionBackend->connection().getReceivers()) {
+        for (auto& receiver : peerConnectionBackend->protectedPeerConnection()->getReceivers()) {
             auto& track = receiver.get().track();
             if (!is<RealtimeIncomingVideoSourceGStreamer>(track.source()))
                 continue;
