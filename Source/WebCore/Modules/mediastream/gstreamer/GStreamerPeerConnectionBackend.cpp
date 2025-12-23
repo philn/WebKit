@@ -227,9 +227,7 @@ void GStreamerPeerConnectionBackend::doStop()
 
 void GStreamerPeerConnectionBackend::doAddIceCandidate(RTCIceCandidate& candidate, AddIceCandidateCallback&& callback)
 {
-    unsigned sdpMLineIndex = candidate.sdpMLineIndex() ? candidate.sdpMLineIndex().value() : 0;
-    auto rtcCandidate = WTF::makeUnique<GStreamerIceCandidate>(*new GStreamerIceCandidate { sdpMLineIndex, candidate.candidate() });
-    m_endpoint->addIceCandidate(*rtcCandidate, WTF::move(callback));
+    m_endpoint->addIceCandidate(candidate, WTF::move(callback));
 }
 
 Ref<RTCRtpReceiver> GStreamerPeerConnectionBackend::createReceiver(std::unique_ptr<GStreamerRtpReceiverBackend>&& backend, const String& trackKind, const String& trackId)
