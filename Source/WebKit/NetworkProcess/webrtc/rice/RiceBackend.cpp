@@ -416,6 +416,17 @@ const RiceAddress* RiceBackend::ensureRiceAddressFromCache(const String& address
     return result.get();
 }
 
+void RiceBackend::setSocketTypeOfService([[maybe_unused]] unsigned streamId, [[maybe_unused]] unsigned value)
+{
+#if RICE_CHECK_VERSION(0, 2, 2)
+    auto sockets = getSocketsForStream(streamId);
+    if (!sockets) [[unlikely]]
+        return;
+
+    rice_sockets_set_tos(sockets.get(), value);
+#endif
+}
+
 } // namespace WebKit
 
 #endif // USE(LIBRICE)
