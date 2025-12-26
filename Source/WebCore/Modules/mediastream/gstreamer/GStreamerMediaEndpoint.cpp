@@ -932,6 +932,32 @@ void GStreamerMediaEndpoint::doSetRemoteDescription(const RTCSessionDescription&
             return;
         }
 
+        unsigned totalMedias = gst_sdp_message_medias_len(sdpMessage.get());
+        bool hasRtcpMuxAttribute = false;
+        for (unsigned i = 0; i < totalMedias; i++) {
+            const auto media = gst_sdp_message_get_media(sdpMessage.get(), i);
+            auto mediaType = CStringView::unsafeFromUTF8(gst_sdp_media_get_media(media));
+            if (mediaType == "application"_s) {
+                hasRtcpMuxAttribute = true;
+                continue;
+            }
+            unsigned totalAttributes = gst_sdp_media_attributes_len(media);
+            for (unsigned ii = 0; ii < totalAttributes; ii++) {
+                const auto attribute = gst_sdp_media_get_attribute(media, ii);
+                auto key = CStringView::unsafeFromUTF8(attribute->key);
+                if (key == "rtcp-mux"_s) {
+                    hasRtcpMuxAttribute = true;
+                    break;
+                }
+            }
+            if (hasRtcpMuxAttribute)
+                break;
+        }
+        if (!hasRtcpMuxAttribute) {
+            peerConnectionBackend->setRemoteDescriptionFailed(Exception { ExceptionCode::InvalidAccessError, "Invalid SDP, the rtcp-mux attribute is missing"_s });
+            return;
+        }
+
         // Make sure each outgoing media source is configured using the proposed codec and linked to webrtcbin.
         linkOutgoingSources(sdpMessage.get());
     }
