@@ -135,9 +135,16 @@ static void webkitGstWebRTCIceAgentSetOnIceCandidate(GstWebRTCICE* ice, GstWebRT
     priv->onCandidate = callback;
 }
 
-static void webkitGstWebRTCIceAgentSetForceRelay(GstWebRTCICE*, gboolean)
+static void webkitGstWebRTCIceAgentSetForceRelay([[maybe_unused]] GstWebRTCICE* ice, [[maybe_unused]] gboolean forceRelay)
 {
-    GST_FIXME("Not implemented yet.");
+#if RICE_CHECK_VERSION(0, 2, 2)
+    auto backend = WEBKIT_GST_WEBRTC_ICE_BACKEND(ice);
+    const auto& iceAgent = backend->priv->agent;
+    if (!iceAgent) [[unlikely]]
+        return;
+
+    rice_agent_set_force_relay(iceAgent.get(), forceRelay);
+#endif
 }
 
 static void webkitGstWebRTCIceAgentSetRiceStunServer(WebKitGstIceAgent* agent, StringView host, uint16_t port)

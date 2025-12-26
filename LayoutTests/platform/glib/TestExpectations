@@ -2709,6 +2709,7 @@ imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-addIceCandidate-timing.
 imported/w3c/web-platform-tests/webrtc/RTCRtpParameters-encodings.html [ Pass ]
 imported/w3c/web-platform-tests/webrtc/RTCRtpParameters-headerExtensions.html [ Pass ]
 imported/w3c/web-platform-tests/webrtc/RTCRtpParameters-rtcp.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCConfiguration-iceTransportPolicy.html [ Pass ]
 
 # The last promise test here fails because webrtcbin doesn't rely on a singleton signaling thread.
 # See also comments in:
