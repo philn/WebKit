@@ -2522,7 +2522,6 @@ webkit.org/b/79203 fast/mediastream/RTCPeerConnection-ice.html [ Failure Timeout
 webkit.org/b/79203 fast/mediastream/RTCPeerConnection-inspect-offer-bundlePolicy-bundle-only.html [ Failure Crash ]
 webkit.org/b/79203 fast/mediastream/RTCPeerConnection-stats.html [ Timeout Crash ]
 webkit.org/b/79203 fast/mediastream/video-srcObject-fit-fill.html [ Pass Timeout ]
-webkit.org/b/230415 fast/mediastream/RTCPeerConnection-iceconnectionstatechange-event.html [ Timeout ]
 webkit.org/b/187603 fast/mediastream/media-stream-track-source-failure.html [ Crash Timeout Failure Pass ]
 
 webkit.org/b/264803 fast/mediastream/mediastreamtrack-video-resize-event.html [ Failure ]
@@ -2622,8 +2621,11 @@ imported/w3c/web-platform-tests/webrtc/protocol/transceiver-mline-recycling.html
 
 # Specific to LibWebRTC:
 webkit.org/b/235885 webrtc/disable-encryption.html [ Skip ]
-webkit.org/b/235885 webrtc/libwebrtc/release-while-getting-stats.html [ Skip ]
-webkit.org/b/235885 webrtc/libwebrtc/descriptionGetters.html [ Failure Pass ]
+webkit.org/b/235885 webrtc/libwebrtc/ [ Skip ]
+webkit.org/b/235885 fast/mediastream/RTCPeerConnection-icecandidate-event.html [ Skip ]
+webrtc/peerconnection-new-candidate-page-cache.html [ Skip ]
+fast/mediastream/RTCPeerConnection-iceconnectionstatechange-event.html [ Skip ]
+http/wpt/webrtc/rtcNetworkInterface.html [ Skip ]
 
 # This test is flaky because sometimes the onnegotiationneeded event is not fired fast enough after
 # the addTrack() call.
@@ -2644,7 +2646,6 @@ webkit.org/b/235885 fast/mediastream/RTCPeerConnection-addIceCandidate.html [ Fa
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-have-local-pranswer.html [ Failure ]
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-have-remote-offer.html [ Failure ]
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-have-remote-pranswer.html [ Failure ]
-webkit.org/b/235885 fast/mediastream/RTCPeerConnection-icecandidate-event.html [ Failure ]
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-media-setup-two-dialogs.html [ Failure Timeout ]
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-remotely-assigned-transceiver-mid.html [ Pass Failure Timeout ]
 webkit.org/b/235885 fast/mediastream/RTCPeerConnection-setLocalDescription-offer.html [ Failure ]
@@ -2843,8 +2844,6 @@ webkit.org/b/286859 webrtc/captureCanvas-webrtc-with-video-scaling-adaptation.ht
 # This test is almost the same as http/wpt/webrtc/transfer-datachannel-service-worker.https.html.
 # The main difference is that in this test an additional message is sent on the data-channel.
 webkit.org/b/264936 imported/w3c/web-platform-tests/webrtc-extensions/transfer-datachannel-service-worker.https.html [ Failure ]
-
-http/wpt/webrtc/rtcNetworkInterface.html [ Failure ]
 
 webkit.org/b/276587 webrtc/video-av1.html [ Pass Timeout ]
 

@@ -130,7 +130,6 @@ webrtc/vp8-then-h264-gpu-process-crash.html [ Skip ]
 
 webkit.org/b/303924 webrtc/peer-connection-audio-mute2.html [ Failure ]
 webkit.org/b/303925 webrtc/audio-replace-track.html [ Failure ]
-[ Release ] fast/mediastream/RTCPeerConnection-icecandidate-event.html [ Timeout ]
 
 #//////////////////////////////////////////////////////////////////////////////////////////
 # End of Triaged Expectations
