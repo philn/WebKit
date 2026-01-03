@@ -51,6 +51,8 @@ public:
     const GRefPtr<GstCaps>& allowedCaps() const;
     [[nodiscard]] GRefPtr<GstCaps> rtpCaps() const;
 
+    const String& mid() const { return m_mid; }
+
     void link();
     const GRefPtr<GstPad>& pad() const { return m_webrtcSinkPad; }
     void setSinkPad(GRefPtr<GstPad>&&);
@@ -65,6 +67,7 @@ public:
     void setParameters(GUniquePtr<GstStructure>&&);
 
     void configure(GRefPtr<GstCaps>&&);
+    void reconfigure(GRefPtr<GstCaps>&&);
 
     [[nodiscard]] GUniquePtr<GstStructure> stats();
 

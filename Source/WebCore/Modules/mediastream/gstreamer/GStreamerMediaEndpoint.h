@@ -187,6 +187,7 @@ private:
 #endif
 
     void linkOutgoingSources(GstSDPMessage*);
+    void reconfigureOutgoingSources(GstSDPMessage*);
 
     String trackIdFromSDPMedia(const GstSDPMedia&);
 
@@ -226,6 +227,7 @@ private:
     Vector<RefPtr<MediaStreamTrackPrivate>> m_pendingIncomingTracks;
 
     Vector<RefPtr<RealtimeOutgoingMediaSourceGStreamer>> m_unlinkedOutgoingSources;
+    Vector<RefPtr<RealtimeOutgoingMediaSourceGStreamer>> m_linkedOutgoingSources;
 
     bool m_isGatheringRTCLogs { false };
 

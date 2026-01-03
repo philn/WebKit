@@ -733,6 +733,7 @@ void GStreamerMediaEndpoint::linkOutgoingSources(GstSDPMessage* sdpMessage)
             auto& sinkPad = source->pad();
             if (gst_pad_is_linked(sinkPad.get())) [[unlikely]] {
                 ASSERT_WITH_MESSAGE(gst_pad_is_linked(sinkPad.get()), "RealtimeMediaSource already linked.");
+                m_linkedOutgoingSources.append(source);
                 return true;
             }
 
@@ -740,6 +741,7 @@ void GStreamerMediaEndpoint::linkOutgoingSources(GstSDPMessage* sdpMessage)
             callOnMainThreadAndWait([&] {
                 source->start();
             });
+            m_linkedOutgoingSources.append(source);
             return true;
         });
     }
@@ -925,6 +927,31 @@ void GStreamerMediaEndpoint::setTransceiverCodecPreferences(const GstSDPMedia& m
     g_object_set(rtcTransceiver.get(), "codec-preferences", caps.get(), nullptr);
 }
 
+void GStreamerMediaEndpoint::reconfigureOutgoingSources(GstSDPMessage* sdpMessage)
+{
+    unsigned totalMedias = gst_sdp_message_medias_len(sdpMessage);
+#ifndef GST_DISABLE_GST_DEBUG
+    GST_DEBUG_OBJECT(m_pipeline.get(), "Re-configuring outgoing sources for %u m-lines", totalMedias);
+    auto sdp = GMallocString::unsafeAdoptFromUTF8(gst_sdp_message_as_text(sdpMessage));
+    GST_TRACE_OBJECT(m_pipeline.get(), "in SDP:\n%s", sdp.utf8());
+#endif
+    for (unsigned i = 0; i < totalMedias; i++) {
+        const auto media = gst_sdp_message_get_media(sdpMessage, i);
+        auto allowedCaps = capsFromSDPMedia(media);
+        auto msid = CStringView::unsafeFromUTF8(gst_sdp_media_get_attribute_val(media, "mid"));
+        GST_DEBUG("phil msid: %s %zu linked sources", msid.utf8(), m_linkedOutgoingSources.size());
+        for (const auto& source : m_linkedOutgoingSources) {
+            GST_DEBUG("   source msid: %s", source->mediaStreamID().ascii().data());
+            if (source->mid() == msid.span()) {
+                GST_DEBUG("phil reconfigure source with msid %s", msid.utf8());
+                source->reconfigure(WTF::move(allowedCaps));
+                //source->setParameters(WTF::move(allowedCaps));
+                break;
+            }
+        }
+    }
+}
+
 void GStreamerMediaEndpoint::doSetRemoteDescription(const RTCSessionDescription& description)
 {
     auto initialSDP = description.sdp().isolatedCopy();
@@ -969,7 +996,8 @@ void GStreamerMediaEndpoint::doSetRemoteDescription(const RTCSessionDescription&
             }
         }
         // Make sure each outgoing media source is configured using the proposed codec and linked to webrtcbin.
-        linkOutgoingSources(sdpMessage.get());
+        // linkOutgoingSources(sdpMessage.get());
+        reconfigureOutgoingSources(sdpMessage.get());
     }
 
     setDescription(&description, DescriptionType::Remote, [protectedThis = Ref(*this), this, initialSDP = WTF::move(initialSDP), localDescriptionSdp = WTF::move(localDescriptionSdp), localDescriptionSdpType = WTF::move(localDescriptionSdpType)](const GstSDPMessage& message) {

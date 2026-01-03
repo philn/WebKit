@@ -608,6 +608,14 @@ bool RealtimeOutgoingMediaSourceGStreamer::configurePacketizers(GRefPtr<GstCaps>
     return true;
 }
 
+void RealtimeOutgoingMediaSourceGStreamer::reconfigure(GRefPtr<GstCaps>&& newCaps)
+{
+    // TODO: for each packetizer: reconfigure encoder, somehow
+    GST_DEBUG_OBJECT(m_bin.get(), "phil caps %" GST_PTR_FORMAT, newCaps.get());
+    g_object_set(m_rtpCapsfilter.get(), "caps", newCaps.get(), nullptr);
+    GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN_CAST(m_bin.get()), GST_DEBUG_GRAPH_SHOW_ALL, "phil");
+}
+
 RealtimeOutgoingMediaSourceGStreamer::ExtensionLookupResults RealtimeOutgoingMediaSourceGStreamer::lookupRtpExtensions(const GstStructure* structure)
 {
     ExtensionLookupResults lookupResults;
