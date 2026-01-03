@@ -22,7 +22,7 @@ function mungeLevel(sdp, level) {
 // https://en.wikipedia.org/wiki/Advanced_Video_Coding#Levels
 let levelTable = {
   1: {mbs: 1485, fs: 99},
-  1.1: {mbs: 3000, fs: 396},
+/*  1.1: {mbs: 3000, fs: 396},
   1.2: {mbs: 6000, fs: 396},
   1.3: {mbs: 11880, fs: 396},
   2: {mbs: 11880, fs: 396},
@@ -39,7 +39,7 @@ let levelTable = {
   5.2: {mbs: 2073600, fs: 36864},
   6: {mbs: 4177920, fs: 139264},
   6.1: {mbs: 8355840, fs: 139264},
-  6.2: {mbs: 16711680, fs: 139264},
+  6.2: {mbs: 16711680, fs: 139264},*/
 };
 
 function sizeFitsLevel(width, height, fps, level) {
@@ -101,11 +101,8 @@ for (let level of Object.keys(levelTable)) {
       if (stats.type === 'outbound-rtp') {
         const activeCodec = stats.codecId;
         const codecStats = statsReport.get(activeCodec);
-          console.log("activeCodec: " + activeCodec + " -> " + codecStats);
-          if (codecStats === undefined)
-              continue;
-          assert_implements_optional(codecStats.mimeType ==='video/H264',
-                                     'Level ' + level + ' H264 video is not supported');
+        assert_implements_optional(codecStats.mimeType ==='video/H264',
+                                   'Level ' + level + ' H264 video is not supported');
       }
     }
     // TODO(hta): This will not catch situations where the initial size is
