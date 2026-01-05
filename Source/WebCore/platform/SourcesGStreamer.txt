@@ -107,6 +107,7 @@ platform/gstreamer/GStreamerElementHarness.cpp
 platform/gstreamer/GStreamerHolePunchQuirkBcmNexus.cpp
 platform/gstreamer/GStreamerHolePunchQuirkRialto.cpp
 platform/gstreamer/GStreamerHolePunchQuirkWesteros.cpp
+platform/gstreamer/GStreamerHolePunchQuirkExample.cpp
 platform/gstreamer/GStreamerQuirkAmLogic.cpp
 platform/gstreamer/GStreamerQuirkBcmNexus.cpp
 platform/gstreamer/GStreamerQuirkBroadcom.cpp

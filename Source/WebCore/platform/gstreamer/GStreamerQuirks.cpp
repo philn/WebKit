@@ -26,6 +26,7 @@
 
 #include "GStreamerCommon.h"
 #include "GStreamerHolePunchQuirkBcmNexus.h"
+#include "GStreamerHolePunchQuirkExample.h"
 #include "GStreamerHolePunchQuirkFake.h"
 #include "GStreamerHolePunchQuirkRialto.h"
 #include "GStreamerHolePunchQuirkWesteros.h"
@@ -126,7 +127,7 @@ GStreamerQuirksManager::GStreamerQuirksManager(bool isForTesting, bool loadQuirk
         return;
 
     if (WTF::equalLettersIgnoringASCIICase(identifierString.span(), "help"_s)) {
-        gst_printerrln("Supported quirks for WEBKIT_GST_HOLE_PUNCH_QUIRK are: fake, bcmnexus, rialto, westeros");
+        gst_printerrln("Supported quirks for WEBKIT_GST_HOLE_PUNCH_QUIRK are: fake, bcmnexus, rialto, westeros, example");
         return;
     }
 
@@ -139,6 +140,8 @@ GStreamerQuirksManager::GStreamerQuirksManager(bool isForTesting, bool loadQuirk
         m_holePunchQuirk = WTF::makeUnique<GStreamerHolePunchQuirkWesteros>();
     else if (WTF::equalLettersIgnoringASCIICase(identifierString.span(), "fake"_s))
         m_holePunchQuirk = WTF::makeUnique<GStreamerHolePunchQuirkFake>();
+    else if (WTF::equalLettersIgnoringASCIICase(identifierString.span(), "example"_s))
+        m_holePunchQuirk = WTF::makeUnique<GStreamerHolePunchQuirkExample>();
     else
         GST_WARNING("HolePunch quirk %s un-supported.", identifierString.utf8());
 }
