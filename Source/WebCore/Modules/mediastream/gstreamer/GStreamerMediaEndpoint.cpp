@@ -2743,8 +2743,46 @@ Seconds GStreamerMediaEndpoint::statsLogInterval(Seconds reportTimestamp) const
 
 void GStreamerMediaEndpoint::gatherDecoderImplementationName(Function<void(String&&)>&& callback)
 {
-    // TODO: collect stats and lookup InboundRtp "decoder_implementation" field.
-    callback({ });
+    if (isStopped() || !m_webrtcBin) {
+        callback({ });
+        return;
+    }
+
+    GRefPtr<GstPad> pad;
+    for (auto* srcPad : GstIteratorAdaptor<GstPad>(gst_element_iterate_src_pads(m_webrtcBin.get()))) {
+        GRefPtr<GstWebRTCRTPTransceiver> transceiver;
+        g_object_get(srcPad, "transceiver", &transceiver.outPtr(), nullptr);
+
+        GstWebRTCKind kind;
+        g_object_get(transceiver.get(), "kind", &kind, nullptr);
+        if (kind == GST_WEBRTC_KIND_VIDEO) {
+            pad = srcPad;
+            break;
+        }
+    }
+
+    if (!pad) {
+        callback({ });
+        return;
+    }
+
+    m_statsCollector->getStats([callback = WTF::move(callback)](auto&& report) mutable {
+        ASSERT(isMainThread());
+        if (!report) {
+            callback({ });
+            return;
+        }
+        // for (const auto& rtcStats : report.get()) {
+        //     if (rtcStats.type() == RTCStatsReport::Type::InboundRtp) {
+        //         auto& inboundRTPStats = downcast<RTCStatsReport::InboundRtpStreamStats>(rtcStats);
+        //         callback(inboundRTPStats.decoderImplementation);
+        //         return;
+        //     }
+        // }
+        callback({ });
+    }, pad, [](const auto&, const auto*) {
+        return nullptr;
+    });
 }
 
 std::optional<bool> GStreamerMediaEndpoint::canTrickleIceCandidates() const

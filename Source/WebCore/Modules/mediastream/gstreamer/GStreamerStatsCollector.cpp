@@ -134,7 +134,8 @@ RTCStatsReport::InboundRtpStreamStats::InboundRtpStreamStats(const GstStructure*
     pliCount = gstStructureGet<unsigned>(structure, "pli-count"_s);
     nackCount = gstStructureGet<unsigned>(structure, "nack-count"_s);
 
-    decoderImplementation = "GStreamer"_s;
+    if (kind == "video"_s)
+        decoderImplementation = "GStreamer"_s;
 
     framesPerSecond = gstStructureGet<double>(structure, "frames-per-second"_s);
     totalDecodeTime = gstStructureGet<double>(structure, "total-decode-time"_s);
