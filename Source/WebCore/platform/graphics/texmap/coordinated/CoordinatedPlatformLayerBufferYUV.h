@@ -27,6 +27,7 @@
 
 #if USE(COORDINATED_GRAPHICS)
 #include "CoordinatedPlatformLayerBuffer.h"
+#include "GraphicsTypesGL.h"
 
 namespace WebCore {
 
@@ -42,8 +43,11 @@ public:
     CoordinatedPlatformLayerBufferYUV(unsigned planeCount, Vector<RefPtr<BitmapTexture>, 4>&& textures, std::array<unsigned, 4>&& yuvPlane, std::array<unsigned, 4>&& yuvPlaneOffset, YuvToRgbColorSpace, TransferFunction, const IntSize&, OptionSet<TextureMapperFlags>, std::unique_ptr<GLFence>&&);
     virtual ~CoordinatedPlatformLayerBufferYUV();
 
+    bool copyToTexture(PlatformGLObject, GCGLenum target, GCGLint level, GCGLenum internalFormat, GCGLenum format, GCGLenum type) final;
+
 private:
     void paintToTextureMapper(TextureMapper&, const FloatRect&, const TransformationMatrix& modelViewMatrix = TransformationMatrix(), float opacity = 1.0) override;
+    std::array<float, 16> getYuvToRgbMatrix();
 
     unsigned m_planeCount { 0 };
     Vector<RefPtr<BitmapTexture>, 4> m_textures;
@@ -52,6 +56,16 @@ private:
     std::array<unsigned, 4> m_yuvPlaneOffset;
     YuvToRgbColorSpace m_yuvToRgbColorSpace { YuvToRgbColorSpace::Bt601 };
     TransferFunction m_transferFunction { TransferFunction::Bt709 };
+
+    GLuint m_framebuffer { 0 };
+    GLuint m_vbo { 0 };
+// #if !USE(OPENGL_ES)
+//     GLuint m_vao { 0 };
+// #endif
+    TransformationMatrix m_modelViewMatrix;
+    TransformationMatrix m_projectionMatrix;
+    TransformationMatrix m_textureSpaceMatrix;
+    TransformationMatrix m_colorConversionMatrix;
 };
 
 } // namespace WebCore

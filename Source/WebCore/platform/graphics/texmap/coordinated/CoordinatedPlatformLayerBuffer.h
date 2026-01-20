@@ -27,6 +27,7 @@
 
 #if USE(COORDINATED_GRAPHICS)
 #include "GLFence.h"
+#include "GraphicsTypesGL.h"
 #include "TextureMapperFlags.h"
 #include "TextureMapperPlatformLayer.h"
 #include <wtf/OptionSet.h>
@@ -58,6 +59,8 @@ public:
         if (auto fence = WTF::move(m_fence))
             fence->serverWait();
     }
+
+    virtual bool copyToTexture(PlatformGLObject, GCGLenum, GCGLint, GCGLenum, GCGLenum, GCGLenum) { return false; }
 
 protected:
     CoordinatedPlatformLayerBuffer(Type type, const IntSize& size, OptionSet<TextureMapperFlags> flags, std::unique_ptr<GLFence>&& fence)

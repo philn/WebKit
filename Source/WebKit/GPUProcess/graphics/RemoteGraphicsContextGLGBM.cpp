@@ -32,6 +32,10 @@
 #include <wtf/TZoneMalloc.h>
 #include <wtf/TZoneMallocInlines.h>
 
+#if ENABLE(VIDEO)
+#include <WebCore/CoordinatedPlatformLayerBufferDMABuf.h>
+#endif
+
 namespace WebKit {
 
 class RemoteGraphicsContextGLGBM final : public RemoteGraphicsContextGL {
@@ -84,6 +88,47 @@ Ref<RemoteGraphicsContextGL> RemoteGraphicsContextGL::create(GPUConnectionToWebP
     instance->initialize(WTF::move(attributes));
     return instance;
 }
+
+#if ENABLE(VIDEO)
+void RemoteGraphicsContextGL::copyDMABufToTexture(std::optional<WebCore::DMABufBufferAttributes>&& attributes, PlatformGLObject outputTexture, uint32_t outputTarget, int32_t level, uint32_t internalFormat, uint32_t format, uint32_t type, bool premultiplyAlpha, bool flipY, CompletionHandler<void(bool)>&& completionHandler)
+{
+    if (!attributes) [[unlikely]] {
+        completionHandler(false);
+        return;
+    }
+
+    auto context = protectedContext();
+    if (!context->makeContextCurrent()) {
+        completionHandler(false);
+        return;
+    }
+
+    static uint64_t id = 0;
+    auto buffer = WebCore::DMABufBuffer::create(id++, WTF::move(*attributes));
+
+    OptionSet<WebCore::TextureMapperFlags> flags;
+    if (flipY)
+        flags.add(WebCore::TextureMapperFlags::ShouldFlipTexture);
+    if (premultiplyAlpha)
+        flags.add(WebCore::TextureMapperFlags::ShouldPremultiply);
+
+    UnixFileDescriptor fenceFD;
+    m_context->prepareForDisplayWithFinishedSignal([this, &fenceFD] {
+        fenceFD = m_context->createExportedFence();
+        if (!fenceFD)
+            m_context->flush();
+    });
+
+    auto layer = WebCore::CoordinatedPlatformLayerBufferDMABuf::create(WTF::move(buffer), flags, WTF::move(fenceFD));
+    if (!layer) {
+        completionHandler(false);
+        return;
+    }
+
+    completionHandler(layer->copyToTexture(outputTexture, outputTarget, level, internalFormat, format, type));
+    return;
+}
+#endif // ENABLE(VIDEO)
 
 } // namespace WebKit
 

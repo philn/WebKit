@@ -356,13 +356,13 @@ public:
     EnumSet<GCGLExtension> knownActiveExtensions() const;
     EnumSet<GCGLExtension> requestableExtensions() const;
 
+    // Called once by all the public entry points that eventually call OpenGL.
+    [[nodiscard]] bool makeContextCurrent();
+
 protected:
     GraphicsContextGLANGLE(GraphicsContextGLAttributes);
 
     bool updateErrors();
-
-    // Called once by all the public entry points that eventually call OpenGL.
-    [[nodiscard]] bool makeContextCurrent();
 
     // Initializes the instance. Returns false if the instance should not be used.
     bool initialize();

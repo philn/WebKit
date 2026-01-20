@@ -51,6 +51,10 @@
 #include <WebCore/MediaPlayer.h>
 #endif
 
+#if ENABLE(VIDEO) && USE(GSTREAMER)
+#include <WebCore/VideoFrameGStreamer.h>
+#endif
+
 namespace WebKit {
 
 using namespace WebCore;
@@ -226,10 +230,9 @@ RefPtr<RemoteVideoFrameObjectHeapProxy> RemoteGraphicsContextGLProxy::protectedV
 
 bool RemoteGraphicsContextGLProxy::copyTextureFromVideoFrame(WebCore::VideoFrame& videoFrame, PlatformGLObject texture, GCGLenum target, GCGLint level, GCGLenum internalFormat, GCGLenum format, GCGLenum type, bool premultiplyAlpha, bool flipY)
 {
-#if PLATFORM(COCOA)
     if (isContextLost())
         return false;
-
+#if PLATFORM(COCOA)
     auto sharedVideoFrame = m_sharedVideoFrameWriter.write(videoFrame, [this, protectedThis = Ref { *this }](auto& semaphore) {
         auto sendResult = send(Messages::RemoteGraphicsContextGL::SetSharedVideoFrameSemaphore { semaphore });
         if (sendResult != IPC::Error::NoError)
@@ -245,6 +248,23 @@ bool RemoteGraphicsContextGLProxy::copyTextureFromVideoFrame(WebCore::VideoFrame
     auto sendResult = sendSync(Messages::RemoteGraphicsContextGL::CopyTextureFromVideoFrame(WTF::move(*sharedVideoFrame), texture, target, level, internalFormat, format, type, premultiplyAlpha, flipY));
     if (!sendResult.succeeded()) {
         markContextLost();
+        return false;
+    }
+
+    auto [result] = sendResult.takeReply();
+    return result;
+#elif USE(GSTREAMER)
+    auto& gstFrame = downcast<WebCore::VideoFrameGStreamer>(videoFrame);
+    auto dmaBuf = gstFrame.getDMABuf();
+    if (!dmaBuf) {
+        return false;
+    }
+    auto attributes = dmaBuf->takeAttributes();
+    if (!attributes) {
+        return false;
+    }
+    auto sendResult = sendSync(Messages::RemoteGraphicsContextGL::CopyDMABufToTexture(WTF::move(attributes), texture, target, level, internalFormat, format, type, premultiplyAlpha, flipY));
+    if (!sendResult.succeeded()) {
         return false;
     }
 

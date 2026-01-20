@@ -38,6 +38,7 @@
 #include <epoxy/gl.h>
 #include <wtf/HashMap.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/Scope.h>
 
 namespace WebCore {
 
@@ -66,7 +67,7 @@ CoordinatedPlatformLayerBufferDMABuf::CoordinatedPlatformLayerBufferDMABuf(Ref<D
 
 CoordinatedPlatformLayerBufferDMABuf::~CoordinatedPlatformLayerBufferDMABuf() = default;
 
-static RefPtr<BitmapTexture> importToTexture(const IntSize& size, const IntSize& subsampling, uint32_t fourcc, const Vector<int>& fds, const Vector<uint32_t>& offsets, const Vector<uint32_t>& strides, uint64_t modifier, OptionSet<BitmapTexture::Flags> textureFlags, TextureMapper& textureMapper)
+static EGLImage importToEGLImage(const IntSize& size, const IntSize& subsampling, uint32_t fourcc, const Vector<int>& fds, const Vector<uint32_t>& offsets, const Vector<uint32_t>& strides, uint64_t modifier)
 {
     auto& display = PlatformDisplay::sharedDisplay();
     Vector<EGLAttrib> attributes = {
@@ -105,13 +106,20 @@ static RefPtr<BitmapTexture> importToTexture(const IntSize& size, const IntSize&
 
     attributes.append(EGL_NONE);
 
-    auto image = display.createEGLImage(EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, nullptr, attributes);
+    return display.createEGLImage(EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, nullptr, attributes);
+}
+
+static RefPtr<BitmapTexture> importToTexture(const IntSize& size, const IntSize& subsampling, uint32_t fourcc, const Vector<int>& fds, const Vector<uint32_t>& offsets, const Vector<uint32_t>& strides, uint64_t modifier, OptionSet<BitmapTexture::Flags> textureFlags, std::optional<TextureMapper*> textureMapper)
+{
+    auto image = importToEGLImage(size, subsampling, fourcc, fds, offsets, strides, modifier);
     if (!image)
         return nullptr;
 
-    auto texture = textureMapper.createTextureForImage(image, textureFlags);
-    display.destroyEGLImage(image);
-    return texture;
+    auto scopeExit = WTF::makeScopeExit([&] {
+        auto& display = PlatformDisplay::sharedDisplay();
+        display.destroyEGLImage(image);
+    });
+    return textureMapper ? textureMapper.value()->createTextureForImage(image, textureFlags) : BitmapTexture::create(image, textureFlags);
 }
 
 static bool formatIsYUV(uint32_t fourcc)
@@ -193,7 +201,7 @@ static const HashMap<uint32_t, Vector<YUVPlaneInfo>>& yuvFormatPlaneInfo()
     return yuvFormatsMap;
 }
 
-std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferDMABuf::importYUV(TextureMapper& textureMapper) const
+std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferDMABuf::importYUV(std::optional<TextureMapper*> textureMapper) const
 {
     OptionSet<BitmapTexture::Flags> textureFlags;
     if (m_flags.contains(TextureMapperFlags::ShouldBlend))
@@ -252,7 +260,7 @@ std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferDM
     return CoordinatedPlatformLayerBufferYUV::create(numberOfPlanes, WTF::move(textures), WTF::move(yuvPlane), WTF::move(yuvPlaneOffset), yuvToRgbColorSpace, transferFunction, m_size, m_flags, nullptr);
 }
 
-std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferDMABuf::importDMABuf(TextureMapper& textureMapper) const
+std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferDMABuf::importDMABuf(std::optional<TextureMapper*> textureMapper) const
 {
     const auto& attributes = m_dmabuf->attributes();
     if (formatIsYUV(attributes.fourcc))
@@ -278,10 +286,23 @@ void CoordinatedPlatformLayerBufferDMABuf::paintToTextureMapper(TextureMapper& t
     }
 
     if (!m_dmabuf->buffer())
-        m_dmabuf->setBuffer(importDMABuf(textureMapper));
+        m_dmabuf->setBuffer(importDMABuf(&textureMapper));
 
     if (auto* buffer = m_dmabuf->buffer())
         buffer->paintToTextureMapper(textureMapper, targetRect, modelViewMatrix, opacity);
+}
+
+bool CoordinatedPlatformLayerBufferDMABuf::copyToTexture(PlatformGLObject texture, GCGLenum target, GCGLint level, GCGLenum internalFormat, GCGLenum format, GCGLenum type)
+{
+    waitForContentsIfNeeded();
+
+    if (!m_dmabuf->buffer())
+        m_dmabuf->setBuffer(importDMABuf({ }));
+
+    if (auto* buffer = m_dmabuf->buffer())
+        return buffer->copyToTexture(texture, target, level, internalFormat, format, type);
+
+    return false;
 }
 
 } // namespace WebCore

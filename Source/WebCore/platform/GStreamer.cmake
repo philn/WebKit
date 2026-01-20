@@ -34,6 +34,16 @@ if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO)
         platform/mediastream/libwebrtc/gstreamer/LibWebRTCProviderGStreamer.h
     )
 
+    if (ENABLE_VIDEO)
+        list(APPEND WebCore_PRIVATE_FRAMEWORK_HEADERS
+            platform/VideoFrameMetadata.h
+            platform/VideoFrameTimeMetadata.h
+            platform/graphics/gstreamer/VideoFrameContentHint.h
+            platform/graphics/gstreamer/VideoFrameGStreamer.h
+            platform/graphics/gstreamer/VideoFrameMetadataGStreamer.h
+        )
+    endif ()
+
     if (ENABLE_MEDIA_TELEMETRY)
       list(APPEND WebCore_SOURCES
         platform/graphics/gstreamer/telemetry/MediaTelemetry.cpp

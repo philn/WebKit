@@ -27,6 +27,7 @@
 
 #if USE(COORDINATED_GRAPHICS) && USE(GBM)
 #include "CoordinatedPlatformLayerBuffer.h"
+#include "GraphicsTypesGL.h"
 #include <wtf/unix/UnixFileDescriptor.h>
 
 namespace WebCore {
@@ -42,11 +43,13 @@ public:
     CoordinatedPlatformLayerBufferDMABuf(Ref<DMABufBuffer>&&, OptionSet<TextureMapperFlags>, WTF::UnixFileDescriptor&&);
     virtual ~CoordinatedPlatformLayerBufferDMABuf();
 
+    bool copyToTexture(PlatformGLObject, GCGLenum target, GCGLint level, GCGLenum internalFormat, GCGLenum format, GCGLenum type) final;
+
 private:
     void paintToTextureMapper(TextureMapper&, const FloatRect&, const TransformationMatrix& modelViewMatrix = TransformationMatrix(), float opacity = 1.0) override;
 
-    std::unique_ptr<CoordinatedPlatformLayerBuffer> importDMABuf(TextureMapper&) const;
-    std::unique_ptr<CoordinatedPlatformLayerBuffer> importYUV(TextureMapper&) const;
+    std::unique_ptr<CoordinatedPlatformLayerBuffer> importDMABuf(std::optional<TextureMapper*>) const;
+    std::unique_ptr<CoordinatedPlatformLayerBuffer> importYUV(std::optional<TextureMapper*>) const;
 
     const Ref<DMABufBuffer> m_dmabuf;
     WTF::UnixFileDescriptor m_fenceFD;
