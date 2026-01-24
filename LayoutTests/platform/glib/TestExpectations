@@ -2782,6 +2782,40 @@ imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-addIceCandidate-timing.
 imported/w3c/web-platform-tests/webrtc/RTCRtpParameters-encodings.html [ Pass ]
 imported/w3c/web-platform-tests/webrtc/RTCRtpParameters-headerExtensions.html [ Pass ]
 imported/w3c/web-platform-tests/webrtc/RTCRtpParameters-rtcp.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/simplecall.https.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/toJSON.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-add-track-no-deadlock.https.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-addIceCandidate-connectionSetup.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-addTransceiver.https.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-candidate-in-sdp.https.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-canTrickleIceCandidates.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-constructor.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-createAnswer.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-createOffer.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-description-attributes-timing.https.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-GC.https.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-getStats.https.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-getTransceivers.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-onsignalingstatechanged.https.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-plan-b-is-not-supported.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-relay-canvas.https.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-remote-track-properties.https.html [ Pass ]
+
+# TODO: clean-up endpoint changes:
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-setLocalDescription-answer.html [ Pass ]
+
+# Crashes:
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-setLocalDescription-offer.html [ Pass ]
+
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-setLocalDescription-pranswer.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-setLocalDescription-rollback.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-setLocalDescription.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-setRemoteDescription-answer.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-setRemoteDescription-nomsid.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-setRemoteDescription-offer.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-setRemoteDescription-pranswer.html [ Pass ]
+imported/w3c/web-platform-tests/webrtc/RTCPeerConnection-setRemoteDescription-replaceTrack.https.html [ Pass ]
+
 
 webkit.org/b/305972 imported/w3c/web-platform-tests/feature-policy/feature-policy-frame-policy-allowed-for-self.https.sub.html [ Pass Crash ]
 webkit.org/b/305972 imported/w3c/web-platform-tests/feature-policy/feature-policy-frame-policy-allowed-for-some-override.https.sub.html [ Pass Crash ]

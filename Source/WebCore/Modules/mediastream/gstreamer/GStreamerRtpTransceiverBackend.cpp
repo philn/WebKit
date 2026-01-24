@@ -86,7 +86,7 @@ std::optional<RTCRtpTransceiverDirection> GStreamerRtpTransceiverBackend::curren
     GstWebRTCRTPTransceiverDirection gstDirection;
     g_object_get(m_rtcTransceiver.get(), "current-direction", &gstDirection, nullptr);
     if (!gstDirection)
-        return RTCRtpTransceiverDirection::Inactive;
+        return { };
     return toRTCRtpTransceiverDirection(gstDirection);
 }
 
