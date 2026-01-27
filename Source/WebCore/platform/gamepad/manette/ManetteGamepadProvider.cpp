@@ -179,10 +179,21 @@ std::unique_ptr<ManetteGamepad> ManetteGamepadProvider::removeGamepadForDevice(M
     return result;
 }
 
-void ManetteGamepadProvider::playEffect(unsigned, const String&, GamepadHapticEffectType, const GamepadEffectParameters&, CompletionHandler<void(bool)>&& completionHandler)
+void ManetteGamepadProvider::playEffect(unsigned index, const String&, GamepadHapticEffectType effectType, const GamepadEffectParameters& parameters, CompletionHandler<void(bool)>&& completionHandler)
 {
     // Not supported by this provider.
-    completionHandler(false);
+    if (index >= m_gamepadVector.size()) {
+        completionHandler(false);
+        return;
+    }
+
+    auto gamepad = m_gamepadVector[index];
+    if (!gamepad) {
+        completionHandler(false);
+        return;
+    }
+
+    gamepad->playEffect(effectType, parameters, WTF::move(completionHandler));
 }
 
 void ManetteGamepadProvider::stopEffects(unsigned, const String&, CompletionHandler<void()>&& completionHandler)

@@ -28,6 +28,8 @@
 
 #if ENABLE(GAMEPAD) && OS(LINUX)
 
+#include "GamepadEffectParameters.h"
+#include "GamepadHapticEffectType.h"
 #include "ManetteGamepadProvider.h"
 #include <linux/input-event-codes.h>
 #include <wtf/HexNumber.h>
@@ -139,6 +141,8 @@ ManetteGamepad::ManetteGamepad(ManetteDevice* device, unsigned index)
 {
     ASSERT(index < 4);
 
+    m_supportedEffectTypes.add(GamepadHapticEffectType::DualRumble);
+
     m_connectTime = m_lastUpdateTime = MonotonicTime::now();
 
     m_id = String::fromUTF8(manette_device_get_name(m_device.get()));
@@ -176,6 +180,25 @@ void ManetteGamepad::absoluteAxisChanged(ManetteDevice*, StandardGamepadAxis axi
     m_axisValues[static_cast<int>(axis)].setValue(value);
 
     ManetteGamepadProvider::singleton().gamepadHadInput(*this, ManetteGamepadProvider::ShouldMakeGamepadsVisible::Yes);
+}
+
+void ManetteGamepad::playEffect(GamepadHapticEffectType effectType, const GamepadEffectParameters& parameters, CompletionHandler<void(bool)>&& completionHandler)
+{
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+    if (!manette_device_has_rumble(m_device.get())) {
+        completionHandler(false);
+        return;
+    }
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+    if (effectType != GamepadHapticEffectType::DualRumble) {
+        completionHandler(false);
+        return;
+    }
+    WTFLogAlways("%s line %d strongMagnitude: %f, weakMagnitude: %f, duration: %f", __PRETTY_FUNCTION__, __LINE__, parameters.strongMagnitude, parameters.weakMagnitude, parameters.duration);
+
+    auto result = manette_device_rumble(m_device.get(), parameters.strongMagnitude, parameters.weakMagnitude, static_cast<uint16_t>(parameters.duration));
+    WTFLogAlways("%s line %d result: %d", __PRETTY_FUNCTION__, __LINE__, result);
+    completionHandler(result);
 }
 
 } // namespace WebCore

@@ -75,6 +75,8 @@ public:
     const Vector<SharedGamepadValue>& axisValues() const final { return m_axisValues; }
     const Vector<SharedGamepadValue>& buttonValues() const final { return m_buttonValues; }
 
+    void playEffect(GamepadHapticEffectType, const GamepadEffectParameters&, CompletionHandler<void(bool)>&&) final;
+
     void absoluteAxisChanged(ManetteDevice*, StandardGamepadAxis, double value);
     void buttonPressedOrReleased(ManetteDevice*, StandardGamepadButton, bool pressed);
 
