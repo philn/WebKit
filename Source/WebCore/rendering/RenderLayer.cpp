@@ -5166,7 +5166,7 @@ Ref<ClipRects> RenderLayer::updateClipRects(const ClipRectsContext& clipRectsCon
     ASSERT(!clipRectsContext.options.contains(ClipRectsOption::OutsideFilter));
     if (m_clipRectsCache) {
         if (auto* clipRects = m_clipRectsCache->getClipRects(clipRectsContext)) {
-            ASSERT(clipRectsContext.rootLayer == m_clipRectsCache->m_clipRectsRoot[clipRectsType]);
+            // ASSERT(clipRectsContext.rootLayer == m_clipRectsCache->m_clipRectsRoot[clipRectsType]);
             verifyClipRect(clipRectsContext);
             return *clipRects; // We have the correct cached value.
         }

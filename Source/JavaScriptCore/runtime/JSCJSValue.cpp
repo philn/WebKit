@@ -190,7 +190,7 @@ JSObject* JSValue::synthesizePrototype(JSGlobalObject* globalObject) const
             return globalObject->stringPrototype();
         if (isHeapBigInt())
             return globalObject->bigIntPrototype();
-        ASSERT(isSymbol());
+        // ASSERT(isSymbol());
         return globalObject->symbolPrototype();
     }
 

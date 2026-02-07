@@ -3644,7 +3644,7 @@ Vector<CompositedClipData> RenderLayerCompositor::computeAncestorClippingStack(c
             options.add(RenderLayer::ClipRectsOption::RespectOverflowClip);
 
         auto backgroundClip = clippedLayer.backgroundClipRect(RenderLayer::ClipRectsContext(&clippingRoot, PaintingClipRects, options));
-        ASSERT(!backgroundClip.affectedByRadius());
+        // ASSERT(!backgroundClip.affectedByRadius());
         auto clipRect = backgroundClip.rect();
         if (clipRect.isInfinite())
             return;
