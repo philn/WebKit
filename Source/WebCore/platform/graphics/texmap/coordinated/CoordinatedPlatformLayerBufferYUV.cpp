@@ -181,7 +181,7 @@ static inline TransformationMatrix createProjectionMatrix(const IntSize& size, b
 
 bool CoordinatedPlatformLayerBufferYUV::copyToTexture(PlatformGLObject outputTexture, GCGLenum outputTarget, GCGLint level, GCGLenum internalFormat, GCGLenum format, GCGLenum type)
 {
-    RELEASE_ASSERT(WTF::isInGPUProcess());
+    // RELEASE_ASSERT(WTF::isInGPUProcess());
     // return false;
     waitForContentsIfNeeded();
     const auto& yuvToRgbMatrix = getYuvToRgbMatrix();

@@ -47,6 +47,7 @@
 #endif
 
 #if USE(COORDINATED_GRAPHICS)
+#include "CoordinatedPlatformLayerBufferDMABuf.h"
 #include "CoordinatedPlatformLayerBufferRGB.h"
 #include "GraphicsLayerContentsDisplayDelegateCoordinated.h"
 #include "TextureMapperFlags.h"
@@ -207,12 +208,31 @@ RefPtr<GraphicsLayerContentsDisplayDelegate> GraphicsContextGLTextureMapperANGLE
 }
 
 #if ENABLE(VIDEO)
-bool GraphicsContextGLTextureMapperANGLE::copyTextureFromVideoFrame(VideoFrame&, PlatformGLObject, GCGLenum, GCGLint, GCGLenum, GCGLenum, GCGLenum, bool, bool)
+bool GraphicsContextGLTextureMapperANGLE::copyTextureFromVideoFrame(VideoFrame& frame, PlatformGLObject outputTexture, GCGLenum outputTarget, GCGLint level, GCGLenum internalFormat, GCGLenum format, GCGLenum type, bool premultiplyAlpha, bool flipY)
 {
-    // FIXME: Implement copy-free (or at least, software copy-free) texture transfer.
+#if USE(GSTREAMER)
+    auto& gstFrame = downcast<VideoFrameGStreamer>(frame);
+    auto buffer = gstFrame.getDMABuf();
+    if (!buffer)
+        return false;
+
+    OptionSet<TextureMapperFlags> flags;
+    if (flipY)
+        flags.add(TextureMapperFlags::ShouldFlipTexture);
+    if (premultiplyAlpha)
+        flags.add(TextureMapperFlags::ShouldPremultiply);
+
+    auto fence = GLFence::create(PlatformDisplay::sharedDisplay().glDisplay());
+    auto layer = CoordinatedPlatformLayerBufferDMABuf::create(buffer.releaseNonNull(), flags, WTF::move(fence));
+    if (!layer)
+        return false;
+
+    layer->copyToTexture(outputTexture, outputTarget, level, internalFormat, format, type);
+    return true;
+#endif // USE(GSTREAMER)
     return false;
 }
-#endif
+#endif // ENABLE(VIDEO)
 
 #if ENABLE(MEDIA_STREAM) || ENABLE(WEB_CODECS)
 RefPtr<VideoFrame> GraphicsContextGLTextureMapperANGLE::surfaceBufferToVideoFrame(SurfaceBuffer)
@@ -224,10 +244,10 @@ RefPtr<VideoFrame> GraphicsContextGLTextureMapperANGLE::surfaceBufferToVideoFram
         options.isMirrored = true;
         return VideoFrameGStreamer::createFromPixelBuffer(pixelBuffer.releaseNonNull(), { }, 30, options);
     }
-#endif
+#endif // USE(GSTREAMER)
     return nullptr;
 }
-#endif
+#endif // ENABLE(MEDIA_STREAM) || ENABLE(WEB_CODECS)
 
 bool GraphicsContextGLTextureMapperANGLE::platformInitializeContext()
 {
