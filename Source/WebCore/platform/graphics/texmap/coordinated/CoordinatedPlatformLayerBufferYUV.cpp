@@ -25,6 +25,7 @@
 
 #include "config.h"
 #include "CoordinatedPlatformLayerBufferYUV.h"
+#include <epoxy/egl_generated.h>
 
 #if USE(COORDINATED_GRAPHICS)
 #include "GLContext.h"
@@ -183,6 +184,7 @@ bool CoordinatedPlatformLayerBufferYUV::copyToTexture(PlatformGLObject outputTex
 {
     // RELEASE_ASSERT(WTF::isInGPUProcess());
     // return false;
+    gst_printerrln("internalFormat: 0x%X format: 0x%X type: 0x%X", internalFormat, format, type);
     waitForContentsIfNeeded();
     const auto& yuvToRgbMatrix = getYuvToRgbMatrix();
 
@@ -244,6 +246,21 @@ bool CoordinatedPlatformLayerBufferYUV::copyToTexture(PlatformGLObject outputTex
     glViewport(0, 0, m_size.width(), m_size.height());
     LOG_GL_ERR();
 
+    // Set proper parameters to the output texture and allocate uninitialized memory for it.
+    glBindTexture(GL_TEXTURE_2D, outputTexture);
+    LOG_GL_ERR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    LOG_GL_ERR();
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    LOG_GL_ERR();
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    LOG_GL_ERR();
+    glTexImage2D(GL_TEXTURE_2D, level, internalFormat, m_size.width(), m_size.height(), 0, format, type, nullptr);
+    LOG_GL_ERR();
+
+    // glBindTexture(outputTarget, 0);
+    // LOG_GL_ERR();
+
     static const GLfloat vertices[] = { 0, 0, 1, 0, 1, 1, 0, 1 };
     glGenBuffers(1, &m_vbo);
     glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
@@ -251,17 +268,6 @@ bool CoordinatedPlatformLayerBufferYUV::copyToTexture(PlatformGLObject outputTex
     LOG_GL_ERR();
 
     glGenFramebuffers(1, &m_framebuffer);
-    LOG_GL_ERR();
-
-    // Set proper parameters to the output texture and allocate uninitialized memory for it.
-    glBindTexture(outputTarget, outputTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(outputTarget, level, internalFormat, m_size.width(), m_size.height(), 0, format, type, nullptr);
-    LOG_GL_ERR();
-
-    glBindTexture(outputTarget, 0);
     LOG_GL_ERR();
 
     // Bind framebuffer to paint and attach the destination texture to it.
