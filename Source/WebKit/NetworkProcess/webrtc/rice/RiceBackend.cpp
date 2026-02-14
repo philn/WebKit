@@ -27,6 +27,7 @@
 #include "RiceBackendProxyMessages.h"
 
 #include <WebCore/RiceUtilities.h>
+#include <WebCore/RiceVersioning.h>
 #include <rice-io.h>
 #include <wtf/CompletionHandler.h>
 #include <wtf/StdLibExtras.h>
@@ -129,7 +130,16 @@ RiceBackend::RiceBackend(NetworkConnectionToWebProcess& connection)
     m_runLoop = RunLoop::create(ASCIILiteral::fromLiteralUnsafe(threadName.ascii().data()));
 }
 
-RiceBackend::~RiceBackend() = default;
+RiceBackend::~RiceBackend()
+{
+    for (auto& socketData : m_sockets.values()) {
+        GRefPtr source = socketData.source;
+        if (!source) [[unlikely]]
+            continue;
+
+        g_source_destroy(source.get());
+    }
+}
 
 IPC::Connection* RiceBackend::messageSenderConnection() const
 {
@@ -203,6 +213,7 @@ void RiceBackend::resolveAddress(const String& address, CompletionHandler<void(E
                     return;
                 }
 
+                // FIXME: We should use all addresses, not only the first one.
                 GUniquePtr<char> address(g_inet_address_to_string(G_INET_ADDRESS(addresses->data)));
                 callOnMainRunLoopAndWait([data, address = WTF::move(address)] {
                     data->callback(String::fromUTF8(address.get()));
@@ -215,6 +226,23 @@ void RiceBackend::resolveAddress(const String& address, CompletionHandler<void(E
     }), data, reinterpret_cast<GDestroyNotify>(destroyResolveAddressData));
 }
 
+void RiceBackend::resolveAddressSync(const String& address, CompletionHandler<void(Expected<String, WebCore::ExceptionData>&&)>&& completionHandler)
+{
+    auto resolver = adoptGRef(g_resolver_get_default());
+    GUniqueOutPtr<GError> error;
+    GList* addresses = g_resolver_lookup_by_name(resolver.get(), address.utf8().data(), nullptr, &error.outPtr());
+    if (!addresses) {
+        auto message = makeString("Unable to resolve address: "_s, String::fromUTF8(error->message));
+        completionHandler(makeUnexpected(ExceptionData { ExceptionCode::NetworkError, message }));
+        return;
+    }
+
+    // FIXME: We should use all addresses, not only the first one.
+    GUniquePtr<char> result(g_inet_address_to_string(G_INET_ADDRESS(addresses->data)));
+    completionHandler(String::fromUTF8(result.get()));
+    g_resolver_free_addresses(addresses);
+}
+
 void RiceBackend::sendData(unsigned streamId, WebCore::RTCIceProtocol protocol, String from, String to, WebCore::SharedMemory::Handle&& handle)
 {
     auto sockets = getSocketsForStream(streamId);
@@ -225,12 +253,15 @@ void RiceBackend::sendData(unsigned streamId, WebCore::RTCIceProtocol protocol, 
     const auto riceTo = ensureRiceAddressFromCache(to);
 
     RiceTransportType transport;
+    ASCIILiteral transportString;
     switch (protocol) {
     case RTCIceProtocol::Udp:
         transport = RICE_TRANSPORT_TYPE_UDP;
+        transportString = "UDP"_s;
         break;
     case RTCIceProtocol::Tcp:
         transport = RICE_TRANSPORT_TYPE_TCP;
+        transportString = "TCP"_s;
         break;
     };
 
@@ -238,10 +269,12 @@ void RiceBackend::sendData(unsigned streamId, WebCore::RTCIceProtocol protocol, 
     if (!sharedMemory)
         return;
 
+    gst_printerrln("Sending %zu bytes from %s to %s (protocol: %s)", sharedMemory->size(), from.ascii().data(), to.ascii().data(), transportString.characters());
     auto buffer = sharedMemory->createSharedBuffer(sharedMemory->size());
+    // gst_util_dump_mem(buffer->span().data(), buffer->size());
     auto result = rice_sockets_send(sockets.get(), transport, riceFrom, riceTo, buffer->span().data(), buffer->size());
     if (result != RICE_ERROR_SUCCESS)
-        g_printerr("Failed to send data to rice sockets, error code: %d\n", static_cast<uint32_t>(result));
+        g_printerr("Failed to send data, error code: %d\n", static_cast<uint32_t>(result));
 }
 
 void RiceBackend::finalizeStream(unsigned streamId)
@@ -262,9 +295,10 @@ void RiceBackend::finalizeStream(unsigned streamId)
         g_source_destroy(data.source.get());
 }
 
-void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identifier, unsigned streamId, GatherSocketAddressesCallback&& completionHandler)
+void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identifier, unsigned streamId, unsigned minRtpPort, unsigned maxRtpPort, GatherSocketAddressesCallback&& completionHandler)
 {
-    HashMap<std::pair<String, RTCIceProtocol>, String> result;
+    HashMap<std::pair<String, RTCIceProtocol>, String> gatheredAddresses;
+    Vector<std::pair<String, RTCIceProtocol>> turnAddresses;
 
     auto recvData2 = createRecvSourceData();
     recvData2->backend = this;
@@ -284,6 +318,10 @@ void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identif
     auto interfaces = rice_interfaces(&totalInterfaces);
     std::span<RiceAddress*> interfaceAddresses = WTF::unsafeMakeSpan(interfaces, totalInterfaces);
 
+    // TODO: Handle minRtpPort and maxRtpPort.
+    UNUSED_PARAM(minRtpPort);
+    UNUSED_PARAM(maxRtpPort);
+
     for (size_t i = 0; i < totalInterfaces; i++) {
         auto ipAddress = riceAddressToString(interfaceAddresses[i], false);
         // mDNS address, not supported yet.
@@ -291,9 +329,38 @@ void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identif
         if (auto socket = rice_udp_socket_new(interfaceAddresses[i])) {
             GUniquePtr<RiceAddress> localAddress(rice_udp_socket_local_addr(socket));
 
-            result.add({ riceAddressToString(localAddress.get()).convertToLowercaseWithoutLocale(), WebCore::RTCIceProtocol::Udp }, name);
+            gatheredAddresses.add({ riceAddressToString(localAddress.get()).convertToLowercaseWithoutLocale(), WebCore::RTCIceProtocol::Udp }, name);
+            g_printerr(">>>> Gathered UDP socket: %s\n", riceAddressToString(localAddress.get()).utf8().data());
             udpAddresses.append(WTF::move(localAddress));
             rice_sockets_add_udp(sockets.get(), socket);
+        }
+
+        if (auto socket = rice_udp_socket_new(interfaceAddresses[i])) {
+            GUniquePtr<RiceAddress> localAddress(rice_udp_socket_local_addr(socket));
+
+            g_printerr(">>>> Gathered TURN UDP socket: %s\n", riceAddressToString(localAddress.get()).utf8().data());
+            turnAddresses.append({ riceAddressToString(localAddress.get()).convertToLowercaseWithoutLocale(), WebCore::RTCIceProtocol::Udp });
+            udpAddresses.append(WTF::move(localAddress));
+            rice_sockets_add_udp(sockets.get(), socket);
+        }
+        {
+            auto recvData = createRecvSourceData();
+            recvData->backend = this;
+            recvData->streamId = streamId;
+            auto tcpListener = adoptGRef(rice_tcp_listen(interfaceAddresses[i], [](RiceTcpSocket* socket, void* userData) {
+                auto recvData = reinterpret_cast<RecvSourceData*>(userData);
+                RefPtr backend = recvData->backend.get();
+                if (!backend)
+                    return;
+                auto sockets = backend->getSocketsForStream(recvData->streamId);
+                rice_sockets_add_tcp(sockets.get(), socket);
+                backend->configureSocketBufferSizes();
+            }, recvData, reinterpret_cast<RiceIoDestroy>(destroyRecvSourceData)));
+
+            GUniquePtr<RiceAddress> localAddress(rice_tcp_listener_local_addr(tcpListener.get()));
+            g_printerr(">>>> Gathered TURN TCP socket listener on: %s\n", riceAddressToString(localAddress.get()).utf8().data());
+            turnAddresses.append({ riceAddressToString(localAddress.get()).convertToLowercaseWithoutLocale(), WebCore::RTCIceProtocol::Tcp });
+            m_tcpListeners.append(WTF::move(tcpListener));
         }
 
         auto recvData = createRecvSourceData();
@@ -306,10 +373,12 @@ void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identif
                 return;
             auto sockets = backend->getSocketsForStream(recvData->streamId);
             rice_sockets_add_tcp(sockets.get(), socket);
+            backend->configureSocketBufferSizes();
         }, recvData, reinterpret_cast<RiceIoDestroy>(destroyRecvSourceData)));
 
         GUniquePtr<RiceAddress> tcpListenerLocalAddress(rice_tcp_listener_local_addr(tcpListener.get()));
-        result.add({ riceAddressToString(tcpListenerLocalAddress.get()).convertToLowercaseWithoutLocale(), WebCore::RTCIceProtocol::Tcp }, name);
+        g_printerr(">>>> Gathered TCP socket listener: %s\n", riceAddressToString(tcpListenerLocalAddress.get()).utf8().data());
+        gatheredAddresses.add({ riceAddressToString(tcpListenerLocalAddress.get()).convertToLowercaseWithoutLocale(), WebCore::RTCIceProtocol::Tcp }, name);
         m_tcpListeners.append(WTF::move(tcpListener));
     }
 
@@ -328,9 +397,11 @@ void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identif
         RefPtr backend = sourceData->backend.get();
         if (!backend)
             return G_SOURCE_REMOVE;
+
         auto sockets = backend->getSocketsForStream(sourceData->streamId);
         if (!sockets)
             return G_SOURCE_CONTINUE;
+
         while (true) {
             rice_sockets_recv(sockets.get(), data, 16384, &recv);
             switch (recv.tag) {
@@ -340,15 +411,7 @@ void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identif
             case RICE_IO_RECV_DATA: {
                 auto from = riceAddressToString(recv.data.from);
                 auto to = riceAddressToString(recv.data.to);
-                RTCIceProtocol protocol;
-                switch (recv.data.transport) {
-                case RICE_TRANSPORT_TYPE_UDP:
-                    protocol = RTCIceProtocol::Udp;
-                    break;
-                case RICE_TRANSPORT_TYPE_TCP:
-                    protocol = RTCIceProtocol::Tcp;
-                    break;
-                };
+                auto protocol = toRTCIceProtocol(recv.data.transport);
                 auto handle = SharedMemoryHandle::createCopy(unsafeMakeSpan(data, recv.data.len), SharedMemoryProtection::ReadOnly);
                 if (!handle) [[unlikely]]
                     break;
@@ -356,7 +419,7 @@ void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identif
                 break;
             }
             case RICE_IO_RECV_CLOSED:
-                // TODO
+                // This enum value is currently unused in rice-io.
                 break;
             }
             rice_recv_clear(&recv);
@@ -369,7 +432,7 @@ void RiceBackend::gatherSocketAddresses(ScriptExecutionContextIdentifier identif
     m_sockets.add(streamId, SocketData { WTF::move(sockets), WTF::move(source) });
     m_udpAddresses.add(streamId, WTF::move(udpAddresses));
 
-    completionHandler(WTF::move(result));
+    completionHandler({ WTF::move(gatheredAddresses), WTF::move(turnAddresses) });
 }
 
 const RiceAddress* RiceBackend::ensureRiceAddressFromCache(const String& address)
@@ -391,6 +454,81 @@ void RiceBackend::setSocketTypeOfService(unsigned streamId, unsigned value)
 #else
     UNUSED_PARAM(streamId);
     UNUSED_PARAM(value);
+#endif
+}
+
+struct SocketAllocationData {
+    ThreadSafeWeakPtr<RiceBackend> backend;
+    unsigned streamId;
+    unsigned componentId;
+    WebCore::RTCIceProtocol protocol;
+    String from;
+    String to;
+};
+WEBKIT_DEFINE_ASYNC_DATA_STRUCT(SocketAllocationData);
+
+void RiceBackend::allocateSocket(unsigned streamId, unsigned componentId, WebCore::RTCIceProtocol protocol, String from, String to)
+{
+    if (protocol == WebCore::RTCIceProtocol::Udp)
+        return;
+
+    g_printerr(">> Allocating socket for stream %u component %u protocol %d from %s to %s\n", streamId, componentId, protocol, from.ascii().data(), to.ascii().data());
+
+    GUniquePtr<RiceAddress> remoteAddress(riceAddressFromString(to));
+
+    auto data = createSocketAllocationData();
+    data->backend = this;
+    data->streamId = streamId;
+    data->componentId = componentId;
+    data->protocol = protocol;
+    data->from = WTF::move(from);
+    data->to = WTF::move(to);
+
+    rice_tcp_connect(remoteAddress.get(), [](auto socket, void* userData) {
+        auto data = reinterpret_cast<SocketAllocationData*>(userData);
+        RefPtr backend = data->backend.get();
+        if (!backend) {
+            destroySocketAllocationData(data);
+            return;
+        }
+        auto sockets = backend->getSocketsForStream(data->streamId);
+        rice_sockets_add_tcp(sockets.get(), socket);
+        backend->configureSocketBufferSizes();
+
+        GUniquePtr<RiceAddress> localAddress(rice_tcp_socket_local_addr(socket));
+        auto localAddressString = riceAddressToString(localAddress.get());
+        GUniquePtr<RiceAddress> remoteAddress(rice_tcp_socket_remote_addr(socket));
+        backend->m_localTcpAddresses.add(data->streamId, std::make_pair(WTF::move(localAddress), WTF::move(remoteAddress)));
+        callOnMainRunLoopAndWait([&, address = WTF::move(localAddressString)] mutable {
+            if (RefPtr connection = backend->messageSenderConnection()) {
+                g_printerr(">> Socket from %s to %s successfully allocated: %s\n", data->from.utf8().data(), data->to.utf8().data(), address.ascii().data());
+                connection->send(Messages::RiceBackendProxy::AllocatedSocket { data->streamId, data->componentId, data->protocol, data->from, data->to, address }, backend->messageSenderDestinationID());
+            }
+        });
+        destroySocketAllocationData(data);
+    }, data, nullptr);
+}
+
+void RiceBackend::removeSocket(unsigned streamId, unsigned componentId, WebCore::RTCIceProtocol protocol, String from, String to)
+{
+    if (protocol == WebCore::RTCIceProtocol::Udp)
+        return;
+
+    g_printerr(">> Removing socket for stream %u component %u protocol %d from %s to %s\n", streamId, componentId, protocol, from.ascii().data(), to.ascii().data());
+    auto [localAddress, remoteAddress] = m_localTcpAddresses.take(streamId);
+    //GUniquePtr<RiceAddress> remoteAddress(riceAddressFromString(to));
+    auto sockets = getSocketsForStream(streamId);
+    rice_sockets_remove_tcp(sockets.get(), localAddress.get(), remoteAddress.get());
+}
+
+void RiceBackend::configureSocketBufferSizes()
+{
+#if RICE_CHECK_VERSION(0, 2, 2)
+    // Setting same librice socket size options as LibWebRTC. 1MB for incoming streams and 256Kb for outgoing streams.
+    static const uint32_t receiveBufferSize = 1048576;
+    static const uint32_t sendBufferSize = 262144;
+    for (auto& data : m_sockets.values())
+        rice_sockets_set_buffer_sizes(data.sockets.get(), sendBufferSize, receiveBufferSize);
 #endif
 }
 

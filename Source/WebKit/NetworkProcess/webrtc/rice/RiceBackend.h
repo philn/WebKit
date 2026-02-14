@@ -29,6 +29,7 @@
 #include <WebCore/ExceptionOr.h>
 #include <WebCore/GRefPtrRice.h>
 #include <WebCore/GUniquePtrRice.h>
+#include <WebCore/RiceGatherResult.h>
 #include <WebCore/RTCIceComponent.h>
 #include <WebCore/RTCIceProtocol.h>
 #include <WebCore/ScriptExecutionContextIdentifier.h>
@@ -78,17 +79,22 @@ public:
     using ResolveCallback = CompletionHandler<void(Expected<String, WebCore::ExceptionData>&&)>;
     void resolveAddress(const String&, ResolveCallback&&);
 
+    void resolveAddressSync(const String&, ResolveCallback&&);
+
     void sendData(unsigned, WebCore::RTCIceProtocol, String, String, WebCore::SharedMemory::Handle&&);
     void finalizeStream(unsigned);
     void setSocketTypeOfService(unsigned, unsigned);
 
-    using GatherSocketAddressesCallback = CompletionHandler<void(HashMap<std::pair<String, WebCore::RTCIceProtocol>, String>&&)>;
-    void gatherSocketAddresses(WebCore::ScriptExecutionContextIdentifier, unsigned, GatherSocketAddressesCallback&&);
+    using GatherSocketAddressesCallback = CompletionHandler<void(WebCore::RiceGatherResult&&)>;
+    void gatherSocketAddresses(WebCore::ScriptExecutionContextIdentifier, unsigned, unsigned, unsigned, GatherSocketAddressesCallback&&);
 
     GRefPtr<RiceSockets> getSocketsForStream(unsigned);
     GRefPtr<GSource> getRecvSourceForStream(unsigned);
 
     void notifyIncomingData(unsigned streamId, WebCore::RTCIceProtocol, String&&, String&&, WebCore::SharedMemory::Handle&&);
+
+    void allocateSocket(unsigned, unsigned, WebCore::RTCIceProtocol, String, String);
+    void removeSocket(unsigned, unsigned, WebCore::RTCIceProtocol, String, String);
 
 private:
 
@@ -101,6 +107,8 @@ private:
     WeakPtr<NetworkConnectionToWebProcess> m_connection;
 
     RefPtr<RunLoop> m_runLoop;
+
+    void configureSocketBufferSizes();
 
     struct SocketData {
         GRefPtr<RiceSockets> sockets;
@@ -115,6 +123,8 @@ private:
     HashMap<unsigned, Vector<String>, WTF::IntHash<unsigned>, WTF::UnsignedWithZeroKeyHashTraits<unsigned>> m_udpSocketAddressesCache;
 
     const RiceAddress* ensureRiceAddressFromCache(const String&);
+
+    HashMap<unsigned, std::pair<GUniquePtr<RiceAddress>, GUniquePtr<RiceAddress>>, WTF::IntHash<unsigned>, WTF::UnsignedWithZeroKeyHashTraits<unsigned>> m_localTcpAddresses;
 };
 
 } // namespace WebKit

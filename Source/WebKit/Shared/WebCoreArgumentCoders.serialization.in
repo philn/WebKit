@@ -8149,6 +8149,14 @@ header: <WebCore/WebCodecsEncodedAudioChunk.h>
 };
 #endif
 
+#if USE(LIBRICE)
+header: <WebCore/RiceGatherResult.h>
+[CustomHeader] struct WebCore::RiceGatherResult {
+    HashMap<WebCore::RiceSocket, String> addresses;
+    Vector<WebCore::RiceSocket> turnAddresses;
+};
+#endif
+
 headers: <JavaScriptCore/WasmModule.h> <WebCore/ImageBitmap.h> <WebCore/MessagePort.h> <WebCore/OffscreenCanvas.h>
 [Nested] class WebCore::SerializedScriptValue::Internals {
     Vector<uint8_t> data;
