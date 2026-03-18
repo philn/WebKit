@@ -45,7 +45,6 @@
 
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
 #include <webrtc/p2p/base/basic_packet_socket_factory.h>
-#include <webrtc/rtc_base/third_party/sigslot/sigslot.h>
 WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
 
 #endif

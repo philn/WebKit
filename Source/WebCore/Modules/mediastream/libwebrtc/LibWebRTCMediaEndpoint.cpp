@@ -65,7 +65,6 @@ IGNORE_CLANG_WARNINGS_BEGIN("nullability-completeness")
 #include <webrtc/p2p/client/basic_port_allocator.h>
 IGNORE_CLANG_WARNINGS_END
 #include <webrtc/pc/peer_connection_factory.h>
-#include <webrtc/system_wrappers/include/field_trial.h>
 #include <wtf/MainThread.h>
 #include <wtf/SetForScope.h>
 #include <wtf/SharedTask.h>

@@ -5642,6 +5642,8 @@
 		41C3B89126493B7B004ED4DE /* RemoteAudioMediaStreamTrackRendererInternalUnitManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RemoteAudioMediaStreamTrackRendererInternalUnitManager.cpp; sourceTree = "<group>"; };
 		41C3B89426493B7C004ED4DE /* RemoteAudioMediaStreamTrackRendererInternalUnitManager.messages.in */ = {isa = PBXFileReference; lastKnownFileType = text; path = RemoteAudioMediaStreamTrackRendererInternalUnitManager.messages.in; sourceTree = "<group>"; };
 		41C5378F21F1362D008B1FAD /* _WKWebsiteDataStoreDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = _WKWebsiteDataStoreDelegate.h; sourceTree = "<group>"; };
+		41C979112F6BE87500CC77F2 /* WebRTCNetworkBase.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WebRTCNetworkBase.h; sourceTree = "<group>"; };
+		41C979122F6BE87500CC77F2 /* WebRTCNetworkBase.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = WebRTCNetworkBase.cpp; sourceTree = "<group>"; };
 		41D129D91F3D101400D15E47 /* WebCacheStorageProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WebCacheStorageProvider.h; sourceTree = "<group>"; };
 		41D5C6D8238EB20D00B9B3CB /* ServiceWorkerSoftUpdateLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ServiceWorkerSoftUpdateLoader.h; sourceTree = "<group>"; };
 		41D5C6D9238EB20E00B9B3CB /* ServiceWorkerSoftUpdateLoader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ServiceWorkerSoftUpdateLoader.cpp; sourceTree = "<group>"; };
@@ -6312,7 +6314,6 @@
 		532159511DBAE6FC0054AA3C /* NetworkDataTask.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = NetworkDataTask.cpp; sourceTree = "<group>"; };
 		532159521DBAE6FC0054AA3C /* NetworkSession.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = NetworkSession.cpp; sourceTree = "<group>"; };
 		535BCB902069C49C00CCCE02 /* NetworkActivityTracker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NetworkActivityTracker.h; sourceTree = "<group>"; };
-		5C3B0A012DA0000000ABCDEF /* NetworkActivityTracker.serialization.in */ = {isa = PBXFileReference; lastKnownFileType = text; path = NetworkActivityTracker.serialization.in; sourceTree = "<group>"; };
 		535E08CA225460FC00DF00CA /* postprocess-header-rule */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = "postprocess-header-rule"; sourceTree = "<group>"; };
 		539EB5461DC2EE40009D48CF /* NetworkDataTaskBlob.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = NetworkDataTaskBlob.cpp; sourceTree = "<group>"; };
 		539EB5471DC2EE40009D48CF /* NetworkDataTaskBlob.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NetworkDataTaskBlob.h; sourceTree = "<group>"; };
@@ -6594,6 +6595,7 @@
 		5C359C0C21547321009E7948 /* WKDeprecated.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WKDeprecated.h; sourceTree = "<group>"; };
 		5C37A5BE2970DB6000D222A0 /* LoadedWebArchive.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LoadedWebArchive.h; sourceTree = "<group>"; };
 		5C3AEA8E1FE1F1DF002318D3 /* WebsitePoliciesData.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WebsitePoliciesData.cpp; sourceTree = "<group>"; };
+		5C3B0A012DA0000000ABCDEF /* NetworkActivityTracker.serialization.in */ = {isa = PBXFileReference; lastKnownFileType = text; path = NetworkActivityTracker.serialization.in; sourceTree = "<group>"; };
 		5C400E6D29DB8D7000446F6F /* BaseExtension.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = BaseExtension.xcconfig; sourceTree = "<group>"; };
 		5C400E6E29DB8D7000446F6F /* NetworkingExtension.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = NetworkingExtension.xcconfig; sourceTree = "<group>"; };
 		5C400E6F29DB8D7100446F6F /* GPUExtension.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = GPUExtension.xcconfig; sourceTree = "<group>"; };
@@ -13762,6 +13764,8 @@
 				413075A21DE85EE70039EC69 /* WebRTCMonitor.cpp */,
 				413075A31DE85EE70039EC69 /* WebRTCMonitor.h */,
 				413075A41DE85EE70039EC69 /* WebRTCMonitor.messages.in */,
+				41C979122F6BE87500CC77F2 /* WebRTCNetworkBase.cpp */,
+				41C979112F6BE87500CC77F2 /* WebRTCNetworkBase.h */,
 				41DC45A01E3DC53C00B11F51 /* WebRTCResolver.cpp */,
 				41FAF5F41E3C0641001AE678 /* WebRTCResolver.h */,
 				41AC86811E042E5300303074 /* WebRTCResolver.messages.in */,

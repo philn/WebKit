@@ -119,7 +119,7 @@ void LibWebRTCNetworkManager::StartUpdating()
         Ref monitor = WebProcess::singleton().libWebRTCNetwork().monitor();
         if (protectedThis->m_receivedNetworkList) {
             WebCore::LibWebRTCProvider::callOnWebRTCNetworkThread([protectedThis] {
-                protectedThis->SignalNetworksChanged();
+                protectedThis->NotifyNetworksChanged();
             });
         } else if (monitor->didReceiveNetworkList())
             protectedThis->networksChanged(monitor->networkList() , monitor->ipv4(), monitor->ipv6());
@@ -187,13 +187,13 @@ void LibWebRTCNetworkManager::networksChanged(const Vector<RTCNetwork>& networks
     WebCore::LibWebRTCProvider::callOnWebRTCNetworkThread([this, protectedThis = Ref { *this }, networks = WTF::move(filteredNetworks), ipv4, ipv6, forceSignaling] {
         std::vector<std::unique_ptr<webrtc::Network>> networkList(networks.size());
         for (size_t index = 0; index < networks.size(); ++index)
-            networkList[index] = std::make_unique<webrtc::Network>(networks[index].value());
+            networkList[index] = networks[index].value();
 
         bool hasChanged;
         set_default_local_addresses(ipv4.rtcAddress(), ipv6.rtcAddress());
         MergeNetworkList(WTF::move(networkList), &hasChanged);
         if (hasChanged || forceSignaling)
-            SignalNetworksChanged();
+            NotifyNetworksChanged();
     });
 
 }
@@ -223,9 +223,9 @@ void LibWebRTCNetworkManager::networkProcessCrashed()
     if (!WebCore::LibWebRTCProvider::hasWebRTCThreads())
         return;
 
-    // In case we have clients waiting for networksChanged, we call SignalNetworksChanged to make sure they do not wait for nothing.
-    WebCore::LibWebRTCProvider::callOnWebRTCNetworkThread([this, protectedThis = Ref { *this }] {
-        SignalNetworksChanged();
+    // In case we have clients waiting for networksChanged, we call NotifyNetworksChanged to make sure they do not wait for nothing.
+    WebCore::LibWebRTCProvider::callOnWebRTCNetworkThread([protectedThis = Ref { *this }] {
+        protectedThis->NotifyNetworksChanged();
     });
 }
 
