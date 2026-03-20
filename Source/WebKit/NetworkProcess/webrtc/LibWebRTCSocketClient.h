@@ -45,7 +45,7 @@ typedef int64_t PacketTime;
 
 namespace WebKit {
 
-class LibWebRTCSocketClient final : public NetworkRTCProvider::Socket, public sigslot::has_slots<> {
+class LibWebRTCSocketClient final : public NetworkRTCProvider::Socket {
     WTF_MAKE_TZONE_ALLOCATED(LibWebRTCSocketClient);
 public:
     LibWebRTCSocketClient(WebCore::LibWebRTCSocketIdentifier, NetworkRTCProvider&, std::unique_ptr<webrtc::AsyncPacketSocket>&&, Type, Ref<IPC::Connection>&&);

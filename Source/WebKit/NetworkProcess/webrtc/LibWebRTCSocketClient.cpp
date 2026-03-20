@@ -54,7 +54,10 @@ LibWebRTCSocketClient::LibWebRTCSocketClient(WebCore::LibWebRTCSocketIdentifier 
     m_socket->RegisterReceivedPacketCallback([this](auto* socket, auto& packet) {
         signalReadPacket(socket, packet.payload().data(), packet.payload().size(), packet.source_address(), packet.arrival_time()->us_or(0));
     });
-    m_socket->SignalSentPacket.connect(this, &LibWebRTCSocketClient::signalSentPacket);
+    m_socket->SubscribeSentPacket(this, [this](auto* socket, const auto& info) {
+        LibWebRTCSocketClient::signalSentPacket(socket, info);
+    });
+
     m_socket->SubscribeCloseEvent(this, [this](webrtc::AsyncPacketSocket* socket, int error) {
         signalClose(socket, error);
     });
@@ -63,11 +66,17 @@ LibWebRTCSocketClient::LibWebRTCSocketClient(WebCore::LibWebRTCSocketIdentifier 
     case Type::ServerConnectionTCP:
         return;
     case Type::ClientTCP:
-        m_socket->SignalConnect.connect(this, &LibWebRTCSocketClient::signalConnect);
-        m_socket->SignalAddressReady.connect(this, &LibWebRTCSocketClient::signalAddressReady);
+        m_socket->SubscribeConnect(this, [this](auto* socket) {
+            LibWebRTCSocketClient::signalConnect(socket);
+        });
+        m_socket->SubscribeAddressReady(this, [this](auto* socket, const auto& address) {
+            LibWebRTCSocketClient::signalAddressReady(socket, address);
+        });
         return;
     case Type::UDP:
-        m_socket->SignalConnect.connect(this, &LibWebRTCSocketClient::signalConnect);
+        m_socket->SubscribeConnect(this, [this](auto* socket) {
+            LibWebRTCSocketClient::signalConnect(socket);
+        });
         signalAddressReady();
         return;
     }
