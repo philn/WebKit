@@ -157,11 +157,11 @@ Ref<MediaSample> MediaSampleGStreamer::createCopyWithAdjustedStartTime(const Med
 
     GRefPtr<GstSample> newSample = adoptGRef(gst_sample_copy(m_sample.get()));
 
-    GstBuffer* buffer = gst_sample_get_buffer(newSample.get());
+    GRefPtr buffer = gst_sample_get_buffer(newSample.get());
     if (!buffer) [[unlikely]]
         return createFakeSample(nullptr, newPresentationTime, newDecodeTime, adjustedDuration, m_presentationSize, m_trackId);
 
-    auto newBuffer = adoptGRef(gst_buffer_make_writable(buffer));
+    auto newBuffer = adoptGRef(gst_buffer_make_writable(buffer.leakRef()));
     GST_BUFFER_PTS(newBuffer.get()) = toGstClockTime(newPresentationTime);
     GST_BUFFER_DTS(newBuffer.get()) = toGstClockTime(newDecodeTime);
     GST_BUFFER_DURATION(newBuffer.get()) = toGstClockTime(adjustedDuration);
