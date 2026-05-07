@@ -155,18 +155,17 @@ Ref<MediaSample> MediaSampleGStreamer::createCopyWithAdjustedStartTime(const Med
     if (!m_sample)
         return createFakeSample(nullptr, newPresentationTime, newDecodeTime, adjustedDuration, m_presentationSize, m_trackId);
 
-    GstBuffer* originalBuffer = gst_sample_get_buffer(m_sample.get());
-    GstBuffer* newBuffer = gst_buffer_copy(originalBuffer);
-    GST_BUFFER_PTS(newBuffer) = toGstClockTime(newPresentationTime);
-    GST_BUFFER_DTS(newBuffer) = toGstClockTime(newDecodeTime);
-    GST_BUFFER_DURATION(newBuffer) = toGstClockTime(adjustedDuration);
+    GRefPtr<GstSample> newSample = adoptGRef(gst_sample_copy(m_sample.get()));
 
-    GstCaps* caps = gst_sample_get_caps(m_sample.get());
-    GstSegment* segment = gst_sample_get_segment(m_sample.get());
-    const GstStructure* originalInfo = gst_sample_get_info(m_sample.get());
-    GstStructure* info = originalInfo ? gst_structure_copy(originalInfo) : nullptr;
-    GRefPtr<GstSample> newSample = adoptGRef(gst_sample_new(newBuffer, caps, segment, info));
-    gst_buffer_unref(newBuffer);
+    GstBuffer* buffer = gst_sample_get_buffer(newSample.get());
+    if (!buffer) [[unlikely]]
+        return createFakeSample(nullptr, newPresentationTime, newDecodeTime, adjustedDuration, m_presentationSize, m_trackId);
+
+    auto newBuffer = adoptGRef(gst_buffer_make_writable(buffer));
+    GST_BUFFER_PTS(newBuffer.get()) = toGstClockTime(newPresentationTime);
+    GST_BUFFER_DTS(newBuffer.get()) = toGstClockTime(newDecodeTime);
+    GST_BUFFER_DURATION(newBuffer.get()) = toGstClockTime(adjustedDuration);
+    gst_sample_set_buffer(newSample.get(), newBuffer.get());
 
     Ref copy = adoptRef(*new MediaSampleGStreamer(WTF::move(newSample), m_presentationSize, m_trackId));
     copy->m_flags = m_flags;

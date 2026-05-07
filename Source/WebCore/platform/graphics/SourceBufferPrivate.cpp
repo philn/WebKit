@@ -1061,8 +1061,8 @@ void SourceBufferPrivate::processPendingMediaSamples()
         // processMediaSample(). An audio sample often has a higher presentation-end-time than
         // the last video sample among the same pending samples; computing the tail across all
         // tracks would deny the video's tail its clip-eligibility.
-        HashMap<TrackID, MediaSample*> presentationTailPerTrack;
-        HashMap<TrackID, MediaTime> maxEndPerTrack;
+        HashMap<TrackID, MediaSample*, WTF::IntHash<TrackID>, WTF::UnsignedWithZeroKeyHashTraits<TrackID>> presentationTailPerTrack;
+        HashMap<TrackID, MediaTime, WTF::IntHash<TrackID>, WTF::UnsignedWithZeroKeyHashTraits<TrackID>> maxEndPerTrack;
         for (auto& s : samples) {
             TrackID tid = s->trackID();
             MediaTime end = s->presentationEndTime();
