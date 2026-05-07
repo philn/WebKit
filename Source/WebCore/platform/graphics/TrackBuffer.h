@@ -52,6 +52,10 @@ public:
     MediaTime NODELETE maximumBufferedTime() const;
     void addBufferedRange(const MediaTime& start, const MediaTime& end, AddTimeRangeOption = AddTimeRangeOption::None);
     void addSample(MediaSample&);
+    // Swap an already-buffered sample for a freshly-created copy (such as one with adjusted timing (usually)
+    // The replacement's trackID and payload are expected to match the original; only presentation
+    // timing and duration are expected to differ. Updates both SampleMaps and m_buffered.
+    void replaceSample(MediaSample& original, Ref<MediaSample>&& replacement);
 
     bool reenqueueMediaForTime(const MediaTime&, const MediaTime& timeFudgeFactor, bool isEnded = false);
     MediaTime findSeekTimeForTargetTime(const MediaTime& targetTime, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold);

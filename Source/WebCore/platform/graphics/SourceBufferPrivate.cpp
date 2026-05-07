@@ -1055,15 +1055,35 @@ void SourceBufferPrivate::processPendingMediaSamples()
         if (!client)
             return MediaPromise::createAndReject(PlatformMediaError::BufferRemoved);
 
+        // Identify the sample carrying the highest presentation-end-time within the pending
+        // samples **per trackID** — i.e., the presentation tail in each track. Only the
+        // presentation tail is eligible for the timeFudgeFactor-based step-1.14 clip in
+        // processMediaSample(). An audio sample often has a higher presentation-end-time than
+        // the last video sample among the same pending samples; computing the tail across all
+        // tracks would deny the video's tail its clip-eligibility.
+        HashMap<TrackID, MediaSample*> presentationTailPerTrack;
+        HashMap<TrackID, MediaTime> maxEndPerTrack;
+        for (auto& s : samples) {
+            TrackID tid = s->trackID();
+            MediaTime end = s->presentationEndTime();
+            auto it = maxEndPerTrack.find(tid);
+            if (it == maxEndPerTrack.end() || end > it->value) {
+                maxEndPerTrack.set(tid, end);
+                presentationTailPerTrack.set(tid, s.ptr());
+            }
+        }
+
         for (auto& sample : samples) {
-            if (!protectedThis->processMediaSample(*client, WTF::move(sample)))
+            MediaSample* tailForTrack = presentationTailPerTrack.get(sample->trackID());
+            bool isPresentationTail = sample.ptr() == tailForTrack;
+            if (!protectedThis->processMediaSample(*client, WTF::move(sample), isPresentationTail))
                 return MediaPromise::createAndReject(PlatformMediaError::ParsingError);
         }
         return MediaPromise::createAndResolve();
     });
 }
 
-bool SourceBufferPrivate::processMediaSample(SourceBufferPrivateClient& client, Ref<MediaSample>&& sample)
+bool SourceBufferPrivate::processMediaSample(SourceBufferPrivateClient& client, Ref<MediaSample>&& sample, bool isPresentationTail)
 {
     assertIsCurrent(m_dispatcher.get());
 
@@ -1399,6 +1419,38 @@ bool SourceBufferPrivate::processMediaSample(SourceBufferPrivateClient& client, 
                 MediaTime highestBufferedTime = trackBuffer.maximumBufferedTime();
                 MediaTime eraseBeginTime = trackBuffer.highestPresentationTimestamp();
                 MediaTime eraseEndTime = frameEndTimestamp - contiguousFrameTolerance;
+
+                // If the incoming sample is the **presentation tail for this track** AND a
+                // reordered frame (B-frame: pts > dts), its declared frame_end may be a trun
+                // decode-to-next-decode placeholder that overshoots the next buffered sample's
+                // pts by a small margin. Taken at face value, step 1.14 treats the overshoot as
+                // a real overlap and removes the overlapped frame, leaving a gap in the buffered
+                // range that stalls playback. If the overshoot is less than timeFudgeFactor,
+                // attribute it to the trun placeholder rather than a genuine overlap and shift
+                // the overlapped frame forward by the overshoot: pts and dts shift equally,
+                // duration shrinks, presentationEndTime is preserved. Any larger overshoot is
+                // treated as a real overlap and left to the default path.
+                bool isBFrame = sample->presentationTime() > sample->decodeTime();
+                if (isPresentationTail && isBFrame) {
+                    MediaTime fudge = PlatformTimeRanges::timeFudgeFactor();
+                    if (frameEndTimestamp > fudge) {
+                        auto it = trackBuffer.samples().presentationOrder().findSampleStartingOnOrAfterPresentationTime(frameEndTimestamp - fudge);
+                        auto presentationEnd = trackBuffer.samples().presentationOrder().end();
+                        for (; it != presentationEnd && it->first < frameEndTimestamp; ++it) {
+                            if (it->first <= presentationTimestamp)
+                                continue;
+                            // Overlapped frame: pts ∈ (presentationTimestamp, frameEndTimestamp)
+                            // and within timeFudgeFactor of frame_end. If fully inside the erase
+                            // range, leave it to the default removal. Otherwise shift forward.
+                            Ref original = it->second;
+                            if (original->presentationEndTime() <= frameEndTimestamp)
+                                break;
+                            MediaTime shift = frameEndTimestamp - original->presentationTime();
+                            trackBuffer.replaceSample(original.get(), original->createCopyWithAdjustedStartTime(shift));
+                            break;
+                        }
+                    }
+                }
 
                 if (eraseEndTime <= eraseBeginTime)
                     break;

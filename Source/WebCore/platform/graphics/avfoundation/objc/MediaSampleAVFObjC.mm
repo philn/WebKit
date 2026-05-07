@@ -300,6 +300,41 @@ std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> MediaSampleAVFObjC::divide(c
     return { MediaSampleAVFObjC::create(sampleBefore.get(), m_id), MediaSampleAVFObjC::create(sampleAfter.get(), m_id) };
 }
 
+Ref<MediaSample> MediaSampleAVFObjC::createCopyWithAdjustedStartTime(const MediaTime& shift) const
+{
+    MediaTime clampedShift = std::max(MediaTime::zeroTime(), std::min(shift, duration()));
+
+    CMItemCount itemCount = 0;
+    if (noErr != PAL::CMSampleBufferGetSampleTimingInfoArray(m_sample.get(), 0, nullptr, &itemCount))
+        return const_cast<MediaSampleAVFObjC&>(*this);
+
+    Vector<CMSampleTimingInfo> timingInfoArray;
+    timingInfoArray.grow(itemCount);
+    if (noErr != PAL::CMSampleBufferGetSampleTimingInfoArray(m_sample.get(), itemCount, timingInfoArray.mutableSpan().data(), nullptr))
+        return const_cast<MediaSampleAVFObjC&>(*this);
+
+    CMTime cmShift = PAL::toCMTime(clampedShift);
+
+    for (auto& timing : timingInfoArray) {
+        if (!CMTIME_IS_INVALID(timing.presentationTimeStamp))
+            timing.presentationTimeStamp = PAL::CMTimeAdd(timing.presentationTimeStamp, cmShift);
+        if (!CMTIME_IS_INVALID(timing.decodeTimeStamp))
+            timing.decodeTimeStamp = PAL::CMTimeAdd(timing.decodeTimeStamp, cmShift);
+        if (!CMTIME_IS_INVALID(timing.duration)) {
+            CMTime newDuration = PAL::CMTimeSubtract(timing.duration, cmShift);
+            if (PAL::CMTimeCompare(newDuration, PAL::kCMTimeZero) < 0)
+                newDuration = PAL::kCMTimeZero;
+            timing.duration = newDuration;
+        }
+    }
+
+    CMSampleBufferRef newSampleBuffer = nullptr;
+    if (noErr != PAL::CMSampleBufferCreateCopyWithNewTiming(kCFAllocatorDefault, m_sample.get(), itemCount, timingInfoArray.span().data(), &newSampleBuffer) || !newSampleBuffer)
+        return const_cast<MediaSampleAVFObjC&>(*this);
+
+    return MediaSampleAVFObjC::create(adoptCF(newSampleBuffer).get(), m_id);
+}
+
 Ref<MediaSample> MediaSampleAVFObjC::createNonDisplayingCopy() const
 {
     CMSampleBufferRef newSampleBuffer = 0;

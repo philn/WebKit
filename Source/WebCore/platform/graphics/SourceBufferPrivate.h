@@ -266,7 +266,7 @@ private:
     std::atomic<size_t> m_abortCount { 0 };
 
     void processPendingMediaSamples();
-    bool processMediaSample(SourceBufferPrivateClient&, Ref<MediaSample>&&);
+    bool processMediaSample(SourceBufferPrivateClient&, Ref<MediaSample>&&, bool isPresentationTail);
 
     enum class ComputeEvictionDataRule {
         Default,

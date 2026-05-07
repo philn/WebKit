@@ -84,6 +84,38 @@ void TrackBuffer::addBufferedRange(const MediaTime& start, const MediaTime& end,
     m_buffered.add(start, end, addTimeRangeOption);
 }
 
+void TrackBuffer::replaceSample(MediaSample& original, Ref<MediaSample>&& replacement)
+{
+    // Subtract the original sample's presentation interval from m_buffered, remove the original
+    // from the SampleMap, install the replacement, and re-add its presentation interval. We
+    // deliberately leave m_decodeQueue untouched:
+    //   - If the original was still pending enqueue, it will be pulled from the queue and played
+    //     at its original pts. That's at most `timeFudgeFactor()` earlier than the shifted pts —
+    //     well below any perceptual threshold at typical frame rates, and the payload is byte-
+    //     identical to the shifted copy.
+    //   - If the original had already been dispatched, there's nothing in the queue to worry
+    //     about anyway.
+    //   - Any operation that would truly need the queue to reflect the shifted timing (seek, hard
+    //     removal from the map via step-1.14/1.15, etc.) already flushes the decode queue via its
+    //     own path.
+    //
+    // MediaSample objects are immutable, so `original` still carries its own (original)
+    // timestamps; we use those to compute the vacated range.
+    MediaTime originalStart = original.presentationTime();
+    MediaTime originalEnd = original.presentationEndTime();
+
+    PlatformTimeRanges invertedRange(originalStart, originalEnd);
+    invertedRange.invert();
+    m_buffered.intersectWith(invertedRange);
+
+    MediaTime replacementStart = replacement->presentationTime();
+    MediaTime replacementEnd = replacement->presentationEndTime();
+    m_samples.removeSample(original);
+    m_samples.addSample(WTF::move(replacement));
+
+    addBufferedRange(replacementStart, replacementEnd, AddTimeRangeOption::EliminateSmallGaps);
+}
+
 void TrackBuffer::addSample(MediaSample& sample)
 {
     m_samples.addSample(sample);

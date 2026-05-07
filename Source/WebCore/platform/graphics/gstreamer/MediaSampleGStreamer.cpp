@@ -144,6 +144,35 @@ Ref<MediaSample> MediaSampleGStreamer::createNonDisplayingCopy() const
     return adoptRef(*new MediaSampleGStreamer(WTF::move(sample), m_presentationSize, m_trackId));
 }
 
+Ref<MediaSample> MediaSampleGStreamer::createCopyWithAdjustedStartTime(const MediaTime& shift) const
+{
+    MediaTime clampedShift = std::max(MediaTime::zeroTime(), std::min(shift, m_duration));
+
+    MediaTime newPresentationTime = m_pts + clampedShift;
+    MediaTime newDecodeTime = m_dts + clampedShift;
+    MediaTime adjustedDuration = m_duration - clampedShift;
+
+    if (!m_sample)
+        return createFakeSample(nullptr, newPresentationTime, newDecodeTime, adjustedDuration, m_presentationSize, m_trackId);
+
+    GstBuffer* originalBuffer = gst_sample_get_buffer(m_sample.get());
+    GstBuffer* newBuffer = gst_buffer_copy(originalBuffer);
+    GST_BUFFER_PTS(newBuffer) = toGstClockTime(newPresentationTime);
+    GST_BUFFER_DTS(newBuffer) = toGstClockTime(newDecodeTime);
+    GST_BUFFER_DURATION(newBuffer) = toGstClockTime(adjustedDuration);
+
+    GstCaps* caps = gst_sample_get_caps(m_sample.get());
+    GstSegment* segment = gst_sample_get_segment(m_sample.get());
+    const GstStructure* originalInfo = gst_sample_get_info(m_sample.get());
+    GstStructure* info = originalInfo ? gst_structure_copy(originalInfo) : nullptr;
+    GRefPtr<GstSample> newSample = adoptGRef(gst_sample_new(newBuffer, caps, segment, info));
+    gst_buffer_unref(newBuffer);
+
+    Ref copy = adoptRef(*new MediaSampleGStreamer(WTF::move(newSample), m_presentationSize, m_trackId));
+    copy->m_flags = m_flags;
+    return copy;
+}
+
 void MediaSampleGStreamer::dump(PrintStream& out) const
 {
     out.print("{PTS(", presentationTime(), "), DTS(", decodeTime(), "), duration(", duration(), "), flags(");
