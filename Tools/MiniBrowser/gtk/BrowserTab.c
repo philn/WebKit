@@ -419,6 +419,19 @@ static gboolean decidePermissionRequest(WebKitWebView *webView, WebKitPermission
         text = g_strdup_printf("Do you want to allow \"%s\" to use cookies while browsing \"%s\"? This will allow \"%s\" to track your activity",
             requestingDomain, currentDomain, requestingDomain);
     } else if (WEBKIT_IS_MEDIA_KEY_SYSTEM_PERMISSION_REQUEST(request)) {
+        const gchar* keySystem = webkit_media_key_system_permission_get_name(WEBKIT_MEDIA_KEY_SYSTEM_PERMISSION_REQUEST(request));
+        if (g_strcmp0(keySystem, "com.widevine.alpha") == 0 || g_strcmp0(keySystem, "org.w3.clearkey") == 0)
+        {
+            webkit_permission_request_allow(request);
+            return TRUE;
+        }
+        else
+        {
+            g_message("[WebView] Denying unsupported key system: %s", keySystem);
+            webkit_permission_request_deny(request);
+            return TRUE;
+        }
+
         char *origin = getWebViewOrigin(webView);
         if (g_hash_table_contains(mediaKeySystemPermissionGrantedOrigins, origin)) {
             webkit_permission_request_allow(request);
