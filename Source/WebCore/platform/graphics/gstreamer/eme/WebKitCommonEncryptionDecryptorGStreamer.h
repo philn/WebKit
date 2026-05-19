@@ -29,6 +29,7 @@
 #include <gst/gst.h>
 #include <wtf/RefPtr.h>
 #include <wtf/WeakPtr.h>
+#include "GStreamerEMEUtilities.h"
 
 G_BEGIN_DECLS
 
@@ -59,10 +60,11 @@ struct _WebKitMediaCommonEncryptionDecryptClass {
 
     ASCIILiteral (*protectionSystemId)(WebKitMediaCommonEncryptionDecrypt*);
     bool (*cdmProxyAttached)(WebKitMediaCommonEncryptionDecrypt*, const RefPtr<WebCore::CDMProxy>&);
-    bool (*decrypt)(WebKitMediaCommonEncryptionDecrypt*, GstBuffer* ivBuffer, GstBuffer* keyIDBuffer, GstBuffer* buffer, unsigned subsamplesCount, GstBuffer* subsamplesBuffer);
+    DecryptionResult (*decrypt)(WebKitMediaCommonEncryptionDecrypt*, GstBuffer* ivBuffer, GstBuffer* keyIDBuffer, GstBuffer* buffer, unsigned subsamplesCount, GstBuffer* subsamplesBuffer);
 };
 
 G_END_DECLS
+
 
 // This function returns a C++ type. It's internal to the decryptors so it is safe to move it here to avoid the C++ return warning because of the C only linkage
 // area.
