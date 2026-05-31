@@ -41,12 +41,18 @@ public:
     ASCIILiteral logClassName() const final { return "MockDisplayCaptureSourceGStreamer"_s; }
 #endif
 
+    IntSize sizeConstraint() const { return { m_widthConstraint, m_heightConstraint }; }
+    double frameRateConstraint() const { return m_frameRateConstraint; }
+
+    const RealtimeMediaSourceSettings& settings() final;
+
 protected:
     // RealtimeMediaSource::VideoFrameObserver
     void videoFrameAvailable(VideoFrame&, VideoFrameTimeMetadata) final;
 
     void generatePresets() override { };
     const Vector<VideoPreset>& presets() LIFETIME_BOUND final { return m_presets; }
+    void applyFrameRateAndZoomWithPreset(double, double, std::optional<VideoPreset>&&) final;
 
 private:
     MockDisplayCaptureSourceGStreamer(const CaptureDevice&, Ref<MockRealtimeVideoSourceGStreamer>&&, MediaDeviceHashSalts&&, std::optional<PageIdentifier>);
@@ -56,15 +62,24 @@ private:
     void stopProducingData() final;
     void settingsDidChange(OptionSet<RealtimeMediaSourceSettings::Flag>) final { m_currentSettings = { }; }
     bool isCaptureSource() const final { return true; }
+    bool isMockSource() const final { return true; }
     const RealtimeMediaSourceCapabilities& capabilities() final;
-    const RealtimeMediaSourceSettings& settings() final;
     CaptureDevice::DeviceType deviceType() const final { return m_deviceType; }
+
+    void storePresetConstraints(const MediaConstraints&);
+    void applyConstraints(const MediaConstraints&, ApplyConstraintsHandler&&) final;
+    IntSize computeResizedVideoFrameSize(IntSize desiredSize, IntSize actualSize) final;
 
     Vector<VideoPreset> m_presets;
     Ref<MockRealtimeVideoSourceGStreamer> m_source;
     CaptureDevice::DeviceType m_deviceType;
     std::optional<RealtimeMediaSourceCapabilities> m_capabilities;
     std::optional<RealtimeMediaSourceSettings> m_currentSettings;
+    std::optional<VideoPreset> m_currentPreset;
+
+    int m_widthConstraint { 0 };
+    int m_heightConstraint { 0 };
+    double m_frameRateConstraint { 0 };
 };
 
 } // namespace WebCore

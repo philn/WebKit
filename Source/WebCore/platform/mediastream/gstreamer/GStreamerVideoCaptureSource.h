@@ -60,6 +60,9 @@ public:
 
     std::pair<GstClockTime, GstClockTime> queryCaptureLatency() const final;
 
+    IntSize sizeConstraint() const { return { m_widthConstraint, m_heightConstraint }; }
+    double frameRateConstraint() const { return m_frameRateConstraint; }
+
 protected:
     GStreamerVideoCaptureSource(GStreamerCaptureDevice&&, MediaDeviceHashSalts&&);
     GStreamerVideoCaptureSource(const PipeWireCaptureDevice&, MediaDeviceHashSalts&&);
@@ -78,11 +81,16 @@ protected:
 private:
     bool isCaptureSource() const final { return true; }
     void settingsDidChange(OptionSet<RealtimeMediaSourceSettings::Flag>) final;
+    void storePresetConstraints(const MediaConstraints&);
 
     RefPtr<GStreamerVideoCapturer> m_capturer;
     CaptureDevice::DeviceType m_deviceType;
 
     std::optional<VideoPreset> m_currentPreset;
+
+    int m_widthConstraint { 0 };
+    int m_heightConstraint { 0 };
+    double m_frameRateConstraint { 0 };
 };
 
 } // namespace WebCore

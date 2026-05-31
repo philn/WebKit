@@ -1025,17 +1025,22 @@ std::optional<MediaConstraintType> RealtimeMediaSource::selectSettings(const Med
     //    distance is finite.
 
     // Check width, height, frame rate and zoom jointly, because while they may be supported individually the combination may not be supported.
-    if (auto invalidConstraint = hasInvalidSizeFrameRateAndZoomConstraints(constraints.mandatoryConstraints.width(), constraints.mandatoryConstraints.height(), constraints.mandatoryConstraints.frameRate(), constraints.mandatoryConstraints.zoom(), minimumDistance))
+    if (auto invalidConstraint = hasInvalidSizeFrameRateAndZoomConstraints(constraints.mandatoryConstraints.width(), constraints.mandatoryConstraints.height(), constraints.mandatoryConstraints.frameRate(), constraints.mandatoryConstraints.zoom(), minimumDistance)) {
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         return invalidConstraint;
-
+    }
     double distance = std::numeric_limits<double>::infinity();
     std::optional<MediaConstraintType> invalidConstraint;
     constraints.mandatoryConstraints.filter([&](auto constraintType, auto& constraint) {
-        if (!supportsConstraint(constraintType))
+        if (!supportsConstraint(constraintType)) {
+            WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+            constraint.log(constraintType);
             return false;
-
+        }
         if (constraintType == MediaConstraintType::Width || constraintType == MediaConstraintType::Height || constraintType == MediaConstraintType::FrameRate || constraintType == MediaConstraintType::Zoom || constraintType == MediaConstraintType::PowerEfficient) {
             candidates.set(constraintType, constraint);
+            WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+            constraint.log(constraintType);
             return false;
         }
 
@@ -1043,17 +1048,22 @@ std::optional<MediaConstraintType> RealtimeMediaSource::selectSettings(const Med
         if (std::isinf(constraintDistance)) {
             ERROR_LOG_IF(m_logger, LOGIDENTIFIER, "RealtimeMediaSource::selectSettings failed constraint %d", static_cast<int>(constraintType));
             invalidConstraint = constraintType;
+            WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+            constraint.log(constraintType);
             return true;
         }
 
         distance = std::min(distance, constraintDistance);
         candidates.set(constraintType, constraint);
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
+        constraint.log(constraintType);
         return false;
     });
 
-    if (invalidConstraint)
+    if (invalidConstraint) {
+        WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         return invalidConstraint;
-
+    }
     minimumDistance = distance;
 
     // 4. If candidates is empty, return undefined as the result of the SelectSettings() algorithm.
@@ -1114,6 +1124,7 @@ std::optional<MediaConstraintType> RealtimeMediaSource::selectSettings(const Med
         }
     }
 
+    WTFLogAlways("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     return { };
 }
 
@@ -1232,8 +1243,10 @@ RealtimeMediaSource::VideoPresetConstraints RealtimeMediaSource::extractVideoPre
     auto& capabilities = this->capabilities();
 
     if (auto constraint = constraints.width()) {
-        if (capabilities.supportsWidth())
+        if (capabilities.supportsWidth()) {
+            WTFLogAlways(">>>>> size.width: %d capabilities.width: %d..%d", size().width(), capabilities.width().min(), capabilities.width().max());
             result.width = constraint->valueForCapabilityRange(size().width(), capabilities.width());
+        }
     }
 
     if (auto constraint = constraints.height()) {
@@ -1322,7 +1335,8 @@ void RealtimeMediaSource::setSize(const IntSize& size)
         return;
 
     ALWAYS_LOG_IF(m_logger, LOGIDENTIFIER, size);
-    
+    WTFLogAlways("Set size to %dx%d", size.width(), size.height());
+    WTFReportBacktrace();
     m_size = size;
     notifySettingsDidChangeObservers({ RealtimeMediaSourceSettings::Flag::Width, RealtimeMediaSourceSettings::Flag::Height });
 }

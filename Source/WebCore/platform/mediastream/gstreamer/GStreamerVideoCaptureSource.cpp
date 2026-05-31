@@ -96,20 +96,22 @@ CaptureSourceOrError GStreamerVideoCaptureSource::create(String&& deviceID, Medi
         return CaptureSourceOrError({ WTF::move(errorMessage), MediaAccessDenialReason::HardwareError });
     }
 
-    auto source = adoptRef(*new GStreamerVideoCaptureSource(WTF::move(*device), WTF::move(hashSalts)));
+    Ref source = adoptRef(*new GStreamerVideoCaptureSource(WTF::move(*device), WTF::move(hashSalts)));
     if (constraints) {
         if (auto result = source->applyConstraints(*constraints))
             return CaptureSourceOrError(CaptureSourceError { result->invalidConstraint });
+        source->storePresetConstraints(*constraints);
     }
     return CaptureSourceOrError(WTF::move(source));
 }
 
 CaptureSourceOrError GStreamerVideoCaptureSource::createPipewireSource(const PipeWireCaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints)
 {
-    auto source = adoptRef(*new GStreamerVideoCaptureSource(device, WTF::move(hashSalts)));
+    Ref source = adoptRef(*new GStreamerVideoCaptureSource(device, WTF::move(hashSalts)));
     if (constraints) {
         if (auto result = source->applyConstraints(*constraints))
             return CaptureSourceOrError(CaptureSourceError { result->invalidConstraint });
+        source->storePresetConstraints(*constraints);
     }
     return CaptureSourceOrError(WTF::move(source));
 }
@@ -280,9 +282,21 @@ const RealtimeMediaSourceSettings& GStreamerVideoCaptureSource::settings()
         m_currentSettings = WTF::move(settings);
     }
 
-    m_currentSettings->setWidth(size().width());
-    m_currentSettings->setHeight(size().height());
-    m_currentSettings->setFrameRate(frameRate());
+    if (m_widthConstraint || m_heightConstraint) {
+        auto desiredSize = computeResizedVideoFrameSize({ m_widthConstraint, m_heightConstraint }, intrinsicSize());
+
+        auto videoFrameRotation = this->videoFrameRotation();
+        if (videoFrameRotation == VideoFrameRotation::Left || videoFrameRotation == VideoFrameRotation::Right)
+            desiredSize = desiredSize.transposedSize();
+
+        m_currentSettings->setWidth(desiredSize.width());
+        m_currentSettings->setHeight(desiredSize.height());
+        gst_printerrln("->> %dx%d", desiredSize.width(), desiredSize.height());
+    }
+
+    if (m_frameRateConstraint && m_frameRateConstraint < m_currentSettings->frameRate())
+        m_currentSettings->setFrameRate(m_frameRateConstraint);
+
     m_currentSettings->setFacingMode(facingMode());
     return m_currentSettings.value();
 }
@@ -363,6 +377,25 @@ void GStreamerVideoCaptureSource::applyFrameRateAndZoomWithPreset(double request
 
     setIntrinsicSize(m_currentPreset->size());
     m_capturer->setFrameRate(requestedFrameRate);
+}
+
+void GStreamerVideoCaptureSource::storePresetConstraints(const MediaConstraints& constraints)
+{
+    auto resultingConstraints = extractVideoPresetConstraints(constraints);
+
+    if (resultingConstraints.width)
+        m_widthConstraint = *resultingConstraints.width;
+    else if (resultingConstraints.height)
+        m_widthConstraint = 0;
+    if (resultingConstraints.height)
+        m_heightConstraint = *resultingConstraints.height;
+    else if (resultingConstraints.width)
+        m_heightConstraint = 0;
+    if (resultingConstraints.frameRate)
+        m_frameRateConstraint = *resultingConstraints.frameRate;
+    gst_printerrln("widthConstraint: %d heightConstraint: %d", m_widthConstraint, m_heightConstraint);
+    WTFReportBacktrace();
+    m_currentSettings = {};
 }
 
 #undef GST_CAT_DEFAULT

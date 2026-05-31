@@ -22,6 +22,7 @@
  */
 
 #include "config.h"
+#include "MockRealtimeVideoSource.h"
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "MockRealtimeVideoSourceGStreamer.h"
@@ -44,18 +45,23 @@ CaptureSourceOrError MockRealtimeVideoSource::create(String&& deviceID, AtomStri
         return CaptureSourceOrError({ "No mock camera device"_s , MediaAccessDenialReason::PermissionDenied });
 #endif
 
-    Ref<RealtimeMediaSource> source = MockRealtimeVideoSourceGStreamer::create(WTF::move(deviceID), WTF::move(name), WTF::move(hashSalts), pageIdentifier);
+    Ref source = MockRealtimeVideoSourceGStreamer::create(WTF::move(deviceID), WTF::move(name), WTF::move(hashSalts), pageIdentifier, constraints);
     if (constraints) {
-        if (auto error = source->applyConstraints(*constraints))
+        std::optional<ApplyConstraintsError> error;
+        source->applyConstraints(*constraints, [&](auto&& result) { error = WTF::move(result); });
+        if (error)
             return CaptureSourceOrError(CaptureSourceError { error->invalidConstraint });
+        // source->storePresetConstraints(*constraints);
     }
 
-    return source;
+    return upcast<RealtimeMediaSource>(source);
 }
 
-MockRealtimeVideoSourceGStreamer::MockRealtimeVideoSourceGStreamer(String&& deviceID, AtomString&& name, MediaDeviceHashSalts&& hashSalts, std::optional<PageIdentifier> pageIdentifier)
+MockRealtimeVideoSourceGStreamer::MockRealtimeVideoSourceGStreamer(String&& deviceID, AtomString&& name, MediaDeviceHashSalts&& hashSalts, std::optional<PageIdentifier> pageIdentifier, const MediaConstraints* constraints)
     : MockRealtimeVideoSource(WTF::move(deviceID), WTF::move(name), WTF::move(hashSalts), pageIdentifier)
 {
+    // if (constraints)
+    //     storePresetConstraints(*constraints);
     ensureGStreamerInitialized();
     auto& singleton = GStreamerVideoCaptureDeviceManager::singleton();
     auto device = singleton.gstreamerDeviceWithUID(this->captureDevice().persistentId());
@@ -124,13 +130,12 @@ void MockRealtimeVideoSourceGStreamer::updateSampleBuffer()
 
     int frameRateNumerator, frameRateDenominator;
     gst_util_double_to_fraction(settings().frameRate(), &frameRateNumerator, &frameRateDenominator);
-
+    gst_printerrln("-> %f fps", settings().frameRate());
     VideoFrameTimeMetadata metadata;
     metadata.captureTime = MonotonicTime::now().secondsSinceEpoch();
 
     VideoFrameGStreamer::CreateOptions options;
     options.presentationTime = fromGstClockTime(gst_util_uint64_scale(m_frameNumber, frameRateDenominator * GST_SECOND, frameRateNumerator));
-    options.rotation = videoFrameRotation();
     options.timeMetadata = WTF::move(metadata);
 
     auto videoFrame = VideoFrameGStreamer::createFromPixelBuffer(pixelBuffer.releaseNonNull(), m_capturer->size(), frameRate(), options);
@@ -157,6 +162,76 @@ void MockRealtimeVideoSourceGStreamer::setSizeFrameRateAndZoom(const VideoPreset
 
     m_capturer->setSize({ *constraints.width, *constraints.height });
 }
+
+void MockRealtimeVideoSourceGStreamer::storePresetConstraints(const MediaConstraints& constraints)
+{
+    auto resultingConstraints = extractVideoPresetConstraints(constraints);
+
+    if (resultingConstraints.width)
+        m_widthConstraint = *resultingConstraints.width;
+    else if (resultingConstraints.height)
+        m_widthConstraint = 0;
+    if (resultingConstraints.height)
+        m_heightConstraint = *resultingConstraints.height;
+    else if (resultingConstraints.width)
+        m_heightConstraint = 0;
+    if (resultingConstraints.frameRate)
+        m_frameRateConstraint = *resultingConstraints.frameRate;
+    gst_printerrln("widthConstraint: %d heightConstraint: %d size: %dx%d @ %f fps", m_widthConstraint, m_heightConstraint, size().width(), size().height(), m_frameRateConstraint);
+    WTFReportBacktrace();
+    m_currentSettings = {};
+}
+
+void MockRealtimeVideoSourceGStreamer::applyConstraints(const MediaConstraints& constraints, ApplyConstraintsHandler&& callback)
+{
+    MockRealtimeVideoSource::applyConstraints(constraints, [this, constraints, callback = WTF::move(callback)](auto&& error) mutable {
+        if (!error)
+            storePresetConstraints(constraints);
+        // m_currentSettings = {};
+        callback(WTF::move(error));
+    });
+}
+
+const RealtimeMediaSourceSettings& MockRealtimeVideoSourceGStreamer::settings()
+{
+    // if (!m_currentSettings) {
+    //     RealtimeMediaSourceSettings settings;
+    //     settings.setDeviceId(hashedId());
+
+    //     RealtimeMediaSourceSupportedConstraints supportedConstraints;
+    //     supportedConstraints.setSupportsDeviceId(true);
+    //     supportedConstraints.setSupportsFacingMode(true);
+    //     supportedConstraints.setSupportsWidth(true);
+    //     supportedConstraints.setSupportsHeight(true);
+    //     supportedConstraints.setSupportsAspectRatio(true);
+    //     supportedConstraints.setSupportsFrameRate(true);
+    //     settings.setSupportedConstraints(supportedConstraints);
+
+    //     m_currentSettings = WTF::move(settings);
+    // }
+    [[maybe_unused]] const auto& settings = MockRealtimeVideoSource::settings();
+    ASSERT(m_currentSettings);
+    if (m_widthConstraint || m_heightConstraint) {
+        auto desiredSize = computeResizedVideoFrameSize({ m_widthConstraint, m_heightConstraint }, intrinsicSize());
+
+        auto videoFrameRotation = this->videoFrameRotation();
+        if (videoFrameRotation == VideoFrameRotation::Left || videoFrameRotation == VideoFrameRotation::Right)
+            desiredSize = desiredSize.transposedSize();
+
+        m_currentSettings->setWidth(desiredSize.width());
+        m_currentSettings->setHeight(desiredSize.height());
+        gst_printerrln("->> mock %dx%d constraint: %dx%d", desiredSize.width(), desiredSize.height(), m_widthConstraint, m_heightConstraint);
+    }
+
+    if (m_frameRateConstraint // && m_frameRateConstraint < m_currentSettings->frameRate()
+        ) {
+        gst_printerrln("->> mock %f fps", m_frameRateConstraint);
+        m_currentSettings->setFrameRate(m_frameRateConstraint);
+    }
+    m_currentSettings->setFacingMode(facingMode());
+    return m_currentSettings.value();
+}
+
 
 } // namespace WebCore
 

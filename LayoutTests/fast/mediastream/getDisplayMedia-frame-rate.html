@@ -34,6 +34,7 @@ promise_test(async t => {
     const stream2 = stream.clone();
     t.add_cleanup(() => stream2.getTracks().forEach(track => track.stop()));
     await stream2.getVideoTracks()[0].applyConstraints({ width:320, height:240, frameRate : 1 });
+             assert_equals(stream2.getVideoTracks()[0].getSettings().width, 320);
     assert_equals(stream2.getVideoTracks()[0].getSettings().frameRate, 1);
 
     video1.srcObject = stream;

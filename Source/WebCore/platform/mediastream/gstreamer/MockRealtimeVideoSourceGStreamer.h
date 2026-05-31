@@ -31,9 +31,9 @@ namespace WebCore {
 
 class MockRealtimeVideoSourceGStreamer final : public MockRealtimeVideoSource, GStreamerCapturerObserver {
 public:
-    static Ref<MockRealtimeVideoSourceGStreamer> create(String&& deviceID, AtomString&& name, MediaDeviceHashSalts&& salts, std::optional<PageIdentifier> pageID)
+    static Ref<MockRealtimeVideoSourceGStreamer> create(String&& deviceID, AtomString&& name, MediaDeviceHashSalts&& salts, std::optional<PageIdentifier> pageID, const MediaConstraints* constraints)
     {
-        return adoptRef(*new MockRealtimeVideoSourceGStreamer(WTF::move(deviceID), WTF::move(name), WTF::move(salts), pageID));
+        return adoptRef(*new MockRealtimeVideoSourceGStreamer(WTF::move(deviceID), WTF::move(name), WTF::move(salts), pageID, constraints));
     }
 
     ~MockRealtimeVideoSourceGStreamer();
@@ -48,10 +48,18 @@ public:
 
     std::pair<GstClockTime, GstClockTime> queryCaptureLatency() const final;
 
+    IntSize sizeConstraint() const { return { m_widthConstraint, m_heightConstraint }; }
+    double frameRateConstraint() const { return m_frameRateConstraint; }
+
+    void applyConstraints(const MediaConstraints&, ApplyConstraintsHandler&&) final;
+    const RealtimeMediaSourceSettings& settings() final;
+
 private:
-    MockRealtimeVideoSourceGStreamer(String&& deviceID, AtomString&& name, MediaDeviceHashSalts&&, std::optional<PageIdentifier>);
+    MockRealtimeVideoSourceGStreamer(String&& deviceID, AtomString&& name, MediaDeviceHashSalts&&, std::optional<PageIdentifier>, const MediaConstraints*);
 
     friend class MockRealtimeVideoSource;
+
+    void storePresetConstraints(const MediaConstraints&);
 
     void startProducingData() final;
     void stopProducingData() final;
@@ -60,6 +68,10 @@ private:
     void setSizeFrameRateAndZoom(const VideoPresetConstraints&) final;
 
     RefPtr<GStreamerVideoCapturer> m_capturer;
+
+    int m_widthConstraint { 0 };
+    int m_heightConstraint { 0 };
+    double m_frameRateConstraint { 0 };
 };
 
 } // namespace WebCore

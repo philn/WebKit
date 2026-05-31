@@ -78,7 +78,7 @@ private:
     friend class MockRealtimeVideoSourceGStreamer;
 
     const RealtimeMediaSourceCapabilities& capabilities() final;
-    const RealtimeMediaSourceSettings& settings() final;
+    const RealtimeMediaSourceSettings& settings() override;
     Ref<TakePhotoNativePromise> takePhotoInternal(PhotoSettings&&) final;
     Ref<PhotoCapabilitiesNativePromise> getPhotoCapabilities() final;
     Ref<PhotoSettingsNativePromise> getPhotoSettings() final;

@@ -82,6 +82,8 @@ protected:
 
     bool canBePowerEfficient();
 
+    void applyConstraints(const MediaConstraints&, ApplyConstraintsHandler&&) override;
+
 private:
     struct CaptureSizeFrameRateAndZoom {
         std::optional<VideoPreset> encodingPreset;
@@ -115,7 +117,6 @@ private:
     using PendingOperation = Variant<PendingPhotoCapture, PendingConstraintApplication>;
 
     void dispatchNextOperation();
-    void applyConstraints(const MediaConstraints&, ApplyConstraintsHandler&&) override;
     void didEnd() override;
 
 #if !RELEASE_LOG_DISABLED

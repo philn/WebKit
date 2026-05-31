@@ -26,15 +26,18 @@
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 #include "ContextDestructionObserverInlines.h"
+#include "MockRealtimeMediaSourceCenter.h"
 
 namespace WebCore {
 
 CaptureSourceOrError MockDisplayCaptureSourceGStreamer::create(const CaptureDevice& device, MediaDeviceHashSalts&& hashSalts, const MediaConstraints* constraints, std::optional<PageIdentifier> pageIdentifier)
 {
-    Ref mockSource = MockRealtimeVideoSourceGStreamer::create(String { device.persistentId() }, AtomString { device.label() }, MediaDeviceHashSalts { hashSalts }, pageIdentifier);
+    Ref mockSource = MockRealtimeVideoSourceGStreamer::create(String { device.persistentId() }, AtomString { device.label() }, MediaDeviceHashSalts { hashSalts }, pageIdentifier, constraints);
 
     if (constraints) {
-        if (auto error = mockSource->applyConstraints(*constraints))
+        std::optional<ApplyConstraintsError> error;
+        mockSource->applyConstraints(*constraints, [&](auto&& result) { error = WTF::move(result); });
+        if (error)
             return CaptureSourceOrError(CaptureSourceError { error->invalidConstraint });
     }
 
@@ -47,6 +50,12 @@ MockDisplayCaptureSourceGStreamer::MockDisplayCaptureSourceGStreamer(const Captu
     , m_source(WTF::move(source))
     , m_deviceType(device.type())
 {
+    // auto mockDevice = MockRealtimeMediaSourceCenter::mockDeviceWithPersistentID(persistentID());
+    // ASSERT(mockDevice);
+    // auto& properties = std::get<MockDisplayProperties>(mockDevice->properties);
+    // setIntrinsicSize(properties.defaultSize);
+    // setSize(properties.defaultSize);
+
     m_source->addVideoFrameObserver(*this);
 }
 
@@ -97,21 +106,103 @@ const RealtimeMediaSourceCapabilities& MockDisplayCaptureSourceGStreamer::capabi
     return m_capabilities.value();
 }
 
+void MockDisplayCaptureSourceGStreamer::storePresetConstraints(const MediaConstraints& constraints)
+{
+    auto resultingConstraints = extractVideoPresetConstraints(constraints);
+
+    if (resultingConstraints.width)
+        m_widthConstraint = *resultingConstraints.width;
+    else if (resultingConstraints.height)
+        m_widthConstraint = 0;
+    if (resultingConstraints.height)
+        m_heightConstraint = *resultingConstraints.height;
+    else if (resultingConstraints.width)
+        m_heightConstraint = 0;
+    if (resultingConstraints.frameRate)
+        m_frameRateConstraint = *resultingConstraints.frameRate;
+    // gst_printerrln("widthConstraint: %d heightConstraint: %d size: %dx%d @ %f fps", m_widthConstraint, m_heightConstraint, size().width(), size().height(), m_frameRateConstraint);
+    // WTFReportBacktrace();
+    m_source->removeVideoFrameObserver(*this);
+    m_source->addVideoFrameObserver(*this, { m_widthConstraint, m_heightConstraint }, m_frameRateConstraint);
+    m_currentSettings = {};
+}
+
+void MockDisplayCaptureSourceGStreamer::applyConstraints(const MediaConstraints& constraints, ApplyConstraintsHandler&& callback)
+{
+    RealtimeMediaSource::applyConstraints(constraints, [this, constraints, callback = WTF::move(callback)](auto&& error) mutable {
+        if (!error)
+            storePresetConstraints(constraints);
+
+        callback(WTF::move(error));
+    });
+}
+
+IntSize MockDisplayCaptureSourceGStreamer::computeResizedVideoFrameSize(IntSize desiredSize, IntSize intrinsicSize)
+{
+    // We keep the aspect ratio of the intrinsic size for the frame size as getDisplayMedia allows max constraints only.
+    if (!intrinsicSize.width() || !intrinsicSize.height())
+        return desiredSize;
+
+    if (!desiredSize.height())
+        desiredSize.setHeight(intrinsicSize.height());
+    if (!desiredSize.width())
+        desiredSize.setWidth(intrinsicSize.width());
+
+    auto maxHeight = std::min(desiredSize.height(), intrinsicSize.height());
+    auto maxWidth = std::min(desiredSize.width(), intrinsicSize.width());
+
+    auto heightForMaxWidth = maxWidth * intrinsicSize.height() / intrinsicSize.width();
+    auto widthForMaxHeight = maxHeight * intrinsicSize.width() / intrinsicSize.height();
+
+    if (heightForMaxWidth <= maxHeight)
+        return { maxWidth, heightForMaxWidth };
+
+    if (widthForMaxHeight <= maxWidth)
+        return { widthForMaxHeight, maxHeight };
+
+    return intrinsicSize;
+}
+
 const RealtimeMediaSourceSettings& MockDisplayCaptureSourceGStreamer::settings()
 {
     if (!m_currentSettings) {
+        // auto settings = m_source->settings().isolatedCopy();
         RealtimeMediaSourceSettings settings;
-        settings.setFrameRate(frameRate());
 
-        m_source->ensureIntrinsicSizeMaintainsAspectRatio();
-        auto size = m_source->size();
-        settings.setWidth(size.width());
-        settings.setHeight(size.height());
-        settings.setDeviceId(hashedId());
+        if (m_widthConstraint || m_heightConstraint) {
+            // TODO: intrinsic size is 0x0 likely because we don't override RealtimeVideoCaptureSource::applyFrameRateAndZoomWithPreset
+            gst_printerrln("->>>>>>> intrinsic size: %dx%d", intrinsicSize().width(), intrinsicSize().height());
+            auto desiredSize = computeResizedVideoFrameSize({ m_widthConstraint, m_heightConstraint }, intrinsicSize());
+
+            // auto videoFrameRotation = this->videoFrameRotation();
+            // if (videoFrameRotation == VideoFrameRotation::Left || videoFrameRotation == VideoFrameRotation::Right)
+            //     desiredSize = desiredSize.transposedSize();
+
+            settings.setWidth(desiredSize.width());
+            settings.setHeight(desiredSize.height());
+            gst_printerrln("->> mock %dx%d constraint: %dx%d", desiredSize.width(), desiredSize.height(), m_widthConstraint, m_heightConstraint);
+        } else {
+            auto size = this->size();
+            settings.setWidth(size.width());
+            settings.setHeight(size.height());
+        }
+
+        if (m_frameRateConstraint // && m_frameRateConstraint < m_currentSettings->frameRate()
+        ) {
+            gst_printerrln("->> mock %f fps", m_frameRateConstraint);
+            settings.setFrameRate(m_frameRateConstraint);
+        } else
+            settings.setFrameRate(frameRate());
+
+        // m_source->ensureIntrinsicSizeMaintainsAspectRatio();
+        // auto size = m_source->size();
+        // settings.setWidth(size.width());
+        // settings.setHeight(size.height());
+        // settings.setDeviceId(hashedId());
         settings.setDisplaySurface(m_source->mockScreen() ? DisplaySurfaceType::Monitor : DisplaySurfaceType::Window);
         settings.setLogicalSurface(false);
 
-        RealtimeMediaSourceSupportedConstraints supportedConstraints;
+        RealtimeMediaSourceSupportedConstraints supportedConstraints = settings.supportedConstraints();
         supportedConstraints.setSupportsFrameRate(true);
         supportedConstraints.setSupportsWidth(true);
         supportedConstraints.setSupportsHeight(true);
@@ -124,6 +215,17 @@ const RealtimeMediaSourceSettings& MockDisplayCaptureSourceGStreamer::settings()
         m_currentSettings = WTF::move(settings);
     }
     return m_currentSettings.value();
+}
+
+void MockDisplayCaptureSourceGStreamer::applyFrameRateAndZoomWithPreset(double requestedFrameRate, double requestedZoom, std::optional<VideoPreset>&& preset)
+{
+    UNUSED_PARAM(requestedZoom);
+
+    m_currentPreset = WTF::move(preset);
+    if (!m_currentPreset)
+        return;
+
+    setIntrinsicSize(m_currentPreset->size());
 }
 
 } // namespace WebCore

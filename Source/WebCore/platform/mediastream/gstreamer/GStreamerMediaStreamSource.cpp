@@ -23,12 +23,16 @@
 
 #include "config.h"
 #include "GStreamerMediaStreamSource.h"
+#include "CaptureDevice.h"
 
 #if ENABLE(VIDEO) && ENABLE(MEDIA_STREAM) && USE(GSTREAMER)
 
 #include "AudioTrackPrivateMediaStream.h"
 #include "GStreamerAudioData.h"
 #include "GStreamerCommon.h"
+#include "GStreamerVideoCaptureSource.h"
+#include "MockRealtimeVideoSourceGStreamer.h"
+#include "MockDisplayCaptureSourceGStreamer.h"
 #include "GUniquePtrGStreamer.h"
 #include "MediaStreamPrivate.h"
 #include "VideoFrameGStreamer.h"
@@ -303,8 +307,31 @@ public:
         m_track->addObserver(*this);
         if (m_track->isAudio())
             m_track->source().addAudioSampleObserver(*this);
-        else if (m_track->isVideo())
-            m_track->source().addVideoFrameObserver(*this);
+        else if (m_track->isVideo()) {
+            if (m_track->isCaptureTrack()) {
+                if (m_track->source().isMockSource()) {
+                    if (m_track->source().deviceType() == CaptureDevice::DeviceType::Camera) {
+                        GST_DEBUG_OBJECT(m_src.get(), "phil Observing camera video capture mock track");
+                        auto& videoSource = reinterpret_cast<MockRealtimeVideoSourceGStreamer&>(m_track->source());
+                        IntSize sizeConstraint(m_track->settings().width(), m_track->settings().height());
+                        m_track->source().addVideoFrameObserver(*this, sizeConstraint, videoSource.frameRateConstraint());
+                    } else {
+                        auto& videoSource = reinterpret_cast<MockDisplayCaptureSourceGStreamer&>(m_track->source());
+                        // IntSize sizeConstraint(videoSource.settings().width(), videoSource.settings().height());
+                        IntSize sizeConstraint(m_track->settings().width(), m_track->settings().height());
+                        GST_DEBUG_OBJECT(m_src.get(), "phil Observing display video capture mock track %dx%d %p", sizeConstraint.width(), sizeConstraint.height(), &(m_track->source()));
+                        m_track->source().addVideoFrameObserver(*this, sizeConstraint, videoSource.frameRateConstraint());
+                    }
+                } else {
+                    GST_DEBUG_OBJECT(m_src.get(), "phil Observing video capture track");
+                    auto& videoSource = reinterpret_cast<GStreamerVideoCaptureSource&>(m_track->source());
+                    m_track->source().addVideoFrameObserver(*this, videoSource.sizeConstraint(), videoSource.frameRateConstraint());
+                }
+            } else {
+                GST_DEBUG_OBJECT(m_src.get(), "phil Observing incoming video track");
+                m_track->source().addVideoFrameObserver(*this);
+            }
+        }
         m_isObserving = true;
     }
 
@@ -397,7 +424,12 @@ public:
 
     void trackStarted(MediaStreamTrackPrivate&) final { };
     void trackMutedChanged(MediaStreamTrackPrivate&) final { };
-    void trackSettingsChanged(MediaStreamTrackPrivate&) final { };
+    void trackSettingsChanged(MediaStreamTrackPrivate&) final
+    {
+        stopObserving();
+        startObserving();
+    }
+
     void readyStateChanged(MediaStreamTrackPrivate&) final { };
 
     void dataFlowStarted(MediaStreamTrackPrivate&) final

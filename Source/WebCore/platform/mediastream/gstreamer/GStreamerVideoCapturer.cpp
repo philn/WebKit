@@ -47,6 +47,10 @@ GStreamerVideoCapturer::GStreamerVideoCapturer(GStreamerCaptureDevice&& device)
     : GStreamerCapturer(WTF::move(device), adoptGRef(gst_caps_new_empty_simple("video/x-raw")))
 {
     initializeVideoCapturerDebugCategory();
+    if (!m_device->isMockDevice())
+        return;
+
+    gst_caps_set_simple(m_caps.get(), "format", G_TYPE_STRING, "RGBA", nullptr);
 }
 
 GStreamerVideoCapturer::GStreamerVideoCapturer(const PipeWireCaptureDevice& device)
@@ -188,6 +192,7 @@ bool GStreamerVideoCapturer::setSize(const IntSize& size)
     if (!width || !height)
         return false;
 
+    gst_printerrln("phil caps %" GST_PTR_FORMAT, m_caps.get());
     auto videoResolution = getVideoResolutionFromCaps(m_caps.get());
     if (videoResolution && videoResolution->width() == width && videoResolution->height() == height) {
         GST_DEBUG_OBJECT(m_pipeline.get(), "Size has not changed");

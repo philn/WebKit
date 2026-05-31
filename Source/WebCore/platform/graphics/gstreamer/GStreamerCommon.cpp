@@ -206,10 +206,12 @@ std::optional<FloatSize> getVideoResolutionFromCaps(const GstCaps* caps)
         return std::nullopt;
     }
 
+    GstStructure* structure = gst_caps_get_structure(caps, 0);
+    if (!gst_structure_n_fields(structure))
+        return std::nullopt;
+
     int width = 0, height = 0;
     int pixelAspectRatioNumerator = 1, pixelAspectRatioDenominator = 1;
-
-    GstStructure* structure = gst_caps_get_structure(caps, 0);
     if (!areEncryptedCaps(caps) && (gst_structure_has_name(structure, "video/x-raw") || gst_structure_has_field(structure, "format"))) {
         GstVideoInfo info;
         gst_video_info_init(&info);
