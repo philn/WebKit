@@ -63,7 +63,6 @@ void GStreamerIncomingTrackProcessor::configure(ThreadSafeWeakPtr<GStreamerMedia
     }
     m_data.caps = WTF::move(caps);
 
-    GST_DEBUG_OBJECT(m_bin.get(), "Processing track with caps %" GST_PTR_FORMAT, m_data.caps.get());
     auto structure = gst_caps_get_structure(m_data.caps.get(), 0);
     if (auto ssrc = gstStructureGet<unsigned>(structure, "ssrc"_s)) {
         m_data.ssrc = *ssrc;
@@ -79,7 +78,10 @@ void GStreamerIncomingTrackProcessor::configure(ThreadSafeWeakPtr<GStreamerMedia
         m_data.mid = mid.span();
 
     m_data.mediaStreamBinName = makeString("incoming-"_s, typeName, "-track-"_s, m_data.ssrc, '-', unsafeSpan(GST_OBJECT_NAME(m_pad.get())));
-    m_bin = gst_bin_new(m_data.mediaStreamBinName.ascii().data());
+    auto binName = m_data.mediaStreamBinName.ascii();
+    m_bin = gst_bin_new(binName.data());
+    if (RefPtr endPoint = m_endPoint.get()) [[likely]]
+        GST_DEBUG_OBJECT(endPoint->pipeline(), "Processing track %s with caps %" GST_PTR_FORMAT, binName.data(), m_data.caps.get());
 
     g_object_get(m_pad.get(), "transceiver", &m_data.transceiver.outPtr(), nullptr);
 

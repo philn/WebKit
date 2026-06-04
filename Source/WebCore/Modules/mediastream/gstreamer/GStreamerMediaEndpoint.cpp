@@ -1599,6 +1599,8 @@ void GStreamerMediaEndpoint::connectIncomingTrack(WebRTCTrackData& data)
             return;
     } else if (source.isIncomingVideoSource()) {
         auto& videoSource = static_cast<RealtimeIncomingVideoSourceGStreamer&>(source);
+        auto dotFileName = makeString(unsafeSpan(GST_OBJECT_NAME(m_pipeline.get())), "-phil"_s);
+        dumpBinToDotFile(m_pipeline, dotFileName);
         if (!videoSource.setBin(WTF::move(mediaStreamBin)))
             return;
     }
