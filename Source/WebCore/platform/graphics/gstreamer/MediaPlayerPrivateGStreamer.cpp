@@ -598,6 +598,8 @@ bool MediaPlayerPrivateGStreamer::doSeek(const SeekTarget& target, float rate, b
     if (!player)
         return false;
 
+    GST_DEBUG_OBJECT(pipeline(), "[Seek] Requested %s %s seek to %f at rate %f", isAsync ? "asynchronous" : "synchronous", isSegment ? "segment" : "non-segment", target.time.toDouble(), rate);
+
     // Default values for rate >= 0.
     MediaTime startTime = target.time, endTime = MediaTime::invalidTime();
 
@@ -747,7 +749,8 @@ void MediaPlayerPrivateGStreamer::seekToTarget(const SeekTarget& inTarget)
         }
     } else {
         // We can seek now.
-        if (!doSeek(target, player->rate())) {
+        bool isSegment = isSeamlessSeekingEnabled();
+        if (!doSeek(target, player->rate(), false, isSegment)) {
             GST_DEBUG_OBJECT(pipeline(), "[Seek] seeking to %s failed", toString(target.time).utf8().data());
             return;
         }
@@ -2452,6 +2455,13 @@ void MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
 
 void MediaPlayerPrivateGStreamer::processBufferingStats(GstMessage* message)
 {
+    RefPtr player = m_player.get();
+    if (!player)
+        return;
+
+    if (player->isLooping())
+        return;
+
     GstBufferingMode mode;
     gst_message_parse_buffering_stats(message, &mode, nullptr, nullptr, nullptr);
 

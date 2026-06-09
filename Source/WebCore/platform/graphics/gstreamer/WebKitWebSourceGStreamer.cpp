@@ -762,7 +762,9 @@ static gboolean webKitWebSrcDoSeek(GstBaseSrc* baseSrc, GstSegment* segment)
     WebKitWebSrc* src = WEBKIT_WEB_SRC(baseSrc);
     DataMutexLocker members { src->priv->dataMutex };
 
-    GST_DEBUG_OBJECT(src, "Seek segment: (%" G_GUINT64_FORMAT "-%" G_GUINT64_FORMAT ") Position previous to seek: %" G_GUINT64_FORMAT, segment->start, segment->stop, members->readPosition);
+    GST_OBJECT_FLAG_UNSET(GST_BASE_SRC_PAD(baseSrc), GST_PAD_FLAG_EOS);
+    GST_DEBUG_OBJECT(src, "Seek segment: %" GST_SEGMENT_FORMAT, segment);
+    GST_DEBUG_OBJECT(src, "Position previous to seek: %" G_GUINT64_FORMAT, members->readPosition);
 
     // Before attempting to seek, basesrc will call isSeekable(). If isSeekable() is true, a flush will be made and
     // this function will be called. basesrc still gives us the chance here to return FALSE and cancel the seek.
