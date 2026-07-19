@@ -433,6 +433,8 @@ private:
 
     GRefPtr<GstClock> m_videoClock;
     GstClockTime m_baseTime;
+
+    CString m_debugId;
 };
 
 } // namespace WebCore

@@ -241,7 +241,9 @@ GStreamerInternalVideoDecoder::GStreamerInternalVideoDecoder(const String& codec
             m_inputCaps.clear();
             return;
         }
-        harnessedElement = gst_bin_new(nullptr);
+        static Atomic<unsigned> id = 0;
+        auto name = makeString("video-decoder-"_s, id.exchangeAdd(1));
+        harnessedElement = gst_bin_new(name.ascii().data());
         gst_bin_add_many(GST_BIN_CAST(harnessedElement.get()), parserElement, element.get(), nullptr);
         gst_element_link(parserElement, element.get());
         GRefPtr sinkPad = adoptGRef(gst_element_get_static_pad(parserElement, "sink"));

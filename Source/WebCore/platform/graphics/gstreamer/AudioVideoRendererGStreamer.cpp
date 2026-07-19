@@ -90,6 +90,17 @@
 
 namespace WebCore {
 
+GST_DEBUG_CATEGORY(webkit_audio_video_renderer_debug);
+#define GST_CAT_DEFAULT webkit_audio_video_renderer_debug
+
+static void initializeDebugCategory()
+{
+    static std::once_flag onceFlag;
+    std::call_once(onceFlag, [] {
+        GST_DEBUG_CATEGORY_INIT(webkit_audio_video_renderer_debug, "webkitaudiovideorenderer", 0, "WebKit Audio Video Renderer");
+    });
+}
+
 WTF_MAKE_TZONE_ALLOCATED_IMPL(AudioVideoRendererGStreamer);
 
 // static PeriodicSharedTimer& sharedTimebaseTimer()
@@ -123,19 +134,23 @@ AudioVideoRendererGStreamer::AudioVideoRendererGStreamer(const Logger& originalL
     }))
 #endif
 {
+    initializeDebugCategory();
+    auto id = makeString("av-renderer-"_s, m_logIdentifier);
+    m_debugId = id.ascii();
+    GST_DEBUG_ID(m_debugId.data(), "Created renderer");
     // addPeriodicTimeObserverForInterval: throws an exception if you pass a non-numeric CMTime, so just use
     // an arbitrarily large time value of once an hour:
     // __block ThreadSafeWeakPtr weakThis { *this };
-//     m_timeJumpedObserver = [m_synchronizer addPeriodicTimeObserverForInterval:PAL::toCMTime(MediaTime::createWithDouble(3600)) queue:mainDispatchQueueSingleton() usingBlock:^(CMTime time) {
-// #if LOG_DISABLED
-//         UNUSED_PARAM(time);
-// #endif
-//         RefPtr protectedThis = weakThis.get();
-//         if (!protectedThis)
-//             return;
+    //     m_timeJumpedObserver = [m_synchronizer addPeriodicTimeObserverForInterval:PAL::toCMTime(MediaTime::createWithDouble(3600)) queue:mainDispatchQueueSingleton() usingBlock:^(CMTime time) {
+    // #if LOG_DISABLED
+    //         UNUSED_PARAM(time);
+    // #endif
+    //         RefPtr protectedThis = weakThis.get();
+    //         if (!protectedThis)
+    //             return;
 
-//         auto clampedTime = CMTIME_IS_NUMERIC(time) ? clampTimeToLastSeekTime(PAL::toMediaTime(time)) : MediaTime::zeroTime();
-//         ALWAYS_LOG(LOGIDENTIFIER, "synchronizer fired: time clamped = ", clampedTime, ", seeking = ", m_isSynchronizerSeeking);
+    //         auto clampedTime = CMTIME_IS_NUMERIC(time) ? clampTimeToLastSeekTime(PAL::toMediaTime(time)) : MediaTime::zeroTime();
+    //         ALWAYS_LOG(LOGIDENTIFIER, "synchronizer fired: time clamped = ", clampedTime, ", seeking = ", m_isSynchronizerSeeking);
 
     //         m_isSynchronizerSeeking = false;
     //         maybeCompleteSeek();
@@ -423,7 +438,7 @@ bool AudioVideoRendererGStreamer::isReadyForMoreSamples(TrackIdentifier trackId)
     case TrackType::Audio:
         // if (RetainPtr audioRenderer = audioRendererFor(trackId))
         //     return audioTrackPropertiesFor(trackId).readyToRequestAudioData && [audioRenderer isReadyForMoreMediaData];
-        return false;
+        return true;
     default:
         ASSERT_NOT_REACHED();
         return false;
@@ -517,7 +532,7 @@ void AudioVideoRendererGStreamer::notifyTrackNeedsReenqueuing(TrackIdentifier tr
 void AudioVideoRendererGStreamer::flush()
 {
     ALWAYS_LOG(LOGIDENTIFIER);
-
+    GST_DEBUG_ID(m_debugId.data(), "Flushing");
     cancelSeekingPromiseIfNeeded();
     m_seekState = SeekCompleted;
     m_isSynchronizerSeeking = false;
@@ -536,8 +551,12 @@ void AudioVideoRendererGStreamer::flushTrack(TrackIdentifier trackId)
 
     switch (*type) {
     case TrackType::Video:
-        if (isEnabledVideoTrackId(trackId))
+        GST_DEBUG_ID(m_debugId.data(), "phil");
+        if (isEnabledVideoTrackId(trackId)) {
+            GST_DEBUG_ID(m_debugId.data(), "-> phil");
             flushVideo();
+        }
+        GST_DEBUG_ID(m_debugId.data(), "phil");
         break;
     case TrackType::Audio:
         flushAudioTrack(trackId);
@@ -1162,6 +1181,7 @@ void AudioVideoRendererGStreamer::pushVideoFrameToCompositor(Ref<VideoFrame>&& f
         setHasAvailableVideoFrame(true);
 
     auto pts = toGstClockTime(time);
+    gst_printerrln("PTS: %" GST_TIME_FORMAT, GST_TIME_ARGS(pts));
     pts += m_baseTime;
     // gst_printerrln("-> wait until: %" GST_TIME_FORMAT " now: %" GST_TIME_FORMAT, GST_TIME_ARGS(time), GST_TIME_ARGS(gst_clock_get_time(m_videoClock.get())));
     GstClockIDPtr clockId = gst_clock_new_single_shot_id(m_videoClock.get(), pts);
@@ -1878,6 +1898,7 @@ void AudioVideoRendererGStreamer::notifyError(PlatformMediaError error)
 //     auto& properties = it->value;
 //     if (!properties.callbackForReenqueuing)
 //         return;
+//     FIXME(phil): This is not called, so audio track doesn't re-enqueue its buffers ->>> no audio decoding!
 //     properties.callbackForReenqueuing(*trackId, PAL::toMediaTime(cmTime));
 // }
 
@@ -2203,7 +2224,10 @@ void AudioVideoRendererGStreamer::setNeedsPlaceholderImage(bool needsPlaceholder
 
 bool AudioVideoRendererGStreamer::isEnabledVideoTrackId(TrackIdentifier trackId) const
 {
-    return m_enabledVideoTrackId == trackId;
+    if (!m_enabledVideoTrackId)
+        return false;
+
+    return *m_enabledVideoTrackId == trackId;
 }
 
 bool AudioVideoRendererGStreamer::hasSelectedVideo() const
@@ -2214,6 +2238,7 @@ bool AudioVideoRendererGStreamer::hasSelectedVideo() const
 void AudioVideoRendererGStreamer::flushVideo()
 {
     ALWAYS_LOG(LOGIDENTIFIER);
+    GST_DEBUG_ID(m_debugId.data(), "Flushing video");
 
     setHasAvailableVideoFrame(false);
     m_hasEverSubmittedVideoSample = false;
@@ -2221,12 +2246,15 @@ void AudioVideoRendererGStreamer::flushVideo()
     m_readyToRequestVideoData = true;
     // if (RefPtr videoRenderer = m_videoRenderer)
     //     videoRenderer->flush();
+    if (m_videoDecoder)
+        m_videoDecoder->flush();
     flushPendingSizeChanges();
     m_keyframeNeeded = true;
 }
 
 void AudioVideoRendererGStreamer::flushAudio()
 {
+    GST_DEBUG_ID(m_debugId.data(), "Flushing audio");
     for (auto& properties : m_audioTracksMap.values()) {
         properties.hasAudibleSample = false;
         properties.readyToRequestAudioData = true;
@@ -2241,6 +2269,7 @@ void AudioVideoRendererGStreamer::flushAudio()
 void AudioVideoRendererGStreamer::flushAudioTrack(TrackIdentifier trackId)
 {
     ALWAYS_LOG(LOGIDENTIFIER);
+    GST_DEBUG_ID(m_debugId.data(), "Flushing audio track");
     // RetainPtr audioRenderer = audioRendererFor(trackId);
     // if (!audioRenderer)
     //     return;

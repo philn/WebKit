@@ -3883,6 +3883,7 @@ void MediaPlayerPrivateGStreamer::pushTextureToCompositor(IsDuplicateSample isDu
     VideoFrameGStreamer::CreateOptions options;
     options.info = m_videoInfo;
     auto frame = VideoFrameGStreamer::createWrappedSample(m_sample, options);
+    // gst_printerrln("PTS: %" GST_TIME_FORMAT, GST_TIME_ARGS(GST_BUFFER_PTS(gst_sample_get_buffer(m_sample.get()))));
 
 #if USE(TEXTURE_MAPPER)
     auto buffer = CoordinatedPlatformLayerBufferVideo::create(WTF::move(frame), m_videoDecoderPlatform, !m_isUsingFallbackVideoSink, m_videoSourceOrientation);

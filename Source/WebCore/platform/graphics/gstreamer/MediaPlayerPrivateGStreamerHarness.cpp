@@ -1335,6 +1335,7 @@ void MediaPlayerPrivateGStreamerHarness::provideMediaData(TrackBuffer& trackBuff
     unsigned enqueuedSamples = 0;
 
     while (true) {
+        // TODO(phil): make this not always return true, maybe keep track of input buffers count vs output buffers count.
         if (!isReadyForMoreSamples(trackId)) {
             DEBUG_LOG(LOGIDENTIFIER, "bailing early, track id ", trackId, " is not ready for more data");
             notifyClientWhenReadyForMoreSamples(trackId);
@@ -1351,6 +1352,7 @@ void MediaPlayerPrivateGStreamerHarness::provideMediaData(TrackBuffer& trackBuff
         ++enqueuedSamples;
     }
 
+    // TODO(phil): We should flush av renderer track here.
     DEBUG_LOG(LOGIDENTIFIER, "enqueued ", enqueuedSamples, " samples, ", trackBuffer.remainingSamples(), " remaining");
     GST_TRACE_ID(m_debugId.data(), "Enqueued %u samples, %zu remaining", enqueuedSamples, trackBuffer.remainingSamples());
 }
