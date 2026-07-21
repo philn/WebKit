@@ -3,7 +3,7 @@ PASS Check if browser supports enough test media types
 PASS Test audio-only changeType for audio/webm; codecs="vorbis" <-> audio/webm; codecs="vorbis"
 PASS Test audio-only changeType for audio/webm; codecs="vorbis" <-> audio/mp4; codecs="mp4a.40.2"
 PASS Test audio-only changeType for audio/webm; codecs="vorbis" <-> audio/mpeg
-FAIL Test audio-only changeType for audio/mp4; codecs="mp4a.40.2" <-> audio/webm; codecs="vorbis" assert_unreached: Unexpected event 'error' Reached unreachable code
+PASS Test audio-only changeType for audio/mp4; codecs="mp4a.40.2" <-> audio/webm; codecs="vorbis"
 PASS Test audio-only changeType for audio/mp4; codecs="mp4a.40.2" <-> audio/mp4; codecs="mp4a.40.2"
 PASS Test audio-only changeType for audio/mp4; codecs="mp4a.40.2" <-> audio/mpeg
 PASS Test audio-only changeType for audio/mpeg <-> audio/webm; codecs="vorbis"
