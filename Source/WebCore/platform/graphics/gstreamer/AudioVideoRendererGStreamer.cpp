@@ -25,14 +25,13 @@
 
 #include "config.h"
 #include "AudioVideoRendererGStreamer.h"
-#include "AudioDecoder.h"
-#include "GStreamerCommon.h"
-#include "PlatformRawAudioDataGStreamer.h"
-#include <gst/gstbuffer.h>
 
 #if ENABLE(VIDEO) && USE(GSTREAMER)
 
+#include "AudioDecoder.h"
 #include "AudioMediaStreamTrackRenderer.h"
+#include "GStreamerCommon.h"
+#include "PlatformRawAudioDataGStreamer.h"
 // #include "CDMFairPlayStreaming.h"
 // #include "CDMInstanceFairPlayStreamingGStreamer.h"
 // #include "CDMLogging.h"
@@ -501,6 +500,7 @@ Ref<AudioVideoRenderer::RequestPromise> AudioVideoRendererGStreamer::requestMedi
         //     [audioRenderer requestMediaDataWhenReadyOnQueue:mainDispatchQueueSingleton() usingBlock:handler.get()];
         //     return property.requestPromise->promise();
         // }
+        return RequestPromise::createAndResolve(trackId);
         break;
     default:
         ASSERT_NOT_REACHED();
@@ -1181,7 +1181,7 @@ void AudioVideoRendererGStreamer::pushVideoFrameToCompositor(Ref<VideoFrame>&& f
         setHasAvailableVideoFrame(true);
 
     auto pts = toGstClockTime(time);
-    gst_printerrln("PTS: %" GST_TIME_FORMAT, GST_TIME_ARGS(pts));
+    // gst_printerrln("PTS: %" GST_TIME_FORMAT, GST_TIME_ARGS(pts));
     pts += m_baseTime;
     // gst_printerrln("-> wait until: %" GST_TIME_FORMAT " now: %" GST_TIME_FORMAT, GST_TIME_ARGS(time), GST_TIME_ARGS(gst_clock_get_time(m_videoClock.get())));
     GstClockIDPtr clockId = gst_clock_new_single_shot_id(m_videoClock.get(), pts);

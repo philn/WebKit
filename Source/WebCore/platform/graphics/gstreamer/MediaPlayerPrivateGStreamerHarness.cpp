@@ -1306,7 +1306,16 @@ void MediaPlayerPrivateGStreamerHarness::maybeFinishLoading()
             setNetworkState(m_readyState >= MediaPlayer::ReadyState::HaveMetadata ? MediaPlayer::NetworkState::DecodeError : MediaPlayer::NetworkState::FormatError);
             return;
         }
+
         setNetworkState(MediaPlayer::NetworkState::Idle);
+
+        invokeAsync(m_appendQueue, [parser = m_parser]() mutable {
+            parser->flushPendingMediaData();
+            return MediaPromise::createAndResolve();
+        })->whenSettled(m_runningQueue, [weakThis = ThreadSafeWeakPtr { *this }](auto&& result) {
+            // if (RefPtr protectedThis = weakThis.get())
+            //     protectedThis->appendCompleted(!!result);
+        });
 
         updateDurationFromTrackBuffers();
     }

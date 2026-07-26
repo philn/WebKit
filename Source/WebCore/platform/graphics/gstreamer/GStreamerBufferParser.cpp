@@ -87,7 +87,7 @@ Expected<void, PlatformMediaError> GStreamerBufferParser::appendData(Ref<const S
 
 void GStreamerBufferParser::flushPendingMediaData()
 {
-    
+    gst_printerrln("flush pending media data");
 }
 
 void GStreamerBufferParser::resetParserState()
@@ -171,6 +171,10 @@ void GStreamerBufferParser::initializeParserHarness()
     //             player->handleNeedContextMessage(message.get());
     //     });
     // }), this);
+
+    g_signal_connect(m_bus.get(), "sync-message::eos", G_CALLBACK(+[](GstBus*, GstMessage* message, GStreamerBufferParser* parser) {
+        gst_printerrln("EOS!!!!!");
+    }), this);
 
     m_harness = GStreamerElementHarness::create(WTF::move(parsebin), [this](auto&, auto&& outputSample) {
         handleSample(WTF::move(outputSample));
