@@ -81,8 +81,12 @@ static GstStaticPadTemplate s_harnessSinkPadTemplate = GST_STATIC_PAD_TEMPLATE("
  * `GStreamerElementHarness::Stream` using the `pullSample()` and `pullEvent()` methods. The list of
  * output streams can be queried with the `GStreamerElementHarness::outputStreams()` method.
  *
- * The harness can work on elements exposing either a static source pad, or one-to-many "sometimes"
- * source pads. Support for different topologies can be added as-needed.
+ * The harness can work on the following element types:
+ * - elements exposing a static source pad
+ * - elements exposing one-to-many "sometimes" source pads
+ * - sink elements
+ *
+ * Support for different topologies can be added as-needed.
  *
  * In cases where a graph dump of the harness and its downstream harnesses is needed for debugging
  * purposes, it can be done by calling the `dumpGraph()` method. At runtime you need to set the
@@ -91,7 +95,7 @@ static GstStaticPadTemplate s_harnessSinkPadTemplate = GST_STATIC_PAD_TEMPLATE("
  * PNG using the mermaid CLI tools or the [live editor](https://mermaid.live).
  */
 
-GStreamerElementHarness::GStreamerElementHarness(GRefPtr<GstElement>&& element, ProcessSampleCallback&& processOutputSampleCallback, std::optional<PadLinkCallback>&& padLinkCallback, GRefPtr<GstCaps>&& allowedOutputCaps)
+GStreamerElementHarness::GStreamerElementHarness(GRefPtr<GstElement>&& element, std::optional<ProcessSampleCallback>&& processOutputSampleCallback, std::optional<PadLinkCallback>&& padLinkCallback, GRefPtr<GstCaps>&& allowedOutputCaps)
     : m_element(WTF::move(element))
     , m_processOutputSampleCallback(WTF::move(processOutputSampleCallback))
     , m_padLinkCallback(WTF::move(padLinkCallback))
@@ -117,6 +121,7 @@ GStreamerElementHarness::GStreamerElementHarness(GRefPtr<GstElement>&& element, 
     }
 
     if (hasSometimesSrcPad) {
+        ASSERT(m_processOutputSampleCallback);
         GST_DEBUG_OBJECT(m_element.get(), "Expecting output buffers on sometimes src pad(s).");
         g_signal_connect(m_element.get(), "pad-added", reinterpret_cast<GCallback>(+[]([[maybe_unused]] GstElement* element, GstPad* pad, gpointer userData) {
             GST_DEBUG_OBJECT(element, "Pad added: %" GST_PTR_FORMAT, pad);
@@ -144,10 +149,14 @@ GStreamerElementHarness::GStreamerElementHarness(GRefPtr<GstElement>&& element, 
         }), this);
 
     } else {
-        GST_DEBUG_OBJECT(m_element.get(), "Expecting output buffers on static src pad.");
         GRefPtr elementSrcPad = adoptGRef(gst_element_get_static_pad(m_element.get(), "src"));
-        auto stream = GStreamerElementHarness::Stream::create(WTF::move(elementSrcPad), nullptr, GRefPtr(m_streamAllowedOutputCaps));
-        m_outputStreams.append(WTF::move(stream));
+        if (elementSrcPad) {
+            ASSERT(m_processOutputSampleCallback);
+            GST_DEBUG_OBJECT(m_element.get(), "Expecting output buffers on static src pad.");
+            auto stream = GStreamerElementHarness::Stream::create(WTF::move(elementSrcPad), nullptr, GRefPtr(m_streamAllowedOutputCaps));
+            m_outputStreams.append(WTF::move(stream));
+        } else
+            GST_DEBUG_OBJECT(m_element.get(), "Not expecting any src pad.");
     }
 
     static Atomic<uint64_t> uniqueStreamId;
@@ -459,9 +468,12 @@ bool GStreamerElementHarness::srcEvent(GRefPtr<GstEvent>&& event)
 
 void GStreamerElementHarness::processOutputSamples()
 {
+    ASSERT(m_processOutputSampleCallback);
+    if (!m_processOutputSampleCallback) [[unlikely]]
+        return;
     for (auto& stream : m_outputStreams) {
         while (auto outputSample = stream->pullSample())
-            m_processOutputSampleCallback(*stream.get(), WTF::move(outputSample));
+            m_processOutputSampleCallback.value()(*stream.get(), WTF::move(outputSample));
     }
 }
 

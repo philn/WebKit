@@ -184,6 +184,40 @@ TEST_F(GStreamerTest, harnessBufferProcessing)
     ASSERT_EQ(counter, 3);
 }
 
+TEST_F(GStreamerTest, harnessSink)
+{
+    GRefPtr<GstElement> element = gst_element_factory_make("fakesink", nullptr);
+    g_object_set(element.get(), "signal-handoffs", TRUE, "async", FALSE, nullptr);
+
+    unsigned counter = 0;
+    g_signal_connect(element.get(), "handoff", G_CALLBACK(+[](GstElement*, GstBuffer* buffer, GstPad*, gpointer userData) {
+        GstMappedBuffer mappedOutputBuffer(buffer, GST_MAP_READ);
+        ASSERT_TRUE(mappedOutputBuffer);
+        EXPECT_EQ(mappedOutputBuffer.size(), 64);
+        unsigned* counter = static_cast<unsigned*>(userData);
+        EXPECT_EQ(mappedOutputBuffer.data()[0], *counter);
+        (*counter)++;
+    }), &counter);
+    auto harness = WebCore::GStreamerElementHarness::create(WTF::move(element));
+
+    // The fakesink has no src pad, so the harness exposes no output stream.
+    ASSERT_TRUE(harness->outputStreams().isEmpty());
+
+    // Harness has not started processing data yet.
+    ASSERT_EQ(counter, 0);
+
+    // Push a batch of samples and expect they were all processed using the fakesink handoff callback.
+    auto caps = adoptGRef(gst_caps_new_empty_simple("foo"));
+    for (unsigned i = 0; i < 3; i++) {
+        auto buffer = adoptGRef(gst_buffer_new_allocate(nullptr, 64, nullptr));
+        gst_buffer_memset(buffer.get(), 0, i, 64);
+        auto sample = adoptGRef(gst_sample_new(buffer.get(), caps.get(), nullptr, nullptr));
+        EXPECT_TRUE(harness->pushSample(WTF::move(sample)));
+    }
+
+    ASSERT_EQ(counter, 3);
+}
+
 TEST_F(GStreamerTest, harnessFlush)
 {
     GRefPtr<GstElement> element = gst_element_factory_make("identity", nullptr);
