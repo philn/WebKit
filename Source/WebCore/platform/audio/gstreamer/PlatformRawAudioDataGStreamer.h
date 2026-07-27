@@ -47,6 +47,7 @@ public:
     constexpr MediaPlatformType platformType() const final { return MediaPlatformType::GStreamer; }
 
     const GRefPtr<GstSample>& sample() const { return m_sample; }
+    [[nodiscard]] GRefPtr<GstSample> takeSample() { return std::exchange(m_sample, nullptr); }
     const GstAudioInfo* info() const LIFETIME_BOUND { return &m_info; }
 
     bool isInterleaved() const;

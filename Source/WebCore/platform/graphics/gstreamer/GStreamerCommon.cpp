@@ -1250,6 +1250,9 @@ IGNORE_WARNINGS_END
             auto& clientName = getApplicationName();
             g_object_set(object, "client-name", clientName.ascii().data(), nullptr);
         }
+        // TODO(philn): Make this conditional on harness player
+        if (g_object_class_find_property(objectClass, "async"))
+            g_object_set(object, "async", FALSE, "sync", FALSE, nullptr);
     }), role.isolatedCopy().releaseImpl().leakRef(), static_cast<GClosureNotify>([](gpointer userData, GClosure*) {
         if (auto* roleImpl = reinterpret_cast<StringImpl*>(userData))
             roleImpl->deref();

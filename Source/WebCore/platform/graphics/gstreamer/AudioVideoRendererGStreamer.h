@@ -30,6 +30,7 @@
 #include "AudioVideoRenderer.h"
 // #include "PeriodicSharedTimer.h"
 #include "GRefPtrGStreamer.h"
+#include "GStreamerElementHarness.h"
 #include "PlatformDynamicRangeLimit.h"
 #include "ProcessIdentity.h"
 #include "TrackInfo.h"
@@ -266,6 +267,9 @@ private:
     bool canEnqueueSample(TrackIdentifier, const MediaSample&);
     void attachContentKeyToSampleIfNeeded(const MediaSample&);
 #endif
+
+    void handleDecodedAudioSample(GRefPtr<GstSample>&&);
+    RefPtr<GStreamerElementHarness> m_audioSinkHarness;
 
     // Logger
     const Logger& logger() const final { return m_logger.get(); }

@@ -160,6 +160,16 @@ AudioVideoRendererGStreamer::AudioVideoRendererGStreamer(const Logger& originalL
 
     m_videoClock = adoptGRef(gst_system_clock_obtain());
     m_baseTime = gst_clock_get_time(m_videoClock.get());
+
+    GRefPtr<GstElement> audioSink = gst_bin_new(nullptr);
+    auto audioconvert = gst_element_factory_make("audioconvert", nullptr);
+    auto platformAudioSink = createPlatformAudioSink("video"_s);
+    gst_bin_add_many(GST_BIN_CAST(audioSink.get()), audioconvert, platformAudioSink, nullptr);
+    gst_element_link(audioconvert, platformAudioSink);
+    GRefPtr pad = adoptGRef(gst_element_get_static_pad(audioconvert, "sink"));
+    gst_element_add_pad(audioSink.get(), gst_ghost_pad_new("sink", pad.get()));
+    m_audioSinkHarness = GStreamerElementHarness::create(WTF::move(audioSink));
+
     stall();
 }
 
@@ -317,7 +327,8 @@ void AudioVideoRendererGStreamer::ensureAudioDecoder(GstCaps* caps)
             return;
 
         auto& data = downcast<PlatformRawAudioDataGStreamer>(decodedData->data.get());
-        gst_printerrln("Decoded audio samples: %" GST_PTR_FORMAT, gst_sample_get_caps(data.sample().get()));
+        protectedThis->handleDecodedAudioSample(data.takeSample());
+        //gst_printerrln("Decoded audio samples: %" GST_PTR_FORMAT, gst_sample_get_caps(data.sample().get()));
     });
     if (!result) {
         gst_printerrln("Error: %s", result.error().ascii().data());
@@ -1189,6 +1200,11 @@ void AudioVideoRendererGStreamer::pushVideoFrameToCompositor(Ref<VideoFrame>&& f
     gst_clock_id_wait(clockId.get(), &jitter);
 }
 #endif // USE(COORDINATED_GRAPHICS)
+
+void AudioVideoRendererGStreamer::handleDecodedAudioSample(GRefPtr<GstSample>&& sample)
+{
+    m_audioSinkHarness->pushSample(WTF::move(sample));
+}
 
 void AudioVideoRendererGStreamer::setVideoLayerSize(const FloatSize& newSize)
 {
