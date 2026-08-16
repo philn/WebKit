@@ -391,6 +391,11 @@ void AudioVideoRendererGStreamer::enqueueSample(TrackIdentifier trackId, Ref<Med
         encodedFrame.timestamp = GST_BUFFER_DTS(buffer);
         if (GST_BUFFER_DURATION_IS_VALID(buffer))
             encodedFrame.duration = GST_BUFFER_DURATION(buffer);
+
+        {
+            Locker locker { m_enqueuedVideoSamplesLock };
+            m_enqueuedVideoSamples++;
+        }
         m_videoDecoder->decode(WTF::move(encodedFrame));
         m_keyframeNeeded = false;
         //     if (RefPtr videoRenderer = m_videoRenderer; videoRenderer && isEnabledVideoTrackId(trackId)) {
@@ -425,8 +430,12 @@ void AudioVideoRendererGStreamer::enqueueSample(TrackIdentifier trackId, Ref<Med
         if (GST_BUFFER_DURATION_IS_VALID(buffer))
             encodedData.duration = GST_BUFFER_DURATION(buffer);
 
-        m_audioDecoder->decode(WTF::move(encodedData));
+        {
+            Locker locker { m_enqueuedAudioSamplesLock };
+            m_enqueuedAudioSamples++;
+        }
 
+        m_audioDecoder->decode(WTF::move(encodedData));
         break;
     }
     default:
@@ -442,13 +451,19 @@ bool AudioVideoRendererGStreamer::isReadyForMoreSamples(TrackIdentifier trackId)
         return false;
 
     switch (*type) {
-    case TrackType::Video:
-        return true;
+    case TrackType::Video: {
+        Locker locker { m_enqueuedVideoSamplesLock };
+        return m_enqueuedVideoSamples < 30;
+        //return true;
         //return m_readyToRequestVideoData && isEnabledVideoTrackId(trackId); // && protect(m_videoRenderer)->isReadyForMoreMediaData();
-    case TrackType::Audio:
+    }
+    case TrackType::Audio: {
         // if (RetainPtr audioRenderer = audioRendererFor(trackId))
         //     return audioTrackPropertiesFor(trackId).readyToRequestAudioData && [audioRenderer isReadyForMoreMediaData];
-        return true;
+        // return true;
+        Locker locker { m_enqueuedAudioSamplesLock };
+        return m_enqueuedAudioSamples < 10;
+    }
     default:
         ASSERT_NOT_REACHED();
         return false;
@@ -468,7 +483,7 @@ Ref<AudioVideoRenderer::RequestPromise> AudioVideoRendererGStreamer::requestMedi
     case TrackType::Video:
         // ASSERT(m_videoRenderer);
         // if (RefPtr videoRenderer = m_videoRenderer) {
-        //     m_requestVideoPromise.emplace(PlatformMediaError::Cancelled);
+        // m_requestVideoPromise.emplace(PlatformMediaError::Cancelled);
         //     videoRenderer->requestMediaDataWhenReady([trackId, weakThis = ThreadSafeWeakPtr { *this }] {
         //         RefPtr protectedThis = weakThis.get();
         //         if (!protectedThis)
@@ -482,9 +497,12 @@ Ref<AudioVideoRenderer::RequestPromise> AudioVideoRendererGStreamer::requestMedi
         //         if (auto existingPromise = std::exchange(protectedThis->m_requestVideoPromise, std::nullopt))
         //             existingPromise->resolve(trackId);
         //     });
-        //     return m_requestVideoPromise->promise();
         // }
-        return RequestPromise::createAndResolve(trackId);
+        if (!m_isPrerolled)
+            return RequestPromise::createAndResolve(trackId);
+        m_requestVideoPromise.emplace(PlatformMediaError::Cancelled);
+        m_videoTrackId = trackId;
+        return m_requestVideoPromise->promise();
         break;
     case TrackType::Audio:
         // if (RetainPtr audioRenderer = audioRendererFor(trackId)) {
@@ -603,6 +621,7 @@ void AudioVideoRendererGStreamer::play(std::optional<MonotonicTime> hostTime)
 {
     ALWAYS_LOG(LOGIDENTIFIER, "m_rate: ", m_rate, " seeking: ", seeking());
     m_isPlaying = true;
+    gst_printerrln("play");
     if (!seeking())
         setSynchronizerRate(m_rate, hostTime);
 }
@@ -611,6 +630,8 @@ void AudioVideoRendererGStreamer::pause(std::optional<MonotonicTime> hostTime)
 {
     ALWAYS_LOG(LOGIDENTIFIER, "m_rate: ", m_rate);
     m_isPlaying = false;
+    gst_printerrln("pause");
+
     // Capture current time to prevent time going backwards after resume.
     // The AVSampleBufferRenderSynchronizer can briefly report earlier times
     // during playback resumption due to timing jitter.
@@ -624,6 +645,13 @@ void AudioVideoRendererGStreamer::pause(std::optional<MonotonicTime> hostTime)
 bool AudioVideoRendererGStreamer::paused() const
 {
     return !m_isPlaying;
+}
+
+bool AudioVideoRendererGStreamer::hasPrerolled()
+{
+    // Locker locker { m_enqueuedVideoSamplesLock };
+    // return m_enqueuedVideoSamples > 0;
+    return m_isPrerolled;
 }
 
 bool AudioVideoRendererGStreamer::timeIsProgressing() const
@@ -1176,6 +1204,16 @@ void AudioVideoRendererGStreamer::pushVideoFrameToCompositor(Ref<VideoFrame>&& f
     // if (!isDuplicateSample)
     //     ++m_sampleCount;
 
+    {
+        Locker locker { m_enqueuedVideoSamplesLock };
+        if (m_enqueuedVideoSamples) [[likely]]
+            m_enqueuedVideoSamples--;
+        if (m_enqueuedVideoSamples < 30) {
+            if (auto existingPromise = std::exchange(m_requestVideoPromise, std::nullopt))
+                existingPromise->resolve(*m_videoTrackId);
+        }
+    }
+
     Ref gstFrame = downcast<VideoFrameGStreamer>(frame.leakRef());
     auto time = gstFrame->presentationTime();
 
@@ -1183,6 +1221,9 @@ void AudioVideoRendererGStreamer::pushVideoFrameToCompositor(Ref<VideoFrame>&& f
         GST_WARNING("Trying to render buffer with invalid PTS, skipping");
         return;
     }
+
+    // gst_printerrln("Push video frame to compositor");
+    m_isPrerolled = true;
 
     m_currentTime = time;
     // m_contentsBufferProxy->setDisplayBuffer(CoordinatedPlatformLayerBufferVideo::create(WTF::move(frame), m_videoDecoderPlatform, !m_isUsingFallbackVideoSink, m_textureMapperFlags));
@@ -1203,6 +1244,12 @@ void AudioVideoRendererGStreamer::pushVideoFrameToCompositor(Ref<VideoFrame>&& f
 
 void AudioVideoRendererGStreamer::handleDecodedAudioSample(GRefPtr<GstSample>&& sample)
 {
+    {
+        Locker locker { m_enqueuedAudioSamplesLock };
+        if (m_enqueuedAudioSamples) [[likely]]
+            m_enqueuedAudioSamples--;
+    }
+
     m_audioSinkHarness->pushSample(WTF::move(sample));
 }
 

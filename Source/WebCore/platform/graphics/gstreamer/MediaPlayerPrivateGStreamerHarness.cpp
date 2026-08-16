@@ -103,6 +103,7 @@ MediaPlayerPrivateGStreamerHarness::MediaPlayerPrivateGStreamerHarness(MediaPlay
     , m_stallRequest(NativePromiseRequest::create())
     , m_playerIdentifier(MediaPlayerIdentifier::generate())
     , m_renderer(createRenderer(*this, player.clientIdentifier(), m_playerIdentifier))
+    //, m_runningQueue(WorkQueue::mainSingleton())
     , m_runningQueue(m_appendQueue.get())
 {
     initializeDebugCategory();
@@ -478,6 +479,7 @@ void MediaPlayerPrivateGStreamerHarness::prepareToPlay()
 void MediaPlayerPrivateGStreamerHarness::play()
 {
     assertIsMainThread();
+    gst_printerrln("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     ALWAYS_LOG(LOGIDENTIFIER);
     playInternal();
 }
@@ -513,11 +515,14 @@ bool MediaPlayerPrivateGStreamerHarness::pauseAtHostTime(const MonotonicTime& ho
 void MediaPlayerPrivateGStreamerHarness::playInternal(std::optional<MonotonicTime> hostTime)
 {
     assertIsMainThread();
+    gst_printerrln("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     ALWAYS_LOG(LOGIDENTIFIER);
     ensureOnRunningQueue([weakThis = ThreadSafeWeakPtr { *this }, hostTime] {
+        gst_printerrln("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         RefPtr protectedThis = weakThis.get();
         if (!protectedThis)
             return;
+        gst_printerrln("%s line %d", __PRETTY_FUNCTION__, __LINE__);
         protectedThis->flushVideoIfNeeded();
         protectedThis->m_renderer->play(hostTime);
         if (!protectedThis->shouldBePlaying())
@@ -994,6 +999,7 @@ void MediaPlayerPrivateGStreamerHarness::setHasAvailableVideoFrame(bool hasAvail
     if (!m_readyStateIsWaitingForAvailableFrame)
         return;
 
+    gst_printerrln("%s line %d", __PRETTY_FUNCTION__, __LINE__);
     m_readyStateIsWaitingForAvailableFrame = false;
     if (RefPtr player = m_player.get())
         player->readyStateChanged();
@@ -1070,6 +1076,7 @@ void MediaPlayerPrivateGStreamerHarness::setReadyState(MediaPlayer::ReadyState s
     ALWAYS_LOG(LOGIDENTIFIER, state, " waitingOnAvailableVideoFrame: ", waitingOnAvailableFrame);
 
     m_readyStateIsWaitingForAvailableFrame = waitingOnAvailableFrame;
+    gst_printerrln("%s line %d waitingOnAvailableFrame: %d", __PRETTY_FUNCTION__, __LINE__, waitingOnAvailableFrame);
     if (waitingOnAvailableFrame)
         return;
 
@@ -1344,6 +1351,13 @@ void MediaPlayerPrivateGStreamerHarness::provideMediaData(TrackBuffer& trackBuff
     unsigned enqueuedSamples = 0;
 
     while (true) {
+        // auto gstRenderer = downcast<AudioVideoRendererGStreamer>(m_renderer);
+        auto& gstRenderer = static_cast<AudioVideoRendererGStreamer&>(m_renderer.get());
+        // gst_printerrln("paused: %d", m_renderer->paused());
+        if (m_renderer->paused()) {
+            if (gstRenderer.hasPrerolled())
+                continue;
+        }            
         // TODO(phil): make this not always return true, maybe keep track of input buffers count vs output buffers count.
         if (!isReadyForMoreSamples(trackId)) {
             DEBUG_LOG(LOGIDENTIFIER, "bailing early, track id ", trackId, " is not ready for more data");
@@ -1354,6 +1368,7 @@ void MediaPlayerPrivateGStreamerHarness::provideMediaData(TrackBuffer& trackBuff
 
         RefPtr sample = trackBuffer.nextSample();
         if (!sample) {
+            //notifyClientWhenReadyForMoreSamples(trackId);
             GST_TRACE_ID(m_debugId.data(), "Track buffer is empty, no sample left");
             break;
         }
@@ -1879,10 +1894,11 @@ void MediaPlayerPrivateGStreamerHarness::monitorReadyState()
 
 void MediaPlayerPrivateGStreamerHarness::ensureOnRunningQueue(Function<void()>&& function)
 {
-    if (runningQueue().isCurrent())
+    // FIXME(phil): This looks deadlock-prone...
+    // if (runningQueue().isCurrent())
         function();
-    else
-        runningQueue().dispatch(WTF::move(function));
+    // else
+    //     runningQueue().dispatch(WTF::move(function));
 }
 
 #undef GST_CAT_DEFAULT

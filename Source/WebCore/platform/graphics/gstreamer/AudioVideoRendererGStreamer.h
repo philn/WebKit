@@ -163,6 +163,8 @@ public:
     // Ref<GenericPromise> setVideoTarget(const PlatformVideoTarget&) final;
     // void isInFullscreenOrPictureInPictureChanged(bool) final;
 
+    bool hasPrerolled();
+
 private:
     WEBCORE_EXPORT AudioVideoRendererGStreamer(const Logger&, uint64_t, std::unique_ptr<SharedTimebase>&&);
 
@@ -437,6 +439,15 @@ private:
 
     GRefPtr<GstClock> m_videoClock;
     GstClockTime m_baseTime;
+
+    Lock m_enqueuedVideoSamplesLock;
+    unsigned m_enqueuedVideoSamples WTF_GUARDED_BY_LOCK(m_enqueuedVideoSamplesLock) { 0 };
+    Lock m_enqueuedAudioSamplesLock;
+    unsigned m_enqueuedAudioSamples WTF_GUARDED_BY_LOCK(m_enqueuedAudioSamplesLock) { 0 };
+
+    std::optional<TrackIdentifier> m_videoTrackId;
+
+    bool m_isPrerolled { false };
 
     CString m_debugId;
 };
