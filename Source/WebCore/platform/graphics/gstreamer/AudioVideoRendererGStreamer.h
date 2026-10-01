@@ -47,6 +47,7 @@
 #include <wtf/ThreadSafeWeakPtr.h>
 
 #if USE(COORDINATED_GRAPHICS)
+#include "CoordinatedPlatformLayerBufferProxy.h"
 #include "CoordinatedPlatformLayerBufferVideo.h"
 #endif
 
@@ -129,6 +130,11 @@ public:
 #if HAVE(AUDIO_OUTPUT_DEVICE_UNIQUE_ID)
     void setOutputDeviceId(const String&) final;
     void setOutputDeviceIdOnRenderer(AVSampleBufferAudioRenderer *);
+#endif
+
+#if USE(COORDINATED_GRAPHICS)
+    void setPlatformLayerBufferProxy(Ref<CoordinatedPlatformLayerBufferProxy>&&);
+    RefPtr<CoordinatedPlatformLayerBufferProxy> platformLayerBufferProxy() const { return m_contentsBufferProxy; }
 #endif
 
     // VideoInterface
@@ -449,7 +455,7 @@ private:
 
     bool m_isPrerolled { false };
 
-    CString m_debugId;
+    ASCIICString m_debugId;
 };
 
 } // namespace WebCore

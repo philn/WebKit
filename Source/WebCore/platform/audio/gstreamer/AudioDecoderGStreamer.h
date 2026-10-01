@@ -23,6 +23,8 @@
 
 #include "AudioDecoder.h"
 #include "GRefPtrGStreamer.h"
+
+#include <expected>
 #include <wtf/TZoneMalloc.h>
 
 namespace WebCore {
@@ -34,7 +36,7 @@ class GStreamerAudioDecoder final : public AudioDecoder {
 
 public:
     static void create(const String& codecName, const Config&, CreateCallback&&, OutputCallback&&);
-    static Expected<Ref<GStreamerAudioDecoder>, String> create(const String& codecName, const Config&, OutputCallback&&);
+    static std::expected<Ref<GStreamerAudioDecoder>, String> create(const String& codecName, const Config&, OutputCallback&&);
 
     ~GStreamerAudioDecoder();
 

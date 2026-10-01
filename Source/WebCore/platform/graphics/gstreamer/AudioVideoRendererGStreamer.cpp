@@ -25,6 +25,7 @@
 
 #include "config.h"
 #include "AudioVideoRendererGStreamer.h"
+#include "ImageOrientation.h"
 
 #if ENABLE(VIDEO) && USE(GSTREAMER)
 
@@ -48,6 +49,7 @@
 // #include "PeriodicSharedTimer.h"
 // #include "PixelBufferConformerCV.h"
 // #include "PlatformDynamicRangeLimitCocoa.h"
+#include "SharedBuffer.h""
 #include "SharedTimebase.h"
 // #include "SpatialAudioExperienceHelper.h"
 #include "TextTrackRepresentation.h"
@@ -154,9 +156,6 @@ AudioVideoRendererGStreamer::AudioVideoRendererGStreamer(const Logger& originalL
     //         m_isSynchronizerSeeking = false;
     //         maybeCompleteSeek();
     //     }];
-#if USE(COORDINATED_GRAPHICS)
-    m_contentsBufferProxy = CoordinatedPlatformLayerBufferProxy::create();
-#endif
 
     m_videoClock = adoptGRef(gst_system_clock_obtain());
     m_baseTime = gst_clock_get_time(m_videoClock.get());
@@ -354,6 +353,8 @@ void AudioVideoRendererGStreamer::enqueueSample(TrackIdentifier trackId, Ref<Med
 #endif
 
     GRefPtr gstSample = sample->platformSample().gstSample();
+    auto buffer = gst_sample_get_buffer(gstSample.get());
+    auto mappedBuffer = GstMappedOwnedBuffer::create(buffer);
     switch (*type) {
     case TrackType::Video: {
     //     ASSERT(mediaType == TrackType::Video);
@@ -381,14 +382,7 @@ void AudioVideoRendererGStreamer::enqueueSample(TrackIdentifier trackId, Ref<Med
         }
         ensureVideoDecoder(gst_sample_get_caps(gstSample.get()));
 
-        VideoDecoder::EncodedFrame encodedFrame;
-        encodedFrame.isKeyFrame = sample->isSync();
-
-        auto buffer = gst_sample_get_buffer(gstSample.get());
-        GstMappedBuffer mappedBuffer(buffer, GST_MAP_READ);
-        encodedFrame.data = mappedBuffer.span<uint8_t>();
-
-        encodedFrame.timestamp = GST_BUFFER_DTS(buffer);
+        VideoEncodedData encodedFrame { SharedBuffer::create(*mappedBuffer), sample->isSync(), static_cast<int64_t>(GST_BUFFER_DTS(buffer)), { } };
         if (GST_BUFFER_DURATION_IS_VALID(buffer))
             encodedFrame.duration = GST_BUFFER_DURATION(buffer);
 
@@ -420,13 +414,7 @@ void AudioVideoRendererGStreamer::enqueueSample(TrackIdentifier trackId, Ref<Med
         //     // }
         ensureAudioDecoder(gst_sample_get_caps(gstSample.get()));
 
-        AudioDecoder::EncodedData encodedData;
-
-        auto buffer = gst_sample_get_buffer(gstSample.get());
-        GstMappedBuffer mappedBuffer(buffer, GST_MAP_READ);
-        encodedData.data = mappedBuffer.span<uint8_t>();
-
-        encodedData.timestamp = GST_BUFFER_DTS(buffer);
+        AudioEncodedData encodedData { SharedBuffer::create(*mappedBuffer), sample->isSync(), static_cast<int64_t>(GST_BUFFER_DTS(buffer)), { } };
         if (GST_BUFFER_DURATION_IS_VALID(buffer))
             encodedData.duration = GST_BUFFER_DURATION(buffer);
 
@@ -1187,14 +1175,15 @@ std::optional<VideoPlaybackQualityMetrics> AudioVideoRendererGStreamer::videoPla
 
 PlatformLayer* AudioVideoRendererGStreamer::platformVideoLayer() const
 {
-#if USE(COORDINATED_GRAPHICS)
-    return m_contentsBufferProxy.get();
-#else
     return nullptr;
-#endif
 }
 
 #if USE(COORDINATED_GRAPHICS)
+void AudioVideoRendererGStreamer::setPlatformLayerBufferProxy(Ref<CoordinatedPlatformLayerBufferProxy>&& proxy)
+{
+    m_contentsBufferProxy = WTF::move(proxy);
+}
+
 void AudioVideoRendererGStreamer::pushVideoFrameToCompositor(Ref<VideoFrame>&& frame, bool isDuplicateSample)
 {
 
@@ -1214,6 +1203,10 @@ void AudioVideoRendererGStreamer::pushVideoFrameToCompositor(Ref<VideoFrame>&& f
         }
     }
 
+    RefPtr proxy = m_contentsBufferProxy;
+    if (!proxy || !proxy->isValid())
+        return;
+
     Ref gstFrame = downcast<VideoFrameGStreamer>(frame.leakRef());
     auto time = gstFrame->presentationTime();
 
@@ -1227,7 +1220,10 @@ void AudioVideoRendererGStreamer::pushVideoFrameToCompositor(Ref<VideoFrame>&& f
 
     m_currentTime = time;
     // m_contentsBufferProxy->setDisplayBuffer(CoordinatedPlatformLayerBufferVideo::create(WTF::move(frame), m_videoDecoderPlatform, !m_isUsingFallbackVideoSink, m_textureMapperFlags));
-    m_contentsBufferProxy->setDisplayBuffer(CoordinatedPlatformLayerBufferVideo::create(WTF::move(gstFrame), { }, true, { }));
+    // TODO: Handle orientation
+    auto orientation = ImageOrientation::Orientation::None;
+    auto buffer = CoordinatedPlatformLayerBufferVideo::create(WTF::move(gstFrame), {}, true, orientation, proxy->threadSafeGrContext());
+    m_contentsBufferProxy->setDisplayBuffer(WTF::move(buffer));
 
     if (!m_hasAvailableVideoFrame)
         setHasAvailableVideoFrame(true);

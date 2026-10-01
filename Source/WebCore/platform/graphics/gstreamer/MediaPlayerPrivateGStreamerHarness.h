@@ -161,7 +161,7 @@ private:
     void paint(GraphicsContext&, const FloatRect&) final;
     void paintCurrentFrameInContext(GraphicsContext&, const FloatRect&) final;
     RefPtr<VideoFrame> videoFrameForCurrentTime() final;
-    DestinationColorSpace colorSpace() final;
+    ColorSpace colorSpace() final;
     Ref<BitmapImagePromise> bitmapImageForCurrentTime() final;
 
     void setNaturalSize(FloatSize);
@@ -180,6 +180,8 @@ private:
     void setPresentationSize(const IntSize&) final;
 #if USE(COORDINATED_GRAPHICS)
     bool supportsAcceleratedRendering() const final { return true; }
+    void setPlatformLayerBufferProxy(Ref<CoordinatedPlatformLayerBufferProxy>&&) override;
+    RefPtr<CoordinatedPlatformLayerBufferProxy> platformLayerBufferProxy() const override;
 #endif
     void acceleratedRenderingStateChanged() final;
 
@@ -352,7 +354,7 @@ private:
     const Ref<AudioVideoRenderer> m_renderer;
     const Ref<WorkQueue> m_runningQueue;
 
-    CString m_debugId;
+    ASCIICString m_debugId;
 };
 
 } // namespace WebCore

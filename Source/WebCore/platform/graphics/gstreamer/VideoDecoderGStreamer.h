@@ -24,6 +24,7 @@
 #include "GRefPtrGStreamer.h"
 #include "VideoDecoder.h"
 
+#include <expected>
 #include <wtf/TZoneMalloc.h>
 
 namespace WebCore {
@@ -35,15 +36,15 @@ class GStreamerVideoDecoder final : public VideoDecoder {
 
 public:
     static void create(const String& codecName, const Config&, CreateCallback&&, OutputCallback&&);
-    static Expected<Ref<GStreamerVideoDecoder>, String> create(const String& codecName, const Config&, OutputCallback&&);
+    static std::expected<Ref<GStreamerVideoDecoder>, String> create(const String& codecName, const Config&, OutputCallback&&);
 
     GStreamerVideoDecoder(const String& codecName, const Config&, OutputCallback&&, GRefPtr<GstElement>&&);
     ~GStreamerVideoDecoder();
 
     Ref<DecodePromise> decode(VideoEncodedData&&) final;
+    Ref<GenericPromise> flush() final;
 
 private:
-    Ref<GenericPromise> flush() final;
 
 private:
     void reset() final;

@@ -96,7 +96,7 @@ void GStreamerAudioDecoder::create(const String& codecName, const Config& config
     });
 }
 
-Expected<Ref<GStreamerAudioDecoder>, String> GStreamerAudioDecoder::create(const String& codecName, const Config& config, OutputCallback&& outputCallback)
+std::expected<Ref<GStreamerAudioDecoder>, String> GStreamerAudioDecoder::create(const String& codecName, const Config& config, OutputCallback&& outputCallback)
 {
     static std::once_flag debugRegisteredFlag;
     std::call_once(debugRegisteredFlag, [] {

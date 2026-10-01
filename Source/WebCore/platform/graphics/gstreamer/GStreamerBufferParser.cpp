@@ -78,7 +78,7 @@ GStreamerBufferParser::GStreamerBufferParser()
     initializeParserHarness();
 }
 
-Expected<void, PlatformMediaError> GStreamerBufferParser::appendData(Ref<const SharedBuffer>&& data)
+std::expected<void, PlatformMediaError> GStreamerBufferParser::appendData(Ref<const SharedBuffer>&& data)
 {
     GRefPtr buffer = wrapSpanData(data->span());
     pushNewBuffer(WTF::move(buffer));
@@ -329,7 +329,7 @@ void GStreamerBufferParser::handleSample(GRefPtr<GstSample>&& outputSample)
     auto mediaSample = MediaSampleGStreamer::create(WTF::move(outputSample), presentationSize, trackId);
     GST_TRACE_OBJECT(m_harness->element(), "Parsed sample, trackId=%" PRIu64 " PTS=%" GST_TIME_FORMAT " DUR=%s %s",
         mediaSample->trackID(), GST_TIME_ARGS(toGstClockTime(mediaSample->presentationTime())),
-        mediaSample->duration().toString().utf8().data(), videoDebugInfo.ascii().data());
+        mediaSample->duration().toString().utf8(), videoDebugInfo.ascii());
     m_callOnClientThreadCallback([this, protectedThis = Ref { *this }, sample = WTF::move(mediaSample), trackId]() mutable {
         if (m_didProvideMediaDataCallback)
             m_didProvideMediaDataCallback(WTF::move(sample), (uint64_t)trackId, emptyString());

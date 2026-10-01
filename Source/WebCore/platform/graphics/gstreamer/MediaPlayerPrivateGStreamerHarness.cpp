@@ -157,6 +157,20 @@ MediaPlayerPrivateGStreamerHarness::~MediaPlayerPrivateGStreamerHarness() WTF_IG
     cancelLoad();
 }
 
+#if USE(COORDINATED_GRAPHICS)
+void MediaPlayerPrivateGStreamerHarness::setPlatformLayerBufferProxy(Ref<CoordinatedPlatformLayerBufferProxy>&& proxy)
+{
+    auto& gstRenderer = static_cast<AudioVideoRendererGStreamer&>(m_renderer.get());
+    gstRenderer.setPlatformLayerBufferProxy(WTF::move(proxy));
+}
+
+RefPtr<CoordinatedPlatformLayerBufferProxy> MediaPlayerPrivateGStreamerHarness::platformLayerBufferProxy() const
+{
+    auto& gstRenderer = static_cast<AudioVideoRendererGStreamer&>(m_renderer.get());
+    return gstRenderer.platformLayerBufferProxy();
+}
+#endif
+
 void MediaPlayerPrivateGStreamerHarness::getSupportedTypes(HashSet<String>& types)
 {
     GStreamerRegistryScanner::getSupportedDecodingTypes(types);
@@ -184,14 +198,14 @@ MediaPlayer::SupportsType MediaPlayerPrivateGStreamerHarness::supportsType(const
     if (!ensureGStreamerInitialized())
         return result;
 
-    GST_DEBUG("Checking mime-type \"%s\"", parameters.type.raw().utf8().data());
+    GST_DEBUG("Checking mime-type \"%s\"", parameters.type.raw().utf8());
 
     registerWebKitGStreamerElements();
 
     auto& gstRegistryScanner = GStreamerRegistryScanner::singleton();
     result = gstRegistryScanner.isContentTypeSupported(GStreamerRegistryScanner::Configuration::Decoding, parameters.type, parameters.contentTypesRequiringHardwareSupport);
 
-    GST_DEBUG("Supported: %s", convertEnumerationToString(result).utf8().data());
+    GST_DEBUG("Supported: %s", convertEnumerationToString(result).utf8());
     return result;
 }
 
@@ -255,7 +269,7 @@ void MediaPlayerPrivateGStreamerHarness::load(const URL& url, const LoadOptions&
 {
     assertIsMainThread();
     ALWAYS_LOG(LOGIDENTIFIER);
-    GST_DEBUG_ID(m_debugId.data(), "Loading %s", url.string().utf8().data());
+    GST_DEBUG_ID(m_debugId.data(), "Loading %s", url.string().utf8());
     setReadyState(MediaPlayer::ReadyState::HaveNothing);
 
     m_assetURL = url;
@@ -922,12 +936,12 @@ RefPtr<VideoFrame> MediaPlayerPrivateGStreamerHarness::videoFrameForCurrentTime(
     return m_lastVideoFrame;
 }
 
-DestinationColorSpace MediaPlayerPrivateGStreamerHarness::colorSpace()
+ColorSpace MediaPlayerPrivateGStreamerHarness::colorSpace()
 {
     assertIsMainThread();
     updateLastImage();
     RefPtr lastImage = m_lastImage;
-    return lastImage ? lastImage->colorSpace() : DestinationColorSpace::SRGB();
+    return lastImage ? lastImage->colorSpace() : ColorSpace::SRGB();
 }
 
 Ref<MediaPlayer::BitmapImagePromise> MediaPlayerPrivateGStreamerHarness::bitmapImageForCurrentTime()

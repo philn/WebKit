@@ -27,7 +27,7 @@
 #include "MediaSampleGStreamer.h"
 #include "PlatformMediaError.h"
 #include "SourceBufferPrivateClient.h"
-#include <wtf/Expected.h>
+#include <expected>
 #include <wtf/RefCounted.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/ThreadSafeWeakPtr.h>
@@ -59,7 +59,7 @@ public:
 
     // appendData will be called on the SourceBufferPrivateAVFObjC data parser queue.
     // Other methods will be called on the main thread, but only once appendData has returned.
-    Expected<void, PlatformMediaError> appendData(Ref<const SharedBuffer>&&);
+    std::expected<void, PlatformMediaError> appendData(Ref<const SharedBuffer>&&);
     void flushPendingMediaData();
     void resetParserState();
     void invalidate();

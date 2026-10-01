@@ -112,7 +112,7 @@ void GStreamerVideoDecoder::create(const String& codecName, const Config& config
     });
 }
 
-Expected<Ref<GStreamerVideoDecoder>, String> GStreamerVideoDecoder::create(const String& codecName, const Config& config, OutputCallback&& outputCallback)
+std::expected<Ref<GStreamerVideoDecoder>, String> GStreamerVideoDecoder::create(const String& codecName, const Config& config, OutputCallback&& outputCallback)
 {
     static std::once_flag debugRegisteredFlag;
     std::call_once(debugRegisteredFlag, [] {
