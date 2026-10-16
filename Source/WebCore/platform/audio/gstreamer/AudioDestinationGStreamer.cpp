@@ -23,6 +23,7 @@
 
 #include "AudioDestinationGStreamer.h"
 
+#include "AudioDestinationHarnessGStreamer.h"
 #include "AudioSourceProvider.h"
 #include "AudioUtilities.h"
 #include "GStreamerCommon.h"
@@ -109,6 +110,10 @@ Ref<AudioDestination> AudioDestination::create(const CreationOptions& options)
     // FIXME: Add support for local/live audio input.
     if (options.numberOfInputChannels)
         WTFLogAlways("AudioDestination::create(%u, %u, %f) - unhandled input channels", options.numberOfInputChannels, options.numberOfOutputChannels, options.sampleRate);
+
+    auto useHarness = StringView::fromLatin1(g_getenv("WEBKIT_GST_USE_WEBAUDIO_HARNESS"));
+    if (useHarness == "1"_s)
+        return adoptRef(*new AudioDestinationHarnessGStreamer(options));
 
     return adoptRef(*new AudioDestinationGStreamer(options));
 }
