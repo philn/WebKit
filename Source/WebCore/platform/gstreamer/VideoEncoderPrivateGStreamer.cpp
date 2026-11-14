@@ -407,7 +407,55 @@ static bool videoEncoderSetEncoder(WebKitVideoEncoder* self, EncoderId encoderId
     }
 
     gst_bin_sync_children_states(bin);
+
     dumpBinToDotFile(bin, "configured-encoder"_s);
+
+#ifndef GST_DISABLE_GST_DEBUG
+    // Add a probe to check actual encoder output caps
+    auto encoderSrcPad = adoptGRef(gst_element_get_static_pad(priv->encoder.get(), "src"));
+    if (encoderSrcPad) {
+        gst_pad_add_probe(encoderSrcPad.get(), GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, [](GstPad*, GstPadProbeInfo* info, gpointer userData) -> GstPadProbeReturn {
+            if (GST_EVENT_TYPE(GST_PAD_PROBE_INFO_EVENT(info)) != GST_EVENT_CAPS)
+                return GST_PAD_PROBE_OK;
+
+            GstCaps* caps;
+            gst_event_parse_caps(GST_PAD_PROBE_INFO_EVENT(info), &caps);
+
+            if (!caps) [[unlikely]]
+                return GST_PAD_PROBE_OK;
+
+            auto structure = gst_caps_get_structure(caps, 0);
+            if (!gst_structure_has_name(structure, "video/x-h264"))
+                return GST_PAD_PROBE_OK;
+
+            auto self = WEBKIT_VIDEO_ENCODER(userData);
+            auto actualProfile = gstStructureGetString(structure, "profile"_s);
+            auto actualLevel = gstStructureGetString(structure, "level"_s);
+            GST_INFO_OBJECT(self, "Encoder actual output - profile: %s, level: %s",
+                            actualProfile ? actualProfile.utf8() : "none",
+                            actualLevel ? actualLevel.utf8() : "none");
+            GST_INFO_OBJECT(self, "### Encoder output - profile: %s",
+                            actualLevel ? actualLevel.utf8() : "none");
+
+            if (!self->priv->encodedCaps) [[unlikely]]
+                return GST_PAD_PROBE_OK;
+
+            // Compare with requested caps
+            auto requestedStructure = gst_caps_get_structure(self->priv->encodedCaps.get(), 0);
+            auto requestedProfile = gstStructureGetString(requestedStructure, "profile"_s);
+            auto requestedLevel = gstStructureGetString(requestedStructure, "level"_s);
+
+            if (requestedLevel != actualLevel)
+                GST_WARNING_OBJECT(self, "Level mismatch! Requested: %s, Actual: %s", requestedLevel.utf8(), actualLevel.utf8());
+
+            if (requestedProfile != actualProfile)
+                GST_WARNING_OBJECT(self, "Profile mismatch! Requested: %s, Actual: %s", requestedProfile.utf8(), actualProfile.utf8());
+
+            return GST_PAD_PROBE_OK;
+        }, self, nullptr);
+    }
+#endif
+
     videoEncoderSetBitrate(self, priv->bitrate);
     return true;
 }
@@ -590,6 +638,90 @@ static void videoEncoderConstructed(GObject* encoder)
             }
         }
 
+        if (GST_EVENT_TYPE(event) == GST_EVENT_CAPS) {
+            GstCaps* caps;
+            gst_event_parse_caps(event, &caps);
+            GST_DEBUG("### caps event: %" GST_PTR_FORMAT, caps);
+            auto self = WEBKIT_VIDEO_ENCODER(parent);
+
+            // Check H.264 level requirements when we have actual stream parameters
+            if (caps && gst_caps_get_size(caps) && self->priv->encodedCaps) {
+                auto structure = gst_caps_get_structure(caps, 0);
+                auto width = gstStructureGet<int>(structure, "width"_s);
+                auto height = gstStructureGet<int>(structure, "height"_s);
+
+                // Extract framerate
+                int fpsNumerator = 0, fpsDenominator = 0;
+                if (width && height && gst_structure_get_fraction(structure, "framerate", &fpsNumerator, &fpsDenominator) && fpsDenominator > 0) {
+                    double fps;
+                    gst_util_fraction_to_double(fpsNumerator, fpsDenominator, &fps);
+
+                    // Check if this is H.264 and has a level specified
+                    auto encodedStructure = gst_caps_get_structure(self->priv->encodedCaps.get(), 0);
+                    if (encodedStructure && gst_structure_has_name(encodedStructure, "video/x-h264")) {
+                        auto level = gstStructureGetString(encodedStructure, "level"_s);
+                        if (level && fps > 0) {
+                            GStreamerCodecUtilities::H264LevelRequirements requirements;
+                            auto adjustedSize = GStreamerCodecUtilities::adjustToH264LevelConstraints(
+                                level, *width, *height, fps, requirements);
+
+                            if (!adjustedSize) {
+                                GST_WARNING_OBJECT(self, "Video stream %dx%d @ %.2f fps exceeds H.264 level %s requirements. "
+                                    "Max frame size: %u MBs, Max MB/s: %u, Max bitrate: %u kbps",
+                                                   *width, *height, fps, level.utf8(),
+                                    requirements.maxFrameSizeInMacroblocks,
+                                    requirements.maxMacroblocksPerSecond,
+                                    requirements.maxBitrate);
+                            } else if (adjustedSize->width() != static_cast<int>(*width) || adjustedSize->height() != static_cast<int>(*height)) {
+                                GST_INFO_OBJECT(self, "Video stream %dx%d @ %.2f fps requires adjustment to %dx%d to fit H.264 level %s",
+                                                *width, *height, fps, adjustedSize->width(), adjustedSize->height(), level.utf8());
+
+                                // Find and update the input capsfilter with adjusted dimensions
+                                auto inputCapsFilter = adoptGRef(gst_bin_get_by_name(GST_BIN(self), "input-capsfilter"));
+                                if (inputCapsFilter) {
+                                    auto newCaps = adoptGRef(gst_caps_new_simple("video/x-raw",
+                                        "width", G_TYPE_INT, adjustedSize->width(),
+                                        "height", G_TYPE_INT, adjustedSize->height(),
+                                        nullptr));
+                                    g_object_set(inputCapsFilter.get(), "caps", newCaps.get(), nullptr);
+                                    GST_DEBUG_OBJECT(self, "Updated input-capsfilter to %dx%d for H.264 level %s",
+                                                     adjustedSize->width(), adjustedSize->height(), level.utf8());
+                                }
+                            }
+
+                            // Check if bitrate exceeds level constraints
+                            if (self->priv->bitrate > requirements.maxBitrate) {
+                                GST_WARNING_OBJECT(self, "Bitrate %u kbps exceeds H.264 level %s maximum of %u kbps. "
+                                    "Encoder may choose a higher level automatically.",
+                                                   self->priv->bitrate, level.utf8(), requirements.maxBitrate);
+                            }
+                        }
+                    }
+                }
+            }
+
+            auto scaleResolutionDownBy = self->priv->scaleResolutionDownBy;
+            if (scaleResolutionDownBy > 1.0) {
+                GST_DEBUG_OBJECT(self, "Applying scale factor: %f", scaleResolutionDownBy);
+                //GstCaps* caps;
+                //gst_event_parse_caps(event, &caps);
+                if (caps && gst_caps_get_size(caps)) {
+                    auto writableCaps = adoptGRef(gst_caps_copy(caps));
+                    auto structure = gst_caps_get_structure(writableCaps.get(), 0);
+                    auto width = gstStructureGet<int>(structure, "width"_s);
+                    auto height = gstStructureGet<int>(structure, "height"_s);
+                    if (width && height) {
+                        int newWidth = *width / scaleResolutionDownBy;
+                        int newHeight = *height / scaleResolutionDownBy;
+                        gst_structure_set(structure, "width", G_TYPE_INT, newWidth, "height", G_TYPE_INT, newHeight, nullptr);
+                        GST_DEBUG_OBJECT(self, "Modified caps: %" GST_PTR_FORMAT, writableCaps.get());
+                        auto newCapsEvent = adoptGRef(gst_event_new_caps(writableCaps.get()));
+                        gst_event_replace(&event, newCapsEvent.get());
+                    }
+                }
+            }
+        }
+
         return gst_pad_event_default(pad, parent, event);
     }));
     gst_element_add_pad(GST_ELEMENT_CAST(self), sinkPad);
@@ -658,6 +790,7 @@ static void webkit_video_encoder_class_init(WebKitVideoEncoderClass* klass)
         [](WebKitVideoEncoder* self) {
             g_object_set(self->priv->encoder.get(), "key-int-max", 15, "threads", NUMBER_OF_THREADS, "b-adapt", FALSE, "vbv-buf-capacity", 120, nullptr);
             g_object_set(self->priv->parser.get(), "config-interval", 1, nullptr);
+            g_object_set(self->priv->outputCapsFilter.get(), "caps", self->priv->encodedCaps.get(), nullptr);
 
             const auto& encodedCaps = self->priv->encodedCaps;
             if (!gst_caps_is_any(encodedCaps.get()) && !gst_caps_is_empty(encodedCaps.get())) [[likely]] {
